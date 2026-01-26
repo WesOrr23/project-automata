@@ -1,0 +1,24 @@
+{
+  "name": "Strings ending in '01'",
+  "description": "DFA that accepts binary strings ending in '01'",
+  "automaton": {
+    "type": "DFA",
+    "states": [0, 1, 2],
+    "alphabet": ["0", "1"],
+    "transitions": [
+      { "from": 0, "to": [1], "symbol": "0" },
+      { "from": 0, "to": [0], "symbol": "1" },
+      { "from": 1, "to": [1], "symbol": "0" },
+      { "from": 1, "to": [2], "symbol": "1" },
+      { "from": 2, "to": [1], "symbol": "0" },
+      { "from": 2, "to": [0], "symbol": "1" }
+    ],
+    "startState": 0,
+    "acceptStates": [2],
+    "nextStateId": 3
+  },
+  "testCases": {
+    "accept": ["01", "101", "001", "1101", "0101"],
+    "reject": ["", "0", "1", "10", "110", "111"]
+  }
+}

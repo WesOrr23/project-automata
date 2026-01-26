@@ -1,0 +1,59 @@
+{
+  "compilerOptions": {
+    // Compilation target: Output JavaScript that 2020+ browsers understand
+    "target": "ES2020",
+
+    // Ensures class fields work correctly in transpiled code
+    "useDefineForClassFields": true,
+
+    // Available APIs: ES2020 features + browser APIs (DOM, etc.)
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+
+    // Module system: Use modern import/export syntax
+    "module": "ESNext",
+
+    // Skip type-checking library files (faster compilation)
+    "skipLibCheck": true,
+
+    /* Bundler mode - Vite handles module resolution */
+
+    // Let Vite resolve imports (not Node.js rules)
+    "moduleResolution": "bundler",
+
+    // Allow importing .ts files directly (Vite strips extensions)
+    "allowImportingTsExtensions": true,
+
+    // Each file can be compiled independently (required for Vite)
+    "isolatedModules": true,
+
+    // Treat all files as modules even without import/export
+    "moduleDetection": "force",
+
+    // Don't output .js files (Vite handles compilation)
+    "noEmit": true,
+
+    // Transform JSX syntax: <div> → React.createElement calls
+    "jsx": "react-jsx",
+
+    /* Type Safety - Catch bugs early! */
+
+    // Enable ALL strict type checking (highly recommended)
+    "strict": true,
+
+    // Error on unused variables (catches copy-paste mistakes)
+    "noUnusedLocals": true,
+
+    // Error on unused function parameters
+    "noUnusedParameters": true,
+
+    // Error on switch statements missing break/return
+    "noFallthroughCasesInSwitch": true,
+
+    // Treat array/object access as possibly undefined (safer!)
+    // Example: array[0] has type 'T | undefined', not 'T'
+    "noUncheckedIndexedAccess": true
+  },
+
+  // Only compile files in the src/ directory
+  "include": ["src"]
+}
