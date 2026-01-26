@@ -4,7 +4,7 @@
 
 An interactive web-based simulator for deterministic and non-deterministic finite automata (DFA/NFA). This is a learning project built with pair programming approach - no "vibe-coding," everything is intentional and well-structured.
 
-**Current Status**: Iteration 1 in progress - implementation done, under review (engine foundation implemented, all 74 tests passing)
+**Current Status**: Iteration 2 complete - basic visualization working (static DFA rendering with SVG)
 **Development Approach**: Agile iterations with clear deliverables
 **Primary Developer Experience**: Familiar with vanilla HTML/CSS/JS, minimal JavaScript experience, learning React and TypeScript
 
@@ -155,7 +155,7 @@ type UIState = {
 
 ## Agile Development Plan
 
-### Iteration 1: Engine Foundation (DFA Only)
+### Iteration 1: Engine Foundation (DFA Only) ✅ COMPLETE
 **Goal**: Core automaton logic works correctly, testable without UI
 
 **Deliverables**:
@@ -172,14 +172,15 @@ type UIState = {
 5. Implement `simulator.ts` (step, run, accepts)
 6. Write comprehensive unit tests
 
-**Scope Notes**:
-- DFA only (NFA support deferred)
-- No UI components yet
-- Focus on correctness and test coverage
+**Outcome**:
+- ✅ All 74 engine tests passing
+- ✅ DFA operations fully functional
+- ✅ Validation and simulation working correctly
+- ✅ Strong foundation for UI layer
 
 ---
 
-### Iteration 2: Basic Visualization
+### Iteration 2: Basic Visualization ✅ COMPLETE
 **Goal**: Display a DFA on screen (static, no interaction)
 
 **Deliverables**:
@@ -189,22 +190,48 @@ type UIState = {
 - Start state and accept states visually distinct
 
 **Tasks**:
-1. React app scaffold with Vite + TypeScript
-2. Create `sample-dfa.json` in `/data` folder
-3. Define UI types (positions, labels)
-4. Implement `AutomatonCanvas.tsx` (SVG container)
-5. Implement `StateNode.tsx` (render state circles)
-6. Implement `TransitionEdge.tsx` (render arrows with labels)
-7. Load JSON and render automaton
+1. Define UI types (StateUI, AutomatonUI in `src/ui-state/types.ts`)
+2. Implement `StateNode.tsx` (render state circles)
+3. Implement `StartStateArrow.tsx` (arrow pointing to start state)
+4. Implement `TransitionEdge.tsx` (render arrows with labels)
+5. Implement `AutomatonCanvas.tsx` (SVG container, orchestrates rendering)
+6. Create hardcoded sample DFA in `App.tsx` and display
 
-**Scope Notes**:
-- Static visualization (positions hardcoded in JSON or calculated)
-- No editing, no interaction yet
-- Just proving we can display an automaton
+**Outcome**:
+- ✅ SVG-based rendering working
+- ✅ All basic components functional (StateNode, TransitionEdge, StartStateArrow, AutomatonCanvas)
+- ✅ Sample DFA displays correctly (accepts strings ending in "01")
+- ✅ Clean separation between engine and UI layers
+- ✅ Granular prop pattern established for components
+- ⚠️ Known limitations: self-loops render invisibly, manual positioning only (addressed in Iteration 3)
 
 ---
 
-### Iteration 3: Simulation + Visual Feedback
+### Iteration 3: Advanced Visualization (PLANNED)
+**Goal**: Complete visualization foundation with auto-layout and proper rendering for all transition types
+
+**Deliverables**:
+- Automatic graph layout using dagre library
+- Self-loop rendering (curved SVG paths)
+- Curved arrows for bi-directional transitions
+- Better label positioning (avoid overlaps)
+
+**Tasks**:
+1. Install dagre library and create layout module (`src/ui-state/layout.ts`)
+2. Implement self-loop rendering in TransitionEdge component
+3. Add curved arrow support for multiple transitions between same states
+4. Update App.tsx to use auto-layout instead of manual positioning
+5. Create comprehensive sample DFAs demonstrating various layouts
+
+**Scope Notes**:
+- Builds on Iteration 2's rendering foundation
+- Addresses known limitations from Iteration 2
+- No simulation or editing yet (still static visualization)
+- Essential foundation for future editing features (Iteration 5)
+
+---
+
+### Iteration 4: Simulation + Visual Feedback
 **Goal**: Working interactive DFA simulator (FIRST MAJOR MILESTONE)
 
 **Deliverables**:
@@ -223,42 +250,42 @@ type UIState = {
 7. Display accept/reject result
 
 **Scope Notes**:
-- Read-only automaton (loaded from JSON)
+- Read-only automaton (uses auto-layout from Iteration 3)
 - DFA only
-- This completes the first working prototype
+- This completes the first working interactive prototype
 
 ---
 
 ### Future Iterations (Backlog - Priority TBD)
 
-**Iteration 4**: Manual Editing
+**Iteration 5**: Manual Editing
 - Add/remove states via UI
 - Add/remove transitions
-- Edit labels and positions
-- Save modified automaton back to JSON
+- Edit labels
+- Save modified automaton to JSON
 
-**Iteration 5**: NFA Support
+**Iteration 6**: NFA Support
 - Update validator for NFA rules
 - Implement NFA simulation (multiple active states)
 - ε-closure computation
 - Visual distinction for ε-transitions
 
-**Iteration 6**: Enhanced File Management
+**Iteration 7**: Enhanced File Management
 - File upload (.json)
 - Save/download automaton
 - Multiple automaton library
 
-**Iteration 7**: Interactive Positioning
+**Iteration 8**: Interactive Positioning
 - Drag-and-drop states
-- Auto-layout algorithms (optional)
+- Manual override of auto-layout
 - Grid snapping
 
-**Iteration 8**: Animation & Polish
+**Iteration 9**: Animation & Polish
 - Smooth transitions between states
 - Animated simulation
 - Better visual design
 
-**Iteration 9**: Advanced Features
+**Iteration 10**: Advanced Features
 - NFA → DFA conversion
 - Minimization
 - Equivalence testing
@@ -481,11 +508,21 @@ function addTransition(
 - ✅ Data structures: Sets for states, alphabet, transitions
 - ✅ Error handling: Throw errors (strict validation)
 
+**Decided in Iteration 2**:
+- ✅ UI type structure: StateUI and AutomatonUI mirror engine architecture
+- ✅ Component prop pattern: Granular values (not object props)
+- ✅ Prop naming: Singular "Prop" suffix (StateNodeProp, not StateNodeProps)
+- ✅ UI labeling strategy: Default "q{id}" format via createDefaultLabel() helper
+
+**Decided for Iteration 3**:
+- ✅ Auto-layout algorithm: dagre (hierarchical graph layout library)
+- ✅ Self-loops: Will use curved SVG paths (bezier or arc)
+- ✅ Multiple transitions between same states: Will use curved arrows with offsets
+
 **To be determined in future iterations**:
-- How to handle self-loops visually
-- How to handle multiple transitions between same states
-- Auto-layout algorithm selection (if needed)
-- UI labeling strategy (default "q0", "q1" or user-editable)
+- Drag-and-drop interaction details (Iteration 8)
+- Manual override strategy for auto-layout (Iteration 8)
+- Animation timing and easing functions (Iteration 9)
 
 ---
 
