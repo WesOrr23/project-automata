@@ -37,7 +37,7 @@ function App() {
   const automatonUI: AutomatonUI = {
     states: new Map([
       [0, { id: 0, position: { x: 200, y: 300 }, label: createDefaultLabel(0) }],
-      [state1, { id: state1, position: { x: 450, y: 150 }, label: createDefaultLabel(state1) }],
+      [state1, { id: state1, position: { x: 450, y: 300 }, label: createDefaultLabel(state1) }],
       [state2, { id: state2, position: { x: 600, y: 300 }, label: createDefaultLabel(state2) }],
     ]),
   };
