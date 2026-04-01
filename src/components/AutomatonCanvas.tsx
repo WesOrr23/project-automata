@@ -6,12 +6,37 @@
  * and renders all child components (states, transitions, start arrow).
  */
 
-import { Automaton } from '../engine/types';
+import { Automaton, Transition } from '../engine/types';
 import { AutomatonUI } from '../ui-state/types';
 import { STATE_RADIUS } from '../ui-state/constants';
 import { StateNode } from './StateNode';
 import { TransitionEdge } from './TransitionEdge';
 import { StartStateArrow } from './StartStateArrow';
+
+/**
+ * Check if a transition is part of a bidirectional pair (A→B and B→A both exist)
+ *
+ * @param sourceStateId - The source state ID
+ * @param destinationStateId - The destination state ID
+ * @param allTransitions - All transitions in the automaton
+ * @returns True if there's a reverse transition (B→A exists)
+ */
+function isPartOfBidirectionalPair(
+  sourceStateId: number,
+  destinationStateId: number,
+  allTransitions: Transition[]
+): boolean {
+  // Don't consider self-loops as bidirectional
+  if (sourceStateId === destinationStateId) {
+    return false;
+  }
+
+  // Check if there's a reverse transition
+  return allTransitions.some((transition) =>
+    transition.from === destinationStateId &&
+    transition.to.has(sourceStateId)
+  );
+}
 
 type AutomatonCanvasProp = {
   /** The automaton data from the engine layer */
@@ -57,6 +82,13 @@ export function AutomatonCanvas({
             return null;
           }
 
+          // Detect if this transition is part of a bidirectional pair
+          const isBidirectional = isPartOfBidirectionalPair(
+            transition.from,
+            toStateId,
+            automaton.transitions
+          );
+
           return (
             <TransitionEdge
               key={`transition-${transitionIndex}-to-${toStateId}`}
@@ -68,6 +100,7 @@ export function AutomatonCanvas({
               toStateId={toStateId}
               symbol={transition.symbol}
               stateRadius={STATE_RADIUS}
+              isBidirectional={isBidirectional}
             />
           );
         });

@@ -32,6 +32,9 @@ type TransitionEdgeProp = {
 
   /** Destination state ID (needed to detect self-loops) */
   toStateId: number;
+
+  /** Whether this transition is part of a bidirectional pair (optional) */
+  isBidirectional?: boolean;
 };
 
 /**
@@ -50,11 +53,22 @@ const SELF_LOOP_CONFIG = {
   labelOffsetY: -45,           // Label position above loop (pixels)
 };
 
+/**
+ * Configuration for curved bidirectional arrows
+ */
+const CURVED_ARROW_CONFIG = {
+  curveOffset: 20,  // Distance to curve away from straight line (pixels)
+};
+
 export function TransitionEdge(props: TransitionEdgeProp) {
   const isSelfLoop = props.fromStateId === props.toStateId;
 
   if (isSelfLoop) {
     return renderSelfLoop(props);
+  }
+
+  if (props.isBidirectional) {
+    return renderCurvedArrow(props);
   }
 
   return renderStraightArrow(props);
@@ -120,6 +134,88 @@ function renderSelfLoop(props: TransitionEdgeProp) {
       <text
         x={fromX}
         y={fromY + labelOffsetY}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize="14px"
+        fill="black"
+        fontFamily="Arial, sans-serif"
+      >
+        {displaySymbol}
+      </text>
+    </g>
+  );
+}
+
+/**
+ * Render a curved arrow for bidirectional transitions
+ * Uses quadratic bezier with perpendicular offset to prevent overlap
+ */
+function renderCurvedArrow(props: TransitionEdgeProp) {
+  const { fromX, fromY, toX, toY, symbol, stateRadius } = props;
+  const { curveOffset } = CURVED_ARROW_CONFIG;
+
+  // Calculate angle from source to destination
+  const angle = Math.atan2(toY - fromY, toX - fromX);
+
+  // Calculate midpoint between state centers
+  const midpointX = (fromX + toX) / 2;
+  const midpointY = (fromY + toY) / 2;
+
+  // Calculate perpendicular angle (90 degrees offset)
+  const perpendicularAngle = angle + Math.PI / 2;
+
+  // Calculate control point offset perpendicular to line
+  const controlPointX = midpointX + curveOffset * Math.cos(perpendicularAngle);
+  const controlPointY = midpointY + curveOffset * Math.sin(perpendicularAngle);
+
+  // Calculate start point on source circle edge
+  const startX = fromX + stateRadius * Math.cos(angle);
+  const startY = fromY + stateRadius * Math.sin(angle);
+
+  // Calculate end point on destination circle edge
+  const endX = toX - stateRadius * Math.cos(angle);
+  const endY = toY - stateRadius * Math.sin(angle);
+
+  // Create SVG path using quadratic bezier curve
+  const pathData = `M ${startX} ${startY} Q ${controlPointX} ${controlPointY}, ${endX} ${endY}`;
+
+  // Calculate arrowhead angle at end point (tangent to curve)
+  const arrowheadAngle = Math.atan2(
+    endY - controlPointY,
+    endX - controlPointX
+  );
+
+  // Calculate arrowhead triangle points
+  const arrowheadAngle1 = arrowheadAngle + Math.PI - Math.PI / 6;
+  const arrowheadAngle2 = arrowheadAngle + Math.PI + Math.PI / 6;
+
+  const arrowheadPoint1X = endX + ARROWHEAD_SIZE * Math.cos(arrowheadAngle1);
+  const arrowheadPoint1Y = endY + ARROWHEAD_SIZE * Math.sin(arrowheadAngle1);
+  const arrowheadPoint2X = endX + ARROWHEAD_SIZE * Math.cos(arrowheadAngle2);
+  const arrowheadPoint2Y = endY + ARROWHEAD_SIZE * Math.sin(arrowheadAngle2);
+
+  const displaySymbol = symbol === null ? 'ε' : symbol;
+
+  return (
+    <g>
+      {/* Curved arrow path */}
+      <path
+        d={pathData}
+        fill="none"
+        stroke="black"
+        strokeWidth={STROKE_WIDTH}
+      />
+
+      {/* Arrowhead */}
+      <polygon
+        points={`${endX},${endY} ${arrowheadPoint1X},${arrowheadPoint1Y} ${arrowheadPoint2X},${arrowheadPoint2Y}`}
+        fill="black"
+      />
+
+      {/* Label positioned at control point (naturally offset from line) */}
+      <text
+        x={controlPointX}
+        y={controlPointY}
         textAnchor="middle"
         dominantBaseline="middle"
         fontSize="14px"
