@@ -2,8 +2,10 @@
  * TransitionEdge Component
  *
  * Renders a transition arrow between two states.
- * The arrow starts and ends at the state circle edges, not centers.
- * The symbol label is positioned at the midpoint of the arrow.
+ * Supports three rendering modes:
+ * - Self-loops: Curved path above the state
+ * - Straight arrows: Direct line between different states
+ * - Curved arrows: For bidirectional edges (future)
  */
 
 type TransitionEdgeProp = {
@@ -24,6 +26,12 @@ type TransitionEdgeProp = {
 
   /** Radius of state circles (to calculate edge intersections) */
   stateRadius: number;
+
+  /** Source state ID (needed to detect self-loops) */
+  fromStateId: number;
+
+  /** Destination state ID (needed to detect self-loops) */
+  toStateId: number;
 };
 
 /**
@@ -33,14 +41,103 @@ const STROKE_WIDTH = 2;
 const ARROWHEAD_SIZE = 8;
 const LABEL_OFFSET = 15; // Distance of label from arrow line
 
-export function TransitionEdge({
-  fromX,
-  fromY,
-  toX,
-  toY,
-  symbol,
-  stateRadius,
-}: TransitionEdgeProp) {
+/**
+ * Configuration for self-loop appearance
+ */
+const SELF_LOOP_CONFIG = {
+  loopRadius: 25,              // Radius of the loop curve (pixels)
+  loopOffsetAngle: -90,        // Position loop at top of state (degrees)
+  labelOffsetY: -45,           // Label position above loop (pixels)
+};
+
+export function TransitionEdge(props: TransitionEdgeProp) {
+  const isSelfLoop = props.fromStateId === props.toStateId;
+
+  if (isSelfLoop) {
+    return renderSelfLoop(props);
+  }
+
+  return renderStraightArrow(props);
+}
+
+/**
+ * Render a self-loop (transition from a state to itself)
+ * Uses a curved SVG path positioned above the state
+ */
+function renderSelfLoop(props: TransitionEdgeProp) {
+  const { fromX, fromY, symbol, stateRadius } = props;
+  const { loopRadius, loopOffsetAngle, labelOffsetY } = SELF_LOOP_CONFIG;
+
+  // Convert angle from degrees to radians
+  const angleRadians = (loopOffsetAngle * Math.PI) / 180;
+
+  // Calculate start point on state circle edge
+  const startX = fromX + stateRadius * Math.cos(angleRadians - 0.3);
+  const startY = fromY + stateRadius * Math.sin(angleRadians - 0.3);
+
+  // Calculate end point on state circle edge
+  const endX = fromX + stateRadius * Math.cos(angleRadians + 0.3);
+  const endY = fromY + stateRadius * Math.sin(angleRadians + 0.3);
+
+  // Control point for curve (positioned above state)
+  const controlPointX = fromX;
+  const controlPointY = fromY - stateRadius - loopRadius;
+
+  // Create SVG path using quadratic bezier curve
+  const pathData = `M ${startX} ${startY} Q ${controlPointX} ${controlPointY}, ${endX} ${endY}`;
+
+  // Calculate arrowhead angle at end point (tangent to curve)
+  const arrowheadAngle = Math.atan2(endY - controlPointY, endX - controlPointX);
+
+  // Calculate arrowhead triangle points
+  const arrowheadAngle1 = arrowheadAngle + Math.PI - Math.PI / 6;
+  const arrowheadAngle2 = arrowheadAngle + Math.PI + Math.PI / 6;
+
+  const arrowheadPoint1X = endX + ARROWHEAD_SIZE * Math.cos(arrowheadAngle1);
+  const arrowheadPoint1Y = endY + ARROWHEAD_SIZE * Math.sin(arrowheadAngle1);
+  const arrowheadPoint2X = endX + ARROWHEAD_SIZE * Math.cos(arrowheadAngle2);
+  const arrowheadPoint2Y = endY + ARROWHEAD_SIZE * Math.sin(arrowheadAngle2);
+
+  const displaySymbol = symbol === null ? 'ε' : symbol;
+
+  return (
+    <g>
+      {/* Self-loop path */}
+      <path
+        d={pathData}
+        fill="none"
+        stroke="black"
+        strokeWidth={STROKE_WIDTH}
+      />
+
+      {/* Arrowhead */}
+      <polygon
+        points={`${endX},${endY} ${arrowheadPoint1X},${arrowheadPoint1Y} ${arrowheadPoint2X},${arrowheadPoint2Y}`}
+        fill="black"
+      />
+
+      {/* Label positioned above loop */}
+      <text
+        x={fromX}
+        y={fromY + labelOffsetY}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize="14px"
+        fill="black"
+        fontFamily="Arial, sans-serif"
+      >
+        {displaySymbol}
+      </text>
+    </g>
+  );
+}
+
+/**
+ * Render a straight arrow between two different states
+ * This is the original logic from Iteration 2
+ */
+function renderStraightArrow(props: TransitionEdgeProp) {
+  const { fromX, fromY, toX, toY, symbol, stateRadius } = props;
   // Calculate angle from source to destination
   const angle = Math.atan2(toY - fromY, toX - fromX);
 
@@ -63,12 +160,12 @@ export function TransitionEdge({
 
   // TODO: Revisit documentation for arrowhead calculation for better readability/clarity
   // Calculate arrowhead points
-  const arrowAngle1 = angle + Math.PI - Math.PI / 6; // 150 degrees
-  const arrowAngle2 = angle + Math.PI + Math.PI / 6; // 210 degrees
-  const arrowPoint1X = endX + ARROWHEAD_SIZE * Math.cos(arrowAngle1);
-  const arrowPoint1Y = endY + ARROWHEAD_SIZE * Math.sin(arrowAngle1);
-  const arrowPoint2X = endX + ARROWHEAD_SIZE * Math.cos(arrowAngle2);
-  const arrowPoint2Y = endY + ARROWHEAD_SIZE * Math.sin(arrowAngle2);
+  const arrowheadAngle1 = angle + Math.PI - Math.PI / 6; // 150 degrees
+  const arrowheadAngle2 = angle + Math.PI + Math.PI / 6; // 210 degrees
+  const arrowheadPoint1X = endX + ARROWHEAD_SIZE * Math.cos(arrowheadAngle1);
+  const arrowheadPoint1Y = endY + ARROWHEAD_SIZE * Math.sin(arrowheadAngle1);
+  const arrowheadPoint2X = endX + ARROWHEAD_SIZE * Math.cos(arrowheadAngle2);
+  const arrowheadPoint2Y = endY + ARROWHEAD_SIZE * Math.sin(arrowheadAngle2);
 
   // Display symbol (ε for null)
   const displaySymbol = symbol === null ? 'ε' : symbol;
@@ -87,7 +184,7 @@ export function TransitionEdge({
 
       {/* Arrowhead */}
       <polygon
-        points={`${endX},${endY} ${arrowPoint1X},${arrowPoint1Y} ${arrowPoint2X},${arrowPoint2Y}`}
+        points={`${endX},${endY} ${arrowheadPoint1X},${arrowheadPoint1Y} ${arrowheadPoint2X},${arrowheadPoint2Y}`}
         fill="black"
       />
 

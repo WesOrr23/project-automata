@@ -64,6 +64,8 @@ export function AutomatonCanvas({
               fromY={fromState.position.y}
               toX={toState.position.x}
               toY={toState.position.y}
+              fromStateId={transition.from}
+              toStateId={toStateId}
               symbol={transition.symbol}
               stateRadius={STATE_RADIUS}
             />
