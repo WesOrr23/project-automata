@@ -1,6 +1,6 @@
 import { createAutomaton, addState, addTransition, addAcceptState } from './engine/automaton';
 import { AutomatonCanvas } from './components/AutomatonCanvas';
-import { AutomatonUI, createDefaultLabel } from './ui-state/types';
+import { computeLayout } from './ui-state/utils';
 
 function App() {
   // Create a DFA that accepts binary strings ending in "01"
@@ -32,22 +32,15 @@ function App() {
   dfa = addTransition(dfa, state2, new Set([state1]), '0');    // '0' → q1 (start new "01" sequence)
   dfa = addTransition(dfa, state2, new Set([0]), '1');         // '1' → q0 (reset)
 
-  // Step 5: Create UI metadata with positions
-  // Triangle layout to avoid arrow overlap issues
-  const automatonUI: AutomatonUI = {
-    states: new Map([
-      [0, { id: 0, position: { x: 200, y: 300 }, label: createDefaultLabel(0) }],
-      [state1, { id: state1, position: { x: 450, y: 300 }, label: createDefaultLabel(state1) }],
-      [state2, { id: state2, position: { x: 600, y: 300 }, label: createDefaultLabel(state2) }],
-    ]),
-  };
+  // Step 5: Compute automatic layout (replaces manual positioning)
+  const automatonUI = computeLayout(dfa);
 
   return (
     <div style={{ textAlign: 'center', padding: '20px' }}>
       <h1>Project Automata</h1>
-      <p>Iteration 2: Basic Visualization</p>
+      <p>Iteration 3: Advanced Visualization</p>
       <p style={{ fontSize: '14px', color: '#666' }}>
-        DFA accepting binary strings ending in "01"
+        DFA accepting binary strings ending in "01" (auto-layout)
       </p>
 
       <AutomatonCanvas automaton={dfa} automatonUI={automatonUI} />

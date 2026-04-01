@@ -8,6 +8,7 @@
 
 import { Automaton } from '../engine/types';
 import { AutomatonUI } from '../ui-state/types';
+import { STATE_RADIUS } from '../ui-state/constants';
 import { StateNode } from './StateNode';
 import { TransitionEdge } from './TransitionEdge';
 import { StartStateArrow } from './StartStateArrow';
@@ -23,7 +24,6 @@ type AutomatonCanvasProp = {
 /**
  * Visual constants
  */
-const STATE_RADIUS = 30;
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
 
