@@ -291,6 +291,13 @@ type UIState = {
 - Equivalence testing
 - Complement/union/intersection operations
 
+**Iteration 11**: Edge Routing & Overlap Prevention
+- Geometric intersection detection between primitives (circles, lines, quadratic curves)
+- Constraint-based edge routing to prevent edge-edge and edge-label overlaps
+- Iterative solver: adjust curves first, reposition nodes if needed
+- Inspired by GraphViz's spline routing phase (which dagre lacks)
+- Potential approaches: visibility graphs, exclusion zones around nodes, polynomial intersection math
+
 ---
 
 ## Key Principles & Patterns

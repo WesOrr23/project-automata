@@ -34,6 +34,36 @@ export type StateUI = {
 };
 
 /**
+ * UI metadata for a single transition
+ *
+ * Contains pre-computed SVG rendering data from GraphViz layout.
+ * GraphViz computes the edge spline, arrowhead position/angle,
+ * and label position - TransitionEdge just renders these values.
+ */
+export type TransitionUI = {
+  /** Source state ID */
+  fromStateId: number;
+
+  /** Destination state ID */
+  toStateId: number;
+
+  /** Transition symbol (null = ε-transition) */
+  symbol: string | null;
+
+  /** SVG path d attribute (cubic bezier spline from GraphViz) */
+  pathData: string;
+
+  /** Position of the arrowhead tip */
+  arrowheadPosition: { x: number; y: number };
+
+  /** Arrowhead angle in radians (direction the arrow points) */
+  arrowheadAngle: number;
+
+  /** GraphViz-computed label position */
+  labelPosition: { x: number; y: number };
+};
+
+/**
  * UI metadata for the entire automaton
  *
  * This type mirrors the Automaton type from the engine layer, but contains
@@ -43,6 +73,12 @@ export type StateUI = {
 export type AutomatonUI = {
   /** Map of state ID to UI metadata */
   states: Map<number, StateUI>;
+
+  /** Pre-computed transition rendering data from GraphViz */
+  transitions: TransitionUI[];
+
+  /** Bounding box of the entire graph (for canvas sizing) */
+  boundingBox: { width: number; height: number };
 };
 
 /**

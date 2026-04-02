@@ -3,9 +3,9 @@ import { computeLayout } from './utils';
 import { createAutomaton, addState, addTransition } from '../engine/automaton';
 
 describe('computeLayout', () => {
-  it('should position all states with valid coordinates', () => {
+  it('should position all states with valid coordinates', async () => {
     const automaton = createAutomaton('DFA', new Set(['0', '1']));
-    const automatonUI = computeLayout(automaton);
+    const automatonUI = await computeLayout(automaton);
 
     // Should have exactly one state (state 0 created by default)
     expect(automatonUI.states.size).toBe(1);
@@ -20,20 +20,20 @@ describe('computeLayout', () => {
     expect(typeof stateUI.position.y).toBe('number');
   });
 
-  it('should generate default labels for all states', () => {
+  it('should generate default labels for all states', async () => {
     const automaton = createAutomaton('DFA', new Set(['0', '1']));
-    const automatonUI = computeLayout(automaton);
+    const automatonUI = await computeLayout(automaton);
 
     const stateUI = automatonUI.states.get(0)!;
     expect(stateUI.label).toBe('q0');
   });
 
-  it('should handle multiple states with reasonable separation', () => {
+  it('should handle multiple states with reasonable separation', async () => {
     let automaton = createAutomaton('DFA', new Set(['0', '1']));
     const { automaton: automaton2, stateId: state1 } = addState(automaton);
     automaton = addTransition(automaton2, 0, new Set([state1]), '0');
 
-    const automatonUI = computeLayout(automaton);
+    const automatonUI = await computeLayout(automaton);
 
     expect(automatonUI.states.size).toBe(2);
 
@@ -50,11 +50,11 @@ describe('computeLayout', () => {
     expect(distance).toBeGreaterThan(50);
   });
 
-  it('should handle disconnected states (no edges between them)', () => {
+  it('should handle disconnected states (no edges between them)', async () => {
     let automaton = createAutomaton('DFA', new Set(['0', '1']));
     const { automaton: automaton2 } = addState(automaton);
 
-    const automatonUI = computeLayout(automaton2);
+    const automatonUI = await computeLayout(automaton2);
 
     expect(automatonUI.states.size).toBe(2);
 
@@ -65,9 +65,9 @@ describe('computeLayout', () => {
     });
   });
 
-  it('should handle single-state automaton', () => {
+  it('should handle single-state automaton', async () => {
     const automaton = createAutomaton('DFA', new Set(['0', '1']));
-    const automatonUI = computeLayout(automaton);
+    const automatonUI = await computeLayout(automaton);
 
     expect(automatonUI.states.size).toBe(1);
 
@@ -78,22 +78,27 @@ describe('computeLayout', () => {
     expect(stateUI.label).toBe('q0');
   });
 
-  it('should handle automaton with self-loops', () => {
+  it('should handle automaton with self-loops', async () => {
     let automaton = createAutomaton('DFA', new Set(['0', '1']));
     automaton = addTransition(automaton, 0, new Set([0]), '0');
 
-    const automatonUI = computeLayout(automaton);
+    const automatonUI = await computeLayout(automaton);
 
     expect(automatonUI.states.size).toBe(1);
 
     const stateUI = automatonUI.states.get(0)!;
     expect(stateUI.position.x).toBeGreaterThanOrEqual(0);
     expect(stateUI.position.y).toBeGreaterThanOrEqual(0);
+
+    // Should have a transition for the self-loop
+    expect(automatonUI.transitions.length).toBe(1);
+    expect(automatonUI.transitions[0]!.fromStateId).toBe(0);
+    expect(automatonUI.transitions[0]!.toStateId).toBe(0);
   });
 
-  it('should create StateUI objects with correct structure', () => {
+  it('should create StateUI objects with correct structure', async () => {
     const automaton = createAutomaton('DFA', new Set(['a', 'b']));
-    const automatonUI = computeLayout(automaton);
+    const automatonUI = await computeLayout(automaton);
 
     const stateUI = automatonUI.states.get(0)!;
 
@@ -105,7 +110,7 @@ describe('computeLayout', () => {
     expect(stateUI.position).toHaveProperty('y');
   });
 
-  it('should handle linear chain of states', () => {
+  it('should handle linear chain of states', async () => {
     // Create 0 → 1 → 2 → 3
     let automaton = createAutomaton('DFA', new Set(['a']));
     let state1: number, state2: number, state3: number;
@@ -118,7 +123,7 @@ describe('computeLayout', () => {
     automaton = addTransition(automaton, state1, new Set([state2]), 'a');
     automaton = addTransition(automaton, state2, new Set([state3]), 'a');
 
-    const automatonUI = computeLayout(automaton);
+    const automatonUI = await computeLayout(automaton);
 
     expect(automatonUI.states.size).toBe(4);
 
@@ -127,9 +132,12 @@ describe('computeLayout', () => {
       expect(stateUI.position.x).toBeGreaterThanOrEqual(0);
       expect(stateUI.position.y).toBeGreaterThanOrEqual(0);
     });
+
+    // Should have 3 transitions
+    expect(automatonUI.transitions.length).toBe(3);
   });
 
-  it('should handle cyclic automaton', () => {
+  it('should handle cyclic automaton', async () => {
     // Create 0 → 1 → 2 → 0 (cycle)
     let automaton = createAutomaton('DFA', new Set(['a']));
     let state1: number, state2: number;
@@ -141,7 +149,7 @@ describe('computeLayout', () => {
     automaton = addTransition(automaton, state1, new Set([state2]), 'a');
     automaton = addTransition(automaton, state2, new Set([0]), 'a');
 
-    const automatonUI = computeLayout(automaton);
+    const automatonUI = await computeLayout(automaton);
 
     expect(automatonUI.states.size).toBe(3);
 
@@ -150,5 +158,43 @@ describe('computeLayout', () => {
       expect(stateUI.position.x).toBeGreaterThanOrEqual(0);
       expect(stateUI.position.y).toBeGreaterThanOrEqual(0);
     });
+
+    // Should have 3 transitions
+    expect(automatonUI.transitions.length).toBe(3);
+  });
+
+  it('should produce transitions with valid SVG path data', async () => {
+    let automaton = createAutomaton('DFA', new Set(['0', '1']));
+    const { automaton: automaton2, stateId: state1 } = addState(automaton);
+    automaton = addTransition(automaton2, 0, new Set([state1]), '0');
+
+    const automatonUI = await computeLayout(automaton);
+
+    expect(automatonUI.transitions.length).toBe(1);
+
+    const transition = automatonUI.transitions[0]!;
+
+    // Path should start with M (moveTo) command
+    expect(transition.pathData).toMatch(/^M /);
+    // Path should contain C (cubic bezier) command
+    expect(transition.pathData).toContain(' C ');
+
+    // Arrowhead position should be valid numbers
+    expect(typeof transition.arrowheadPosition.x).toBe('number');
+    expect(typeof transition.arrowheadPosition.y).toBe('number');
+    expect(Number.isFinite(transition.arrowheadAngle)).toBe(true);
+
+    // Label position should be valid numbers
+    expect(typeof transition.labelPosition.x).toBe('number');
+    expect(typeof transition.labelPosition.y).toBe('number');
+  });
+
+  it('should include bounding box for canvas sizing', async () => {
+    const automaton = createAutomaton('DFA', new Set(['0', '1']));
+    const automatonUI = await computeLayout(automaton);
+
+    expect(automatonUI.boundingBox).toBeDefined();
+    expect(automatonUI.boundingBox.width).toBeGreaterThan(0);
+    expect(automatonUI.boundingBox.height).toBeGreaterThan(0);
   });
 });

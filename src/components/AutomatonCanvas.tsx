@@ -2,55 +2,24 @@
  * AutomatonCanvas Component
  *
  * Main container that orchestrates the rendering of the entire automaton.
- * Takes the engine Automaton and UI metadata, extracts granular values,
- * and renders all child components (states, transitions, start arrow).
+ * Takes the engine Automaton and UI metadata (including pre-computed edge
+ * paths from GraphViz), and renders all child components.
  */
 
-import { Automaton, Transition } from '../engine/types';
+import { Automaton } from '../engine/types';
 import { AutomatonUI } from '../ui-state/types';
 import { STATE_RADIUS } from '../ui-state/constants';
 import { StateNode } from './StateNode';
 import { TransitionEdge } from './TransitionEdge';
 import { StartStateArrow } from './StartStateArrow';
 
-/**
- * Check if a transition is part of a bidirectional pair (A→B and B→A both exist)
- *
- * @param sourceStateId - The source state ID
- * @param destinationStateId - The destination state ID
- * @param allTransitions - All transitions in the automaton
- * @returns True if there's a reverse transition (B→A exists)
- */
-function isPartOfBidirectionalPair(
-  sourceStateId: number,
-  destinationStateId: number,
-  allTransitions: Transition[]
-): boolean {
-  // Don't consider self-loops as bidirectional
-  if (sourceStateId === destinationStateId) {
-    return false;
-  }
-
-  // Check if there's a reverse transition
-  return allTransitions.some((transition) =>
-    transition.from === destinationStateId &&
-    transition.to.has(sourceStateId)
-  );
-}
-
 type AutomatonCanvasProp = {
   /** The automaton data from the engine layer */
   automaton: Automaton;
 
-  /** UI metadata (positions, labels) for visual rendering */
+  /** UI metadata (positions, labels, edge paths) for visual rendering */
   automatonUI: AutomatonUI;
 };
-
-/**
- * Visual constants
- */
-const CANVAS_WIDTH = 800;
-const CANVAS_HEIGHT = 600;
 
 export function AutomatonCanvas({
   automaton,
@@ -58,53 +27,21 @@ export function AutomatonCanvas({
 }: AutomatonCanvasProp) {
   return (
     <svg
-      width={CANVAS_WIDTH}
-      height={CANVAS_HEIGHT}
+      width={automatonUI.boundingBox.width}
+      height={automatonUI.boundingBox.height}
       style={{ border: '1px solid #ccc' }}
     >
       {/* Layer 1: Transition edges (background) */}
-      {automaton.transitions.flatMap((transition, transitionIndex) => {
-        const fromState = automatonUI.states.get(transition.from);
-
-        // Skip if source state UI data is missing
-        if (!fromState) {
-          return [];
-        }
-
-        // For NFA-compatibility: iterate over ALL destination states in the 'to' Set
-        // DFA: transition.to will have exactly 1 element
-        // NFA: transition.to can have multiple elements
-        return Array.from(transition.to).map((toStateId) => {
-          const toState = automatonUI.states.get(toStateId);
-
-          // Skip if destination state UI data is missing
-          if (!toState) {
-            return null;
-          }
-
-          // Detect if this transition is part of a bidirectional pair
-          const isBidirectional = isPartOfBidirectionalPair(
-            transition.from,
-            toStateId,
-            automaton.transitions
-          );
-
-          return (
-            <TransitionEdge
-              key={`transition-${transitionIndex}-to-${toStateId}`}
-              fromX={fromState.position.x}
-              fromY={fromState.position.y}
-              toX={toState.position.x}
-              toY={toState.position.y}
-              fromStateId={transition.from}
-              toStateId={toStateId}
-              symbol={transition.symbol}
-              stateRadius={STATE_RADIUS}
-              isBidirectional={isBidirectional}
-            />
-          );
-        });
-      })}
+      {automatonUI.transitions.map((transition, index) => (
+        <TransitionEdge
+          key={`transition-${index}`}
+          pathData={transition.pathData}
+          symbol={transition.symbol}
+          arrowheadPosition={transition.arrowheadPosition}
+          arrowheadAngle={transition.arrowheadAngle}
+          labelPosition={transition.labelPosition}
+        />
+      ))}
 
       {/* Layer 2: State nodes (foreground) */}
       {Array.from(automatonUI.states.values()).map((stateUI) => {
@@ -125,22 +62,18 @@ export function AutomatonCanvas({
       })}
 
       {/* Layer 3: Start state arrow (foreground) */}
-      {automaton.startState !== null && (
-        (() => {
-          const startStateUI = automatonUI.states.get(automaton.startState);
-          if (!startStateUI) {
-            return null;
-          }
+      {automaton.startState !== null && (() => {
+        const startStateUI = automatonUI.states.get(automaton.startState);
+        if (!startStateUI) return null;
 
-          return (
-            <StartStateArrow
-              targetX={startStateUI.position.x}
-              targetY={startStateUI.position.y}
-              stateRadius={STATE_RADIUS}
-            />
-          );
-        })()
-      )}
+        return (
+          <StartStateArrow
+            targetX={startStateUI.position.x}
+            targetY={startStateUI.position.y}
+            stateRadius={STATE_RADIUS}
+          />
+        );
+      })()}
     </svg>
   );
 }

@@ -1,39 +1,47 @@
+import { useState, useEffect } from 'react';
 import { createAutomaton, addState, addTransition, addAcceptState } from './engine/automaton';
+import { Automaton } from './engine/types';
+import { AutomatonUI } from './ui-state/types';
 import { AutomatonCanvas } from './components/AutomatonCanvas';
 import { computeLayout } from './ui-state/utils';
 
-function App() {
-  // Create a DFA that accepts binary strings ending in "01"
-  // States: q0 (start), q1 (saw 0), q2 (saw "01" - accept)
-
-  // Step 1: Create automaton with initial state 0
+/**
+ * Build the sample DFA that accepts binary strings ending in "01"
+ * States: q0 (start), q1 (saw 0), q2 (saw "01" - accept)
+ */
+function buildSampleDFA(): Automaton {
   let dfa = createAutomaton('DFA', new Set(['0', '1']));
 
-  // Step 2: Add two more states
   let state1: number;
   ({ automaton: dfa, stateId: state1 } = addState(dfa));
 
   let state2: number;
   ({ automaton: dfa, stateId: state2 } = addState(dfa));
 
-  // Step 3: Set state 2 as accept state
   dfa = addAcceptState(dfa, state2);
 
-  // Step 4: Add transitions
   // From q0 (start):
-  dfa = addTransition(dfa, 0, new Set([state1]), '0');  // '0' → q1
-  dfa = addTransition(dfa, 0, new Set([0]), '1');       // '1' → q0 (stay)
+  dfa = addTransition(dfa, 0, new Set([state1]), '0');
+  dfa = addTransition(dfa, 0, new Set([0]), '1');
 
   // From q1 (saw '0'):
-  dfa = addTransition(dfa, state1, new Set([state1]), '0');    // '0' → q1 (stay, waiting for 1)
-  dfa = addTransition(dfa, state1, new Set([state2]), '1');    // '1' → q2 (accept!)
+  dfa = addTransition(dfa, state1, new Set([state1]), '0');
+  dfa = addTransition(dfa, state1, new Set([state2]), '1');
 
   // From q2 (accept - saw "01"):
-  dfa = addTransition(dfa, state2, new Set([state1]), '0');    // '0' → q1 (start new "01" sequence)
-  dfa = addTransition(dfa, state2, new Set([0]), '1');         // '1' → q0 (reset)
+  dfa = addTransition(dfa, state2, new Set([state1]), '0');
+  dfa = addTransition(dfa, state2, new Set([0]), '1');
 
-  // Step 5: Compute automatic layout (replaces manual positioning)
-  const automatonUI = computeLayout(dfa);
+  return dfa;
+}
+
+function App() {
+  const [dfa] = useState<Automaton>(() => buildSampleDFA());
+  const [automatonUI, setAutomatonUI] = useState<AutomatonUI | null>(null);
+
+  useEffect(() => {
+    computeLayout(dfa).then(setAutomatonUI);
+  }, [dfa]);
 
   return (
     <div style={{ textAlign: 'center', padding: '20px' }}>
@@ -43,7 +51,11 @@ function App() {
         DFA accepting binary strings ending in "01" (auto-layout)
       </p>
 
-      <AutomatonCanvas automaton={dfa} automatonUI={automatonUI} />
+      {automatonUI === null ? (
+        <p>Loading layout...</p>
+      ) : (
+        <AutomatonCanvas automaton={dfa} automatonUI={automatonUI} />
+      )}
     </div>
   );
 }
