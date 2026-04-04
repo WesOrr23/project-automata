@@ -1,0 +1,374 @@
+/* ===================================
+   Project Automata — Design System
+
+   Brand: Cool blue (#3b82f6)
+   Color: 4-layer system — blue-tinted neutrals, blue ramp accents, semantic colors
+   Typography: 1 font family, 4 sizes, 2 weights
+   Spacing: 4px base unit, 8px primary step
+   =================================== */
+
+:root {
+  /* ─── Layer 1: Neutral Foundation (blue-tinted) ─── */
+
+  --bg-page: #f0f3f8;
+  --bg-sidebar: #ffffff;
+  --bg-card: rgba(255, 255, 255, 0.75);
+  --bg-input: #f4f6f9;
+
+  /* Borders */
+  --border-light: rgba(255, 255, 255, 0.7);
+  --border-subtle: rgba(59, 130, 246, 0.1);
+
+  /* Text hierarchy */
+  --text-heading: #0f172a;
+  --text-body: #334155;
+  --text-secondary: #94a3b8;
+  --text-consumed: #cbd5e1;
+
+  /* ─── Layer 2: Blue Accent Ramp ─── */
+
+  --blue-50: #eff6ff;
+  --blue-100: #dbeafe;
+  --blue-200: #bfdbfe;
+  --blue-300: #93c5fd;
+  --blue-400: #60a5fa;
+  --blue-500: #3b82f6;   /* Brand center */
+  --blue-600: #2563eb;
+  --blue-700: #1d4ed8;
+  --blue-800: #1e40af;
+  --blue-900: #1e3a8a;
+
+  /* Button colors (from blue ramp) */
+  --bg-button: rgba(255, 255, 255, 0.7);
+  --bg-button-hover: var(--blue-50);
+  --bg-button-active: var(--blue-100);
+  --border-button: rgba(59, 130, 246, 0.12);
+
+  /* Focus */
+  --focus-ring: rgba(59, 130, 246, 0.15);
+  --focus-border: var(--blue-400);
+
+  /* Active state (simulation in progress) */
+  --active-fill: var(--blue-200);
+  --active-stroke: var(--blue-600);
+  --active-text: var(--blue-700);
+
+  /* ─── Layer 3: Semantic Colors ─── */
+
+  /* Success / Accepted */
+  --success-bg: #ecfdf5;
+  --success-text: #16a34a;
+  --success-border: rgba(22, 163, 74, 0.2);
+  --success-fill: #dcfce7;
+  --success-stroke: #16a34a;
+
+  /* Error / Rejected */
+  --error-bg: #fef2f2;
+  --error-text: #dc2626;
+  --error-border: rgba(220, 38, 38, 0.2);
+  --error-fill: #fee2e2;
+  --error-stroke: #dc2626;
+
+  /* ─── Typography ─── */
+
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* 4 sizes */
+  --text-lg: 20px;
+  --text-base: 14px;
+  --text-sm: 12px;
+  --text-mono: 20px;
+
+  /* 2 weights */
+  --weight-normal: 400;
+  --weight-bold: 600;
+
+  /* ─── Spacing (4px grid) ─── */
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 40px;
+  --space-8: 48px;
+
+  /* ─── Radii ─── */
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* ─── Shadows (subtle) ─── */
+
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04);
+
+  /* ─── Sidebar ─── */
+
+  --sidebar-width: 200px;
+}
+
+/* ─── Reset & Base ─── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--weight-normal);
+  color: var(--text-body);
+  background: var(--bg-page);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ─── Floating Sidebar ─── */
+
+.sidebar {
+  position: fixed;
+  top: var(--space-4);
+  left: var(--space-4);
+  width: var(--sidebar-width);
+  max-height: calc(100vh - var(--space-6));
+  overflow-y: auto;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  z-index: 10;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.sidebar.collapsed {
+  transform: translateX(calc(-1 * var(--sidebar-width) - var(--space-4)));
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar-toggle {
+  position: fixed;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: 11;
+  width: var(--space-6);
+  height: var(--space-6);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-sidebar);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+}
+
+.sidebar-toggle:hover {
+  background: var(--bg-button-hover);
+  color: var(--text-body);
+}
+
+.sidebar-toggle.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ─── Canvas Area ─── */
+
+.canvas-area {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+}
+
+.canvas-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-5);
+}
+
+/* ─── Buttons ─── */
+
+.btn {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-button);
+  background: var(--bg-button);
+  color: var(--text-heading);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: var(--shadow-sm);
+  user-select: none;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--bg-button-hover);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.btn:active:not(:disabled) {
+  background: var(--bg-button-active);
+  box-shadow: none;
+}
+
+.btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Primary action button */
+.btn-primary {
+  background: var(--blue-500);
+  color: white;
+  border-color: var(--blue-600);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--blue-600);
+  border-color: var(--blue-700);
+}
+
+.btn-primary:active:not(:disabled) {
+  background: var(--blue-700);
+}
+
+/* ─── Text Input ─── */
+
+.glass-input {
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  font-weight: var(--weight-normal);
+  padding: var(--space-2) var(--space-3);
+  width: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-input);
+  color: var(--text-heading);
+  outline: none;
+  transition: all 0.15s ease;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.glass-input:focus {
+  border-color: var(--focus-border);
+  box-shadow:
+    inset 0 1px 2px rgba(15, 23, 42, 0.03),
+    0 0 0 3px var(--focus-ring);
+}
+
+.glass-input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.glass-input::placeholder {
+  color: var(--text-secondary);
+}
+
+/* ─── Speed Toggle ─── */
+
+.speed-toggle {
+  display: inline-flex;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-input);
+  padding: 2px;
+  gap: 0px;
+}
+
+.speed-toggle-option {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.speed-toggle-option.active {
+  background: var(--blue-500);
+  color: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.speed-toggle-option:hover:not(.active) {
+  color: var(--text-body);
+}
+
+/* ─── Result Banner ─── */
+
+.result-banner {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-base);
+  text-align: center;
+}
+
+.result-banner.accepted {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border: 1px solid var(--success-border);
+}
+
+.result-banner.rejected {
+  background: var(--error-bg);
+  color: var(--error-text);
+  border: 1px solid var(--error-border);
+}
+
+/* ─── Typography Utilities ─── */
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-body);
+}
+
+.caption {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* ─── Divider ─── */
+
+.divider {
+  height: 1px;
+  background: var(--border-subtle);
+}

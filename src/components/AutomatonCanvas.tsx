@@ -19,34 +19,58 @@ type AutomatonCanvasProp = {
 
   /** UI metadata (positions, labels, edge paths) for visual rendering */
   automatonUI: AutomatonUI;
+
+  /** State IDs currently active during simulation */
+  activeStateIds?: Set<number>;
+
+  /** Result status for highlighting the final state after simulation */
+  resultStatus?: 'accepted' | 'rejected' | null;
+
+  /** The next transition to be taken (for edge highlighting) */
+  nextTransition?: { fromStateId: number; toStateId: number; symbol: string } | null;
 };
 
 export function AutomatonCanvas({
   automaton,
   automatonUI,
+  activeStateIds,
+  resultStatus,
+  nextTransition,
 }: AutomatonCanvasProp) {
   return (
     <svg
       width={automatonUI.boundingBox.width}
       height={automatonUI.boundingBox.height}
-      style={{ border: '1px solid #ccc' }}
+      style={{ display: 'block' }}
     >
       {/* Layer 1: Transition edges (background) */}
-      {automatonUI.transitions.map((transition, index) => (
-        <TransitionEdge
-          key={`transition-${index}`}
-          pathData={transition.pathData}
-          symbol={transition.symbol}
-          arrowheadPosition={transition.arrowheadPosition}
-          arrowheadAngle={transition.arrowheadAngle}
-          labelPosition={transition.labelPosition}
-        />
-      ))}
+      {automatonUI.transitions.map((transition, index) => {
+        const isNextTransition = nextTransition !== null
+          && nextTransition !== undefined
+          && transition.fromStateId === nextTransition.fromStateId
+          && transition.toStateId === nextTransition.toStateId
+          && transition.symbol === nextTransition.symbol;
+
+        return (
+          <TransitionEdge
+            key={`transition-${index}`}
+            pathData={transition.pathData}
+            symbol={transition.symbol}
+            arrowheadPosition={transition.arrowheadPosition}
+            arrowheadAngle={transition.arrowheadAngle}
+            labelPosition={transition.labelPosition}
+            isNextTransition={isNextTransition}
+          />
+        );
+      })}
 
       {/* Layer 2: State nodes (foreground) */}
       {Array.from(automatonUI.states.values()).map((stateUI) => {
         const isStart = automaton.startState === stateUI.id;
         const isAccept = automaton.acceptStates.has(stateUI.id);
+        const isActive = activeStateIds?.has(stateUI.id) ?? false;
+        // Only show result status on the active (current) state
+        const stateResultStatus = isActive ? (resultStatus ?? null) : null;
 
         return (
           <StateNode
@@ -57,6 +81,8 @@ export function AutomatonCanvas({
             y={stateUI.position.y}
             isStart={isStart}
             isAccept={isAccept}
+            isActive={isActive}
+            resultStatus={stateResultStatus}
           />
         );
       })}

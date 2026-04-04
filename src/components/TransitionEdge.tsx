@@ -21,13 +21,19 @@ type TransitionEdgeProp = {
 
   /** GraphViz-computed label position */
   labelPosition: { x: number; y: number };
+
+  /** Whether this transition is the next one to be taken during simulation */
+  isNextTransition?: boolean;
 };
 
 const STROKE_WIDTH = 2;
 const ARROWHEAD_SIZE = 8;
 
 export function TransitionEdge(props: TransitionEdgeProp) {
-  const { pathData, symbol, arrowheadPosition, arrowheadAngle, labelPosition } = props;
+  const { pathData, symbol, arrowheadPosition, arrowheadAngle, labelPosition, isNextTransition = false } = props;
+
+  const edgeColor = isNextTransition ? '#2563eb' : '#334155'; // --blue-600 : --text-body
+  const edgeStrokeWidth = isNextTransition ? 3 : STROKE_WIDTH;
 
   // Calculate arrowhead triangle points from angle
   const arrowheadAngle1 = arrowheadAngle + Math.PI - Math.PI / 6;
@@ -46,14 +52,14 @@ export function TransitionEdge(props: TransitionEdgeProp) {
       <path
         d={pathData}
         fill="none"
-        stroke="black"
-        strokeWidth={STROKE_WIDTH}
+        stroke={edgeColor}
+        strokeWidth={edgeStrokeWidth}
       />
 
       {/* Arrowhead */}
       <polygon
         points={`${arrowheadPosition.x},${arrowheadPosition.y} ${arrowheadPoint1X},${arrowheadPoint1Y} ${arrowheadPoint2X},${arrowheadPoint2Y}`}
-        fill="black"
+        fill={edgeColor}
       />
 
       {/* Symbol label */}
@@ -63,7 +69,8 @@ export function TransitionEdge(props: TransitionEdgeProp) {
         textAnchor="middle"
         dominantBaseline="middle"
         fontSize="14px"
-        fill="black"
+        fill={edgeColor}
+        fontWeight={isNextTransition ? 'bold' : 'normal'}
         fontFamily="Arial, sans-serif"
       >
         {displaySymbol}

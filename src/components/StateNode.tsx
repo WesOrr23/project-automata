@@ -24,8 +24,11 @@ type StateNodeProp = {
   /** Whether this is an accept state (renders double circle) */
   isAccept: boolean;
 
-  /** Whether this state is active during simulation (reserved for future use) */
+  /** Whether this state is active during simulation */
   isActive?: boolean;
+
+  /** Result status for final state highlighting after simulation completes */
+  resultStatus?: 'accepted' | 'rejected' | null;
 };
 
 /**
@@ -40,10 +43,29 @@ export function StateNode({
   label,
   x,
   y,
-    isStart: _isStart,
+  isStart: _isStart,
   isAccept,
-  isActive: _isActive = false,
+  isActive = false,
+  resultStatus = null,
 }: StateNodeProp) {
+  // Determine fill and stroke colors based on simulation state
+  // Priority: resultStatus > isActive > default
+  // Colors sourced from CSS custom properties (design tokens)
+  // SVG doesn't inherit CSS vars, so we use the raw values that match index.css
+  let fillColor = 'white';
+  let strokeColor = '#334155'; // --text-body (slate-700)
+
+  if (resultStatus === 'accepted') {
+    fillColor = '#dcfce7'; // --success-fill
+    strokeColor = '#16a34a'; // --success-stroke
+  } else if (resultStatus === 'rejected') {
+    fillColor = '#fee2e2'; // --error-fill
+    strokeColor = '#dc2626'; // --error-stroke
+  } else if (isActive) {
+    fillColor = '#bfdbfe'; // --blue-200
+    strokeColor = '#2563eb'; // --blue-600
+  }
+
   return (
     <g data-state-id={stateId}>
       {/* Outer circle (always present) */}
@@ -51,8 +73,8 @@ export function StateNode({
         cx={x}
         cy={y}
         r={STATE_RADIUS}
-        fill="white"
-        stroke="black"
+        fill={fillColor}
+        stroke={strokeColor}
         strokeWidth={STROKE_WIDTH}
       />
 
@@ -63,7 +85,7 @@ export function StateNode({
           cy={y}
           r={STATE_RADIUS - INNER_CIRCLE_OFFSET}
           fill="none"
-          stroke="black"
+          stroke={strokeColor}
           strokeWidth={STROKE_WIDTH}
         />
       )}
@@ -75,8 +97,8 @@ export function StateNode({
         textAnchor="middle"
         dominantBaseline="middle"
         fontSize="14px"
-        fill="black"
-        fontFamily="Arial, sans-serif"
+        fill="#0f172a"
+        fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
       >
         {label}
       </text>
