@@ -8,27 +8,23 @@
  */
 
 import { useState } from 'react';
-import { Plus, Trash2, X } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { Automaton } from '../../engine/types';
 
 type TransitionEditorProp = {
   automaton: Automaton;
   displayLabels: Map<number, string>;
-  error: string | null;
   highlightedTransition: { from: number; to: number; symbol: string | null } | null;
-  onAddTransition: (from: number, to: number, symbol: string) => string | null;
+  onAddTransition: (from: number, to: number, symbol: string) => void;
   onRemoveTransition: (from: number, to: number, symbol: string | null) => void;
-  onDismissError: () => void;
 };
 
 export function TransitionEditor({
   automaton,
   displayLabels,
-  error,
   highlightedTransition,
   onAddTransition,
   onRemoveTransition,
-  onDismissError,
 }: TransitionEditorProp) {
   const sortedStates = Array.from(automaton.states).sort((a, b) => a - b);
   const sortedAlphabet = Array.from(automaton.alphabet).sort();
@@ -117,37 +113,6 @@ export function TransitionEditor({
               <Plus size={14} />
             </button>
           </div>
-
-          {/* Error appears inline right after the form, not buried at the bottom */}
-          {error && (
-            <div
-              className="editor-validation-banner"
-              role="alert"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-2)',
-                justifyContent: 'space-between',
-              }}
-            >
-              <span style={{ flex: 1 }}>{error}</span>
-              <button
-                className="editor-row-action"
-                onClick={onDismissError}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    onDismissError();
-                  }
-                }}
-                aria-label="Dismiss error"
-                title="Dismiss"
-                style={{ border: 'none', background: 'transparent', color: 'inherit' }}
-              >
-                <X size={14} />
-              </button>
-            </div>
-          )}
         </>
       )}
 

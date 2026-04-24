@@ -18,7 +18,6 @@ import { TransitionEditor } from './TransitionEditor';
 type EditPanelProp = {
   automaton: Automaton;
   displayLabels: Map<number, string>;
-  error: string | null;
   highlightedStateId: number | null;
   highlightedTransition: { from: number; to: number; symbol: string | null } | null;
   highlightedSymbol: string | null;
@@ -28,15 +27,13 @@ type EditPanelProp = {
   onRemoveState: (stateId: number) => void;
   onSetStartState: (stateId: number) => void;
   onToggleAcceptState: (stateId: number) => void;
-  onAddTransition: (from: number, to: number, symbol: string) => string | null;
+  onAddTransition: (from: number, to: number, symbol: string) => void;
   onRemoveTransition: (from: number, to: number, symbol: string | null) => void;
-  onDismissError: () => void;
 };
 
 export function EditPanel({
   automaton,
   displayLabels,
-  error,
   highlightedStateId,
   highlightedTransition,
   highlightedSymbol,
@@ -48,7 +45,6 @@ export function EditPanel({
   onToggleAcceptState,
   onAddTransition,
   onRemoveTransition,
-  onDismissError,
 }: EditPanelProp) {
   return (
     <>
@@ -78,11 +74,9 @@ export function EditPanel({
       <TransitionEditor
         automaton={automaton}
         displayLabels={displayLabels}
-        error={error}
         highlightedTransition={highlightedTransition}
         onAddTransition={onAddTransition}
         onRemoveTransition={onRemoveTransition}
-        onDismissError={onDismissError}
       />
     </>
   );

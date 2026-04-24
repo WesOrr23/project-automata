@@ -21,6 +21,7 @@ import { EditPanel } from './components/toolMenu/EditPanel';
 import { ToolMenuState, ToolTabID } from './components/toolMenu/types';
 import { NotificationStack } from './notifications/NotificationStack';
 import { useNotifications } from './notifications/useNotifications';
+import type { NotificationTarget } from './notifications/types';
 import { computeLayout } from './ui-state/utils';
 import { useSimulation } from './hooks/useSimulation';
 
@@ -53,10 +54,9 @@ function App() {
   const [automatonUI, setAutomatonUI] = useState<AutomatonUI | null>(null);
   const [inputString, setInputString] = useState('');
   const [menuState, setMenuState] = useState<ToolMenuState>({ mode: 'COLLAPSED' });
-  const [editError, setEditError] = useState<string | null>(null);
 
   const sim = useSimulation(automaton);
-  const { highlightedTarget } = useNotifications();
+  const { highlightedTarget, notify } = useNotifications();
 
   // Derive per-component highlight props from the active notification target.
   // Each component only cares about one kind of target; everything else stays
@@ -147,7 +147,6 @@ function App() {
   }
 
   function handleTabClick(tab: ToolTabID) {
-    setEditError(null);
     setMenuState({ mode: 'OPEN', activeTab: tab });
   }
 
@@ -209,20 +208,29 @@ function App() {
   //
   // Each of these uses the functional updater form `setAutomaton(prev => ...)`
   // so rapid successive clicks see the latest automaton state rather than a
-  // stale closure. Errors thrown by engine functions are caught and surfaced
-  // via setEditError.
+  // stale closure. Errors thrown by engine functions are routed to the global
+  // notification system via notify().
 
-  function applyEdit(update: (current: Automaton) => Automaton) {
-    setAutomaton((previous) => {
-      try {
-        const next = update(previous);
-        setEditError(null);
-        return next;
-      } catch (error) {
-        setEditError((error as Error).message);
-        return previous;
-      }
-    });
+  function applyEdit(
+    update: (current: Automaton) => Automaton,
+    targetOnError?: NotificationTarget
+  ) {
+    // Pre-check against the current snapshot so any error throws *outside*
+    // of React's state updater (state updaters must be pure — calling notify()
+    // inside one fires twice under StrictMode).
+    try {
+      update(automaton);
+    } catch (error) {
+      notify({
+        severity: 'error',
+        title: (error as Error).message,
+        target: targetOnError,
+      });
+      return;
+    }
+    // Commit via functional updater so rapid successive clicks all see the
+    // latest state.
+    setAutomaton((previous) => update(previous));
   }
 
   function handleAddState() {
@@ -245,21 +253,22 @@ function App() {
     );
   }
 
-  function handleAddTransition(from: number, to: number, symbol: string): string | null {
-    // addTransition throws on duplicates, invalid states, etc. We need to
-    // return the error string synchronously for the editor UI, so we call
-    // the engine here and also apply via functional setState.
-    try {
-      // Use current snapshot for the synchronous error check; the functional
-      // setState below handles the actual state transition correctly.
-      addTransition(automaton, from, new Set([to]), symbol);
-    } catch (error) {
-      const message = (error as Error).message;
-      setEditError(message);
-      return message;
-    }
-    applyEdit((prev) => addTransition(prev, from, new Set([to]), symbol));
-    return null;
+  function handleAddTransition(from: number, to: number, symbol: string) {
+    // addTransition throws on duplicates and invalid args. The duplicate case
+    // is the most useful one to highlight — point the user at the existing
+    // conflicting transition (same from + symbol).
+    const existing = automaton.transitions.find(
+      (transition) => transition.from === from && transition.symbol === symbol
+    );
+    const target: NotificationTarget | undefined = existing
+      ? {
+          kind: 'transition',
+          from: existing.from,
+          to: Array.from(existing.to)[0] ?? to,
+          symbol: existing.symbol,
+        }
+      : undefined;
+    applyEdit((prev) => addTransition(prev, from, new Set([to]), symbol), target);
   }
 
   function handleRemoveTransition(from: number, to: number, symbol: string | null) {
@@ -322,7 +331,6 @@ function App() {
     <EditPanel
       automaton={automaton}
       displayLabels={displayLabels}
-      error={editError}
       highlightedStateId={highlightedStateId}
       highlightedTransition={highlightedTransition}
       highlightedSymbol={highlightedSymbol}
@@ -334,7 +342,6 @@ function App() {
       onToggleAcceptState={handleToggleAcceptState}
       onAddTransition={handleAddTransition}
       onRemoveTransition={handleRemoveTransition}
-      onDismissError={() => setEditError(null)}
     />
   );
 

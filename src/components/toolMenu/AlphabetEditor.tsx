@@ -3,11 +3,13 @@
  *
  * Manages the automaton's input alphabet: shows current symbols as
  * removable badges, provides an input + Add button for new symbols.
- * Detects paste events and warns if the pasted content would be truncated.
+ * Errors and paste-truncation warnings are routed to the global
+ * notification system via useNotifications().
  */
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { useNotifications } from '../../notifications/useNotifications';
 
 type AlphabetEditorProp = {
   alphabet: Set<string>;
@@ -23,27 +25,32 @@ export function AlphabetEditor({
   onAlphabetRemove,
 }: AlphabetEditorProp) {
   const [draftSymbol, setDraftSymbol] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [pasteWarning, setPasteWarning] = useState<string | null>(null);
+  const { notify } = useNotifications();
 
   function handleAdd() {
     const symbol = draftSymbol.trim();
     if (symbol.length === 0) {
-      setError('Symbol cannot be empty');
+      notify({ severity: 'error', title: 'Symbol cannot be empty' });
       return;
     }
     if (symbol.length > 1) {
-      setError('Symbols must be a single character');
+      notify({
+        severity: 'error',
+        title: 'Symbols must be a single character',
+        detail: `You entered "${symbol}" (${symbol.length} characters).`,
+      });
       return;
     }
     if (alphabet.has(symbol)) {
-      setError(`'${symbol}' is already in the alphabet`);
+      notify({
+        severity: 'error',
+        title: `'${symbol}' is already in the alphabet`,
+        target: { kind: 'alphabet', symbol },
+      });
       return;
     }
     onAlphabetAdd(symbol);
     setDraftSymbol('');
-    setError(null);
-    setPasteWarning(null);
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
@@ -53,9 +60,11 @@ export function AlphabetEditor({
   function handlePaste(event: React.ClipboardEvent<HTMLInputElement>) {
     const pasted = event.clipboardData.getData('text');
     if (pasted.length > 1) {
-      setPasteWarning(`Pasted content truncated to first character ('${pasted[0]}')`);
-    } else {
-      setPasteWarning(null);
+      notify({
+        severity: 'warning',
+        title: `Pasted content truncated`,
+        detail: `Only the first character ('${pasted[0]}') will be used; symbols are one character each.`,
+      });
     }
   }
 
@@ -93,33 +102,18 @@ export function AlphabetEditor({
           type="text"
           className="glass-input"
           value={draftSymbol}
-          onChange={(event) => {
-            setDraftSymbol(event.target.value);
-            if (error) setError(null);
-          }}
+          onChange={(event) => setDraftSymbol(event.target.value)}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           placeholder="New symbol"
           maxLength={1}
           style={{ flex: 1 }}
           aria-label="New alphabet symbol (one character)"
-          aria-describedby="alphabet-hint"
         />
         <button className="btn" onClick={handleAdd}>
           Add
         </button>
       </div>
-
-      {error && (
-        <p className="caption" style={{ color: 'var(--error-text)', marginTop: 'var(--space-2)' }}>
-          {error}
-        </p>
-      )}
-      {pasteWarning && !error && (
-        <p className="caption" style={{ color: '#b45309', marginTop: 'var(--space-2)' }}>
-          {pasteWarning}
-        </p>
-      )}
     </div>
   );
 }
