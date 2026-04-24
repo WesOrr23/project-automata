@@ -1229,6 +1229,13 @@ button svg {
   padding: var(--space-1) 0;
 }
 
+/* Overwrite warning — same violet as the Modify button so the user sees
+ * the connection between the warning text and the violet edge on the canvas. */
+.transition-creator-instruction.warn {
+  color: #5b21b6;
+  font-weight: var(--weight-bold);
+}
+
 .btn-danger {
   background: var(--error-bg);
   color: var(--error-text);
@@ -1240,15 +1247,18 @@ button svg {
   border-color: var(--error-stroke);
 }
 
+/* "Modify" — distinct from Add (blue) and Delete (red), without
+ * resorting to a screaming warning yellow. Soft violet sits cleanly
+ * next to the blue brand colour without feeling like an error. */
 .btn-warning {
-  background: #fef3c7;
-  color: #92400e;
-  border-color: #fde68a;
+  background: #f5f3ff;
+  color: #5b21b6;
+  border-color: #c4b5fd;
 }
 
 .btn-warning:hover:not(:disabled) {
-  background: #fde68a;
-  border-color: #d97706;
+  background: #ede9fe;
+  border-color: #8b5cf6;
 }
 
 /* ─── State picker popover (anchored right of menu) ─── */
@@ -1307,10 +1317,8 @@ button svg {
   stroke-width: 4;
 }
 
-/* ─── Canvas state nodes in pick mode ─── */
-/* When the transition creator is asking for a state, every state node on
- * the canvas becomes a clickable target. Subtle pulse + cursor:pointer
- * tells the user "click one of these." */
+/* ─── Canvas state nodes — pick mode (active picking) ─── */
+/* Pulsing ring + cursor:pointer tells the user "click one of these." */
 
 .state-node-pickable circle {
   transition: stroke-width 0.15s ease, filter 0.15s ease;
@@ -1328,6 +1336,76 @@ button svg {
 
 .state-node-pickable circle:not(:hover) {
   animation: state-node-pickable-breath 2s ease-in-out infinite;
+}
+
+/* ─── Canvas state nodes — selectable (idle edit mode) ─── */
+/* Quieter affordance: hover thickens the ring, no constant pulse. */
+
+.state-node-selectable circle {
+  transition: stroke-width 0.15s ease, filter 0.15s ease;
+}
+
+.state-node-selectable:hover circle {
+  stroke-width: 3;
+  filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.35));
+}
+
+/* ─── State actions popover ─── */
+.state-actions-popover {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-sidebar);
+  box-shadow: var(--shadow-lg);
+  min-width: 160px;
+  outline: none;
+}
+
+.state-actions-popover-header {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-secondary);
+  text-align: center;
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 2px;
+}
+
+.state-actions-popover-action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  background: transparent;
+  color: var(--text-heading);
+  font: inherit;
+  font-size: var(--text-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+  text-align: left;
+}
+
+.state-actions-popover-action:hover:not(:disabled) {
+  background: var(--blue-50);
+  color: var(--blue-700);
+}
+
+.state-actions-popover-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.state-actions-popover-action.danger:hover:not(:disabled) {
+  background: var(--error-bg);
+  color: var(--error-text);
 }
 
 /* ─── Source highlighting (notification target pulse) ─── */
@@ -1387,6 +1465,15 @@ button svg {
 
 .pulse-canvas-error {
   stroke: var(--error-stroke) !important;
+}
+
+@keyframes pulse-canvas-warn {
+  0%, 100% { stroke-opacity: 1; }
+  50%      { stroke-opacity: 0.55; }
+}
+
+.pulse-canvas-warn {
+  animation: pulse-canvas-warn 1.4s ease-in-out infinite;
 }
 
 .pulse-canvas-warning {

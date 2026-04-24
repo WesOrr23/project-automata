@@ -45,10 +45,22 @@ type AutomatonCanvasProp = {
   onPickState?: (stateId: number) => void;
 
   /**
+   * Called when the user clicks a state node while NOT in pick mode
+   * (typically: edit-mode state actions popover).
+   */
+  onStateClick?: (stateId: number, anchorEl: SVGGElement) => void;
+
+  /**
    * Called when the user clicks an existing transition edge on the canvas.
    * Loads it into the creator form for editing/deletion.
    */
   onEdgeClick?: (transition: { from: number; to: number; symbol: string | null }) => void;
+
+  /**
+   * Transition that would be silently overwritten by the in-progress
+   * creator form. Highlighted in violet on the canvas as a warning.
+   */
+  warnTransition?: { from: number; to: number; symbol: string } | null;
 };
 
 export function AutomatonCanvas({
@@ -61,7 +73,9 @@ export function AutomatonCanvas({
   highlightedTransition,
   pickMode,
   onPickState,
+  onStateClick,
   onEdgeClick,
+  warnTransition,
 }: AutomatonCanvasProp) {
   // The start-state arrow extends LEFT of the start-state circle by ~50px,
   // which is outside GraphViz's computed bounding box. Extend the SVG
@@ -92,6 +106,13 @@ export function AutomatonCanvas({
           && transition.toStateId === highlightedTransition.to
           && transition.symbol === highlightedTransition.symbol;
 
+        const isWarned =
+          warnTransition !== null
+          && warnTransition !== undefined
+          && transition.fromStateId === warnTransition.from
+          && transition.toStateId === warnTransition.to
+          && transition.symbol === warnTransition.symbol;
+
         return (
           <TransitionEdge
             key={`transition-${index}`}
@@ -102,6 +123,7 @@ export function AutomatonCanvas({
             labelPosition={transition.labelPosition}
             isNextTransition={isNextTransition}
             isHighlighted={isHighlighted}
+            isWarned={isWarned}
             onEdgeClick={
               onEdgeClick
                 ? () =>
@@ -125,7 +147,19 @@ export function AutomatonCanvas({
         const stateResultStatus = isActive ? (resultStatus ?? null) : null;
 
         const isHighlighted = stateUI.id === highlightedStateId;
-        const isPickable = pickMode === 'state';
+        const isPickMode = pickMode === 'state';
+        // Pick mode wins; otherwise fall back to onStateClick (state actions).
+        const interactive = isPickMode
+          ? Boolean(onPickState)
+          : Boolean(onStateClick);
+        const interactionStyle = isPickMode ? 'pick' : 'select';
+        const handleClick = isPickMode
+          ? onPickState
+            ? () => onPickState(stateUI.id)
+            : undefined
+          : onStateClick
+            ? (anchorEl: SVGGElement) => onStateClick(stateUI.id, anchorEl)
+            : undefined;
 
         return (
           <StateNode
@@ -139,8 +173,9 @@ export function AutomatonCanvas({
             isActive={isActive}
             resultStatus={stateResultStatus}
             isHighlighted={isHighlighted}
-            isPickable={isPickable}
-            onPick={isPickable && onPickState ? () => onPickState(stateUI.id) : undefined}
+            isInteractive={interactive}
+            interactionStyle={interactionStyle}
+            onClick={handleClick}
           />
         );
       })}

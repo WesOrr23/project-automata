@@ -28,6 +28,9 @@ type TransitionEdgeProp = {
   /** Whether this transition is the active highlight target of a notification */
   isHighlighted?: boolean;
 
+  /** Whether this transition is being warned (e.g. would be silently overwritten). */
+  isWarned?: boolean;
+
   /** Called when the user clicks this edge (loads it into the creator form). */
   onEdgeClick?: () => void;
 };
@@ -44,17 +47,26 @@ export function TransitionEdge(props: TransitionEdgeProp) {
     labelPosition,
     isNextTransition = false,
     isHighlighted = false,
+    isWarned = false,
     onEdgeClick,
   } = props;
 
-  // Highlight (notification target) wins over next-transition (simulation).
+  // Color priority: highlighted (red) > warned (violet) > next (blue) > default (slate).
   let edgeColor = isNextTransition ? '#2563eb' : '#334155'; // --blue-600 : --text-body
   let edgeStrokeWidth = isNextTransition ? 3 : STROKE_WIDTH;
+  if (isWarned) {
+    edgeColor = '#7c3aed'; // violet-600 — same family as Modify button
+    edgeStrokeWidth = 3;
+  }
   if (isHighlighted) {
     edgeColor = '#dc2626'; // --error-stroke
     edgeStrokeWidth = 3;
   }
-  const highlightClass = isHighlighted ? 'pulse-canvas pulse-canvas-error' : undefined;
+  const highlightClass = isHighlighted
+    ? 'pulse-canvas pulse-canvas-error'
+    : isWarned
+      ? 'pulse-canvas pulse-canvas-warn'
+      : undefined;
 
   // Calculate arrowhead triangle points from angle
   const arrowheadAngle1 = arrowheadAngle + Math.PI - Math.PI / 6;

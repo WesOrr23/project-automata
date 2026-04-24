@@ -34,13 +34,21 @@ type StateNodeProp = {
   isHighlighted?: boolean;
 
   /**
-   * Whether the canvas is in "pick a state" mode. Drives the cursor and
-   * hover affordance so the user knows the state node is clickable.
+   * Whether the state is currently interactive (clickable). Drives the
+   * cursor and hover affordance.
    */
-  isPickable?: boolean;
+  isInteractive?: boolean;
 
-  /** Called when the state is clicked while pickable. */
-  onPick?: () => void;
+  /**
+   * Visual emphasis variant — 'pick' shows a pulsing ring (used while
+   * the canvas is in pick mode for the creator form), 'select' shows
+   * a quieter affordance (used for state-action clicks in edit mode).
+   */
+  interactionStyle?: 'pick' | 'select';
+
+  /** Called when the state is clicked. The DOM element is passed for
+   * popover anchoring purposes (state-action popover). */
+  onClick?: (anchorEl: SVGGElement) => void;
 };
 
 /**
@@ -60,8 +68,9 @@ export function StateNode({
   isActive = false,
   resultStatus = null,
   isHighlighted = false,
-  isPickable = false,
-  onPick,
+  isInteractive = false,
+  interactionStyle = 'select',
+  onClick,
 }: StateNodeProp) {
   // Determine fill and stroke colors based on simulation state
   // Priority: resultStatus > isActive > default
@@ -89,9 +98,10 @@ export function StateNode({
 
   const highlightClass = isHighlighted ? 'pulse-canvas pulse-canvas-error' : undefined;
 
-  // Combined classes: highlight pulse (notification) + pickable affordance.
+  // Combined classes for visual affordance.
   const groupClassNames = [
-    isPickable ? 'state-node-pickable' : '',
+    isInteractive && interactionStyle === 'pick' ? 'state-node-pickable' : '',
+    isInteractive && interactionStyle === 'select' ? 'state-node-selectable' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -100,20 +110,24 @@ export function StateNode({
     <g
       data-state-id={stateId}
       className={groupClassNames}
-      onClick={isPickable ? onPick : undefined}
-      role={isPickable ? 'button' : undefined}
-      tabIndex={isPickable ? 0 : undefined}
+      onClick={
+        isInteractive && onClick
+          ? (event) => onClick(event.currentTarget)
+          : undefined
+      }
+      role={isInteractive ? 'button' : undefined}
+      tabIndex={isInteractive ? 0 : undefined}
       onKeyDown={
-        isPickable && onPick
+        isInteractive && onClick
           ? (event) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
-                onPick();
+                onClick(event.currentTarget);
               }
             }
           : undefined
       }
-      style={isPickable ? { cursor: 'pointer' } : undefined}
+      style={isInteractive ? { cursor: 'pointer' } : undefined}
     >
       {/* Outer circle (always present) */}
       <circle

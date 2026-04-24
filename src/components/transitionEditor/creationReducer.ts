@@ -147,3 +147,44 @@ export function actionButtonLabel(state: CreationState): string {
       return 'Add';
   }
 }
+
+/**
+ * If committing the current form would silently overwrite an existing
+ * transition (same source + symbol, different destination), return that
+ * existing transition. Returns null if commit would just add a new edge
+ * or if no commit is possible.
+ *
+ * In edit mode, the existing transition that matches editingExisting
+ * doesn't count as "overwrite" — that's the one being modified.
+ */
+export function findOverwriteTarget(
+  state: CreationState,
+  transitions: ReadonlyArray<{ from: number; to: ReadonlySet<number>; symbol: string | null }>
+): { from: number; to: number; symbol: string } | null {
+  if (state.source === null || state.symbol === '') return null;
+  for (const transition of transitions) {
+    if (transition.from !== state.source) continue;
+    if (transition.symbol !== state.symbol) continue;
+    // Skip the edit's original — it's getting replaced, not overwritten.
+    if (
+      state.editingExisting !== null &&
+      transition.from === state.editingExisting.from &&
+      transition.symbol === state.editingExisting.symbol
+    ) {
+      continue;
+    }
+    const dest = Array.from(transition.to)[0];
+    if (dest === undefined) continue;
+    // In create mode, if the existing destination matches what the user is
+    // about to set, the commit is a true no-op — no warning.
+    if (
+      state.editingExisting === null &&
+      state.destination !== null &&
+      dest === state.destination
+    ) {
+      return null;
+    }
+    return { from: transition.from, to: dest, symbol: state.symbol };
+  }
+  return null;
+}

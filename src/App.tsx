@@ -21,8 +21,10 @@ import { ToolMenuState, ToolTabID } from './components/toolMenu/types';
 import { NotificationStack } from './notifications/NotificationStack';
 import { useNotifications } from './notifications/useNotifications';
 import type { NotificationTarget } from './notifications/types';
+import { StateActionsPopover } from './components/popover/StateActionsPopover';
 import {
   creationReducer,
+  findOverwriteTarget,
   INITIAL_CREATION_STATE,
 } from './components/transitionEditor/creationReducer';
 import { computeLayout } from './ui-state/utils';
@@ -75,6 +77,27 @@ function App() {
     creationState.phase === 'picking-destination'
       ? 'state'
       : null;
+
+  // Detect a transition that committing the form would silently overwrite,
+  // so the canvas can highlight it as a warning.
+  const overwriteTarget = findOverwriteTarget(creationState, automaton.transitions);
+
+  // State-actions popover (opened by clicking a state node on the canvas
+  // while in EDIT mode and not actively picking).
+  const [stateActions, setStateActions] = useState<{
+    stateId: number;
+    anchorRect: DOMRect;
+  } | null>(null);
+
+  function handleCanvasStateClick(stateId: number, anchorEl: SVGGElement) {
+    setStateActions({ stateId, anchorRect: anchorEl.getBoundingClientRect() });
+  }
+
+  // Close the popover whenever the underlying state list changes (e.g.
+  // after a Delete action) so it doesn't linger pointing at a removed state.
+  useEffect(() => {
+    setStateActions(null);
+  }, [automaton.states]);
 
   function handleCanvasPickState(stateId: number) {
     if (creationState.phase === 'picking-source') {
@@ -488,6 +511,29 @@ function App() {
 
       <NotificationStack />
 
+      {stateActions !== null && (
+        <StateActionsPopover
+          stateLabel={displayLabels.get(stateActions.stateId) ?? `q${stateActions.stateId}`}
+          isStartState={stateActions.stateId === automaton.startState}
+          isAcceptState={automaton.acceptStates.has(stateActions.stateId)}
+          canDelete={automaton.states.size > 1}
+          anchorRect={stateActions.anchorRect}
+          onSetStart={() => {
+            handleSetStartState(stateActions.stateId);
+            setStateActions(null);
+          }}
+          onToggleAccept={() => {
+            handleToggleAcceptState(stateActions.stateId);
+            setStateActions(null);
+          }}
+          onDelete={() => {
+            handleRemoveState(stateActions.stateId);
+            setStateActions(null);
+          }}
+          onClose={() => setStateActions(null)}
+        />
+      )}
+
       <main className="canvas-area">
         {automatonUI === null ? (
           <p className="caption">Loading...</p>
@@ -502,7 +548,13 @@ function App() {
             highlightedTransition={highlightedTransition}
             pickMode={canvasPickMode}
             onPickState={handleCanvasPickState}
+            onStateClick={
+              appMode === 'EDITING' && canvasPickMode === null
+                ? handleCanvasStateClick
+                : undefined
+            }
             onEdgeClick={appMode === 'EDITING' ? handleCanvasEdgeClick : undefined}
+            warnTransition={appMode === 'EDITING' ? overwriteTarget : null}
           />
         )}
       </main>

@@ -25,6 +25,7 @@ import { Automaton } from '../../engine/types';
 import {
   actionButtonLabel,
   actionMode,
+  findOverwriteTarget,
   isReady,
   type CreationAction,
   type CreationState,
@@ -51,8 +52,18 @@ type TransitionCreatorProp = {
  * Contextual instructions shown below the form. Reflect the current state
  * machine state — tell the user what to do next.
  */
-function instructionFor(state: CreationState, symbolValid: boolean): string {
+function instructionFor(
+  state: CreationState,
+  symbolValid: boolean,
+  overwriteLabel: string | null
+): string {
   const mode = actionMode(state);
+  // Overwrite warning takes precedence over the "ready" message — the user
+  // needs to know they're about to clobber an existing transition.
+  if (overwriteLabel !== null && symbolValid) {
+    const verb = mode === 'modify' ? 'Modify' : 'Add';
+    return `${verb} will replace ${overwriteLabel} (highlighted on the canvas).`;
+  }
   if (mode === 'modify') {
     if (!symbolValid) return `'${state.symbol}' is not in the alphabet.`;
     return 'Click Modify to apply your changes (or Cancel to discard).';
@@ -146,6 +157,14 @@ export function TransitionCreator({
   const ready = isReady(state) && symbolValid;
   const mode = actionMode(state);
   const buttonLabel = actionButtonLabel(state);
+
+  // Compute "would overwrite" for the instruction text. The canvas
+  // highlight is wired separately by the parent (App.tsx) which has the
+  // same data and computes the same value.
+  const overwriteTarget = findOverwriteTarget(state, automaton.transitions);
+  const overwriteLabel = overwriteTarget
+    ? `${labelFor(overwriteTarget.from)} → ${overwriteTarget.symbol} → ${labelFor(overwriteTarget.to)}`
+    : null;
 
   function openPickerForSlot(slot: 'source' | 'destination', anchorEl: HTMLElement) {
     setPickerSlot(slot);
@@ -272,8 +291,10 @@ export function TransitionCreator({
             </button>
           </div>
 
-          <p className="transition-creator-instruction">
-            {instructionFor(state, symbolValid)}
+          <p
+            className={`transition-creator-instruction ${overwriteLabel !== null && symbolValid ? 'warn' : ''}`}
+          >
+            {instructionFor(state, symbolValid, overwriteLabel)}
           </p>
 
           {state.editingExisting !== null && (

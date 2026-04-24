@@ -177,3 +177,16 @@ End-to-end test for Phase 4:
 3. Type "0" in symbol box → Add button enables
 4. Click Add → transition appears on canvas, form resets
 5. Click the new edge on canvas → form populates with that transition → Delete → transition gone
+
+---
+
+## Reserved for Iteration 8
+
+**Undo / Redo.** Every automaton edit (state add/remove, alphabet
+change, transition set/replace, accept toggle, start change) should be
+reversible. Approach: maintain a history stack of `Automaton` snapshots
+(or, more compactly, a stack of inverse-action records). Cmd/Ctrl+Z and
+Cmd/Ctrl+Shift+Z keyboard shortcuts. Visual Undo / Redo buttons in the
+sidebar (probably under Configure or as a small toolbar near the menu).
+Reset history on file import. Cap history depth (~50 actions) to bound
+memory.
