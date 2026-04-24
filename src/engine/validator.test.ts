@@ -295,9 +295,7 @@ describe('getValidationReport', () => {
     const report = getValidationReport(result);
 
     expect(report.valid).toBe(false);
-    expect(report.errors).toContain(
-      'DFA is incomplete (missing transitions for some symbols)'
-    );
+    expect(report.errors).toContain("Missing transition: q0 on '1'");
   });
 
   it('warns about missing accept states', () => {
@@ -310,7 +308,7 @@ describe('getValidationReport', () => {
 
     expect(report.valid).toBe(true); // Still valid, just warning
     expect(report.warnings).toContain(
-      'No accept states defined (will reject all inputs)'
+      'No accept states defined — every input will be rejected'
     );
   });
 

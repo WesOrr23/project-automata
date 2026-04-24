@@ -7,7 +7,7 @@
  * - List of existing transitions with delete buttons
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Automaton } from '../../engine/types';
 
@@ -32,6 +32,28 @@ export function TransitionEditor({
   const [fromState, setFromState] = useState<number>(sortedStates[0] ?? 0);
   const [toState, setToState] = useState<number>(sortedStates[0] ?? 0);
   const [symbol, setSymbol] = useState<string>(sortedAlphabet[0] ?? '');
+
+  // Snap form selections back to valid values when the underlying data changes
+  // (e.g. the alphabet was edited, or a selected state was deleted). Prevents
+  // the form from holding a stale value that no longer matches any option.
+  useEffect(() => {
+    if (!automaton.states.has(fromState)) {
+      setFromState(sortedStates[0] ?? 0);
+    }
+    if (!automaton.states.has(toState)) {
+      setToState(sortedStates[0] ?? 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [automaton.states]);
+
+  useEffect(() => {
+    if (symbol !== '' && !automaton.alphabet.has(symbol)) {
+      setSymbol(sortedAlphabet[0] ?? '');
+    } else if (symbol === '' && sortedAlphabet.length > 0) {
+      setSymbol(sortedAlphabet[0] ?? '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [automaton.alphabet]);
 
   function labelFor(stateId: number): string {
     return displayLabels.get(stateId) ?? `q${stateId}`;

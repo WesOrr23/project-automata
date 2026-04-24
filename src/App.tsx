@@ -168,11 +168,13 @@ function App() {
   }
 
   function handleAlphabetRemove(symbol: string) {
+    // Allow removing the last symbol — leaving the alphabet empty. Simulation
+    // is gated on a non-empty alphabet via isRunnable, so this can't produce
+    // a runnable-but-broken automaton. Empty alphabet is a useful editing
+    // intermediate state (e.g. wholesale switching from 0/1 to a/b).
     setAutomaton((prev) => {
-      if (prev.alphabet.size <= 1) return prev;
       const newAlphabet = new Set(prev.alphabet);
       newAlphabet.delete(symbol);
-      // Cascade: drop transitions that referenced the removed symbol
       const newTransitions = prev.transitions.filter((t) => t.symbol !== symbol);
       return { ...prev, alphabet: newAlphabet, transitions: newTransitions };
     });
@@ -213,7 +215,8 @@ function App() {
 
   function applyEdit(
     update: (current: Automaton) => Automaton,
-    targetOnError?: NotificationTarget
+    targetOnError?: NotificationTarget,
+    titleOnError?: string
   ) {
     // Pre-check against the current snapshot so any error throws *outside*
     // of React's state updater (state updaters must be pure — calling notify()
@@ -221,10 +224,15 @@ function App() {
     try {
       update(automaton);
     } catch (error) {
+      const message = (error as Error).message;
       notify({
         severity: 'error',
-        title: (error as Error).message,
+        title: titleOnError ?? message,
+        detail: titleOnError ? message : undefined,
         target: targetOnError,
+        // Edits that fail are non-blocking — the user can keep working. Auto-
+        // dismiss so the stack doesn't fill with stale errors.
+        autoDismissMs: 6_000,
       });
       return;
     }
@@ -268,7 +276,12 @@ function App() {
           symbol: existing.symbol,
         }
       : undefined;
-    applyEdit((prev) => addTransition(prev, from, new Set([to]), symbol), target);
+    const title = existing ? 'Duplicate transition' : 'Could not add transition';
+    applyEdit(
+      (prev) => addTransition(prev, from, new Set([to]), symbol),
+      target,
+      title
+    );
   }
 
   function handleRemoveTransition(from: number, to: number, symbol: string | null) {

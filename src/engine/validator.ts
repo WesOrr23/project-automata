@@ -145,8 +145,35 @@ export function isRunnable(automaton: Automaton): boolean {
   if (automaton.type !== 'DFA') {
     return false;
   }
+  // Alphabet must be non-empty
+  if (automaton.alphabet.size === 0) {
+    return false;
+  }
 
   return hasStartState(automaton) && isDFA(automaton) && isComplete(automaton);
+}
+
+/**
+ * Find all (state, symbol) pairs missing from a DFA's transition table.
+ *
+ * @param automaton - The automaton to analyze (assumed to be a DFA)
+ * @returns Array of `{ stateId, symbol }` pairs for which no transition exists
+ */
+export function getMissingTransitions(
+  automaton: Automaton
+): Array<{ stateId: number; symbol: string }> {
+  const missing: Array<{ stateId: number; symbol: string }> = [];
+  for (const stateId of automaton.states) {
+    for (const symbol of automaton.alphabet) {
+      const exists = automaton.transitions.some(
+        (t) => t.from === stateId && t.symbol === symbol
+      );
+      if (!exists) {
+        missing.push({ stateId, symbol });
+      }
+    }
+  }
+  return missing;
 }
 
 /**
@@ -220,6 +247,11 @@ export function getValidationReport(
   const errors: string[] = [];
   const warnings: string[] = [];
 
+  // Empty alphabet: nothing to simulate over
+  if (automaton.alphabet.size === 0) {
+    errors.push('Alphabet is empty — add at least one symbol to simulate');
+  }
+
   // Check for start state
   if (!hasStartState(automaton)) {
     errors.push('No start state defined');
@@ -230,20 +262,32 @@ export function getValidationReport(
     errors.push('Not a valid DFA (check for ε-transitions or non-determinism)');
   }
 
-  // Check completeness
-  if (isDFA(automaton) && !isComplete(automaton)) {
-    errors.push('DFA is incomplete (missing transitions for some symbols)');
+  // Check completeness — list the specific missing transitions so the user
+  // knows exactly what to add.
+  if (isDFA(automaton) && automaton.alphabet.size > 0 && !isComplete(automaton)) {
+    const missing = getMissingTransitions(automaton);
+    if (missing.length === 1) {
+      const m = missing[0]!;
+      errors.push(`Missing transition: q${m.stateId} on '${m.symbol}'`);
+    } else if (missing.length <= 5) {
+      const list = missing.map((m) => `q${m.stateId}/'${m.symbol}'`).join(', ');
+      errors.push(`Missing ${missing.length} transitions: ${list}`);
+    } else {
+      const sample = missing.slice(0, 3).map((m) => `q${m.stateId}/'${m.symbol}'`).join(', ');
+      errors.push(`Missing ${missing.length} transitions (e.g. ${sample}, …)`);
+    }
   }
 
   // Check for accept states
   if (!hasAcceptStates(automaton)) {
-    warnings.push('No accept states defined (will reject all inputs)');
+    warnings.push('No accept states defined — every input will be rejected');
   }
 
   // Check for orphaned states
   const orphaned = getOrphanedStates(automaton);
   if (orphaned.size > 0) {
-    warnings.push(`Unreachable states: ${[...orphaned].join(', ')}`);
+    const labels = [...orphaned].sort((a, b) => a - b).map((id) => `q${id}`).join(', ');
+    warnings.push(`Unreachable states: ${labels}`);
   }
 
   return {

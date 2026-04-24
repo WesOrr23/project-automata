@@ -53,8 +53,11 @@ export function SimulationControls({
   onSpeedChange,
   onJumpTo,
 }: SimulationControlsProp) {
-  const canStep =
-    (hasSimulation || hasInput) && (status === 'idle' || status === 'paused' || status === 'finished');
+  // Step is only valid when there are unconsumed input symbols. Once the
+  // simulation finishes, Step is disabled (use Back to step backwards or
+  // edit the input to start over).
+  const canStep = (hasSimulation || hasInput) && (status === 'idle' || status === 'paused');
+  // Play allows replay from a finished state — re-initialises and runs.
   const canPlay =
     (hasSimulation || hasInput) && (status === 'idle' || status === 'paused' || status === 'finished');
   const canPause = status === 'running';

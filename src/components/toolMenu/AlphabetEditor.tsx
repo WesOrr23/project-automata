@@ -30,22 +30,30 @@ export function AlphabetEditor({
   function handleAdd() {
     const symbol = draftSymbol.trim();
     if (symbol.length === 0) {
-      notify({ severity: 'error', title: 'Symbol cannot be empty' });
+      notify({
+        severity: 'error',
+        title: 'Empty symbol',
+        detail: 'Enter a single character to add to the alphabet.',
+        autoDismissMs: 4_000,
+      });
       return;
     }
     if (symbol.length > 1) {
       notify({
         severity: 'error',
-        title: 'Symbols must be a single character',
-        detail: `You entered "${symbol}" (${symbol.length} characters).`,
+        title: 'Symbol too long',
+        detail: `You entered "${symbol}" (${symbol.length} characters). Alphabet symbols are one character each.`,
+        autoDismissMs: 4_000,
       });
       return;
     }
     if (alphabet.has(symbol)) {
       notify({
         severity: 'error',
-        title: `'${symbol}' is already in the alphabet`,
+        title: 'Duplicate symbol',
+        detail: `'${symbol}' is already in the alphabet.`,
         target: { kind: 'alphabet', symbol },
+        autoDismissMs: 4_000,
       });
       return;
     }
@@ -62,14 +70,14 @@ export function AlphabetEditor({
     if (pasted.length > 1) {
       notify({
         severity: 'warning',
-        title: `Pasted content truncated`,
-        detail: `Only the first character ('${pasted[0]}') will be used; symbols are one character each.`,
+        title: 'Paste truncated',
+        detail: `Only the first character ('${pasted[0]}') was kept; symbols are one character each.`,
+        autoDismissMs: 4_000,
       });
     }
   }
 
   const sortedAlphabet = Array.from(alphabet).sort();
-  const canRemove = alphabet.size > 1;
 
   return (
     <div>
@@ -87,9 +95,8 @@ export function AlphabetEditor({
             <button
               className="alphabet-badge-remove"
               onClick={() => onAlphabetRemove(symbol)}
-              disabled={!canRemove}
               aria-label={`Remove symbol ${symbol}`}
-              title={canRemove ? `Remove '${symbol}'` : 'Alphabet must have at least one symbol'}
+              title={`Remove '${symbol}'`}
             >
               <X size={12} />
             </button>

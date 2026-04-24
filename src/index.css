@@ -259,12 +259,15 @@ body {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
   background: var(--bg-button);
-  overflow: hidden;
   transition: all 0.15s ease;
 }
 
+/* Compact cards clip their (non-existent) content for the rounded corners.
+ * The active card explicitly does NOT clip — its content can exceed the
+ * card's height and the parent .tool-menu-open scrolls. */
 .tool-menu-card.compact {
   cursor: pointer;
+  overflow: hidden;
 }
 
 .tool-menu-card.compact:hover {
@@ -643,21 +646,21 @@ body {
 }
 
 /* ─── Hover-only row actions ─── */
-/* Actions are invisible until the row is hovered or one of its descendants
- * has focus (so keyboard users can still reach them). `visibility: hidden`
- * (instead of just opacity) so hidden buttons are non-interactive and can't
- * capture hover accidentally when the cursor moves fast between rows.
+/* Actions are removed from the layout until the row is hovered or one of its
+ * descendants has focus. `display: none` (instead of visibility/opacity)
+ * eliminates ghosting from background bleed-through and ensures the hidden
+ * button can't capture pointer events.
+ *
+ * The row is flex with align-items:center, so removing the action doesn't
+ * change row height — only the trailing whitespace.
  */
 .show-actions-on-hover .hide-unless-hover {
-  visibility: hidden;
-  opacity: 0;
+  display: none;
 }
 
 .show-actions-on-hover:hover .hide-unless-hover,
-.show-actions-on-hover:focus-within .hide-unless-hover,
-.show-actions-on-hover .hide-unless-hover:focus-visible {
-  visibility: visible;
-  opacity: 1;
+.show-actions-on-hover:focus-within .hide-unless-hover {
+  display: flex;
 }
 
 /* Compact tab cards are <button> now; reset default browser styling. */
