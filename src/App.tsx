@@ -344,7 +344,6 @@ function App() {
       automaton={automaton}
       displayLabels={displayLabels}
       highlightedStateId={highlightedStateId}
-      highlightedTransition={highlightedTransition}
       highlightedSymbol={highlightedSymbol}
       onAlphabetAdd={handleAlphabetAdd}
       onAlphabetRemove={handleAlphabetRemove}

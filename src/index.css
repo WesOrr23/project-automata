@@ -1091,6 +1091,188 @@ button svg {
   }
 }
 
+/* ─── Transition Creator (visual transition editor) ─── */
+
+.transition-creator {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+}
+
+.transition-creator-svg-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.mini-transition-svg {
+  user-select: none;
+  display: block;
+}
+
+.mini-transition-slot {
+  cursor: pointer;
+}
+
+.mini-transition-slot circle {
+  fill: var(--bg-sidebar);
+  stroke: var(--text-secondary);
+  stroke-width: 2;
+  transition: stroke 0.15s ease, fill 0.15s ease;
+}
+
+.mini-transition-slot-empty circle {
+  fill: var(--bg-input);
+  stroke-dasharray: 3 3;
+}
+
+.mini-transition-slot-filled circle {
+  fill: var(--blue-50);
+  stroke: var(--blue-500);
+  stroke-dasharray: none;
+}
+
+.mini-transition-slot:hover circle {
+  stroke: var(--blue-600);
+}
+
+.mini-transition-slot-active circle {
+  stroke: var(--blue-500);
+  stroke-width: 3;
+  animation: mini-transition-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes mini-transition-pulse {
+  0%, 100% {
+    stroke-opacity: 1;
+    filter: drop-shadow(0 0 0 var(--blue-300));
+  }
+  50% {
+    stroke-opacity: 0.6;
+    filter: drop-shadow(0 0 4px var(--blue-300));
+  }
+}
+
+.mini-transition-label {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: var(--weight-bold);
+  fill: var(--text-heading);
+  pointer-events: none;
+}
+
+.mini-transition-slot-empty .mini-transition-label {
+  fill: var(--text-secondary);
+}
+
+.mini-transition-arrow {
+  stroke: var(--text-body);
+  stroke-width: 1.5;
+}
+
+.mini-transition-arrowhead {
+  fill: var(--text-body);
+}
+
+.mini-transition-symbol {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: var(--weight-bold);
+  fill: var(--blue-600);
+}
+
+.transition-creator-symbol-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.transition-creator-symbol-row .editor-select {
+  flex: 1;
+}
+
+.btn-danger {
+  background: var(--error-bg);
+  color: var(--error-text);
+  border-color: var(--error-border);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #fecaca;
+  border-color: var(--error-stroke);
+}
+
+/* Temporary list (Phase 1 only) */
+.transition-creator-temp-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--border-subtle);
+}
+
+.transition-creator-temp-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+}
+
+/* ─── State picker popover (anchored right of menu) ─── */
+
+.state-picker-popover {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-sidebar);
+  box-shadow: var(--shadow-lg);
+  max-height: 240px;
+  overflow-y: auto;
+  outline: none;
+  min-width: 100px;
+}
+
+.state-picker-popover-option {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  padding: var(--space-1) var(--space-3);
+  border: none;
+  background: transparent;
+  color: var(--text-heading);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.1s ease;
+}
+
+.state-picker-popover-option.highlighted {
+  background: var(--blue-100);
+  color: var(--blue-700);
+}
+
+.state-picker-popover-option[aria-selected='true'] {
+  background: var(--blue-500);
+  color: white;
+}
+
+.state-picker-popover-option[aria-selected='true'].highlighted {
+  background: var(--blue-600);
+}
+
 /* ─── Source highlighting (notification target pulse) ─── */
 
 @keyframes pulse-error {

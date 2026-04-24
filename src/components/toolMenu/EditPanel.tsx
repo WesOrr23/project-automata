@@ -13,13 +13,12 @@
 import { Automaton } from '../../engine/types';
 import { AlphabetEditor } from './AlphabetEditor';
 import { StateEditor } from './StateEditor';
-import { TransitionEditor } from './TransitionEditor';
+import { TransitionCreator } from '../transitionEditor/TransitionCreator';
 
 type EditPanelProp = {
   automaton: Automaton;
   displayLabels: Map<number, string>;
   highlightedStateId: number | null;
-  highlightedTransition: { from: number; to: number; symbol: string | null } | null;
   highlightedSymbol: string | null;
   onAlphabetAdd: (symbol: string) => void;
   onAlphabetRemove: (symbol: string) => void;
@@ -34,7 +33,6 @@ export function EditPanel({
   automaton,
   displayLabels,
   highlightedStateId,
-  highlightedTransition,
   highlightedSymbol,
   onAlphabetAdd,
   onAlphabetRemove,
@@ -69,10 +67,9 @@ export function EditPanel({
 
       <div className="divider" />
 
-      <TransitionEditor
+      <TransitionCreator
         automaton={automaton}
         displayLabels={displayLabels}
-        highlightedTransition={highlightedTransition}
         onSetTransition={onSetTransition}
       />
     </>
