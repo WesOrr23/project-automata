@@ -63,10 +63,18 @@ export function AutomatonCanvas({
   onPickState,
   onEdgeClick,
 }: AutomatonCanvasProp) {
+  // The start-state arrow extends LEFT of the start-state circle by ~50px,
+  // which is outside GraphViz's computed bounding box. Extend the SVG
+  // viewBox left so the arrow has room to render. We also widen the SVG
+  // element by the same amount so layout still reserves the space.
+  const START_ARROW_RESERVE = 70;
+  const viewWidth = automatonUI.boundingBox.width + START_ARROW_RESERVE;
+  const viewHeight = automatonUI.boundingBox.height;
   return (
     <svg
-      width={automatonUI.boundingBox.width}
-      height={automatonUI.boundingBox.height}
+      width={viewWidth}
+      height={viewHeight}
+      viewBox={`${-START_ARROW_RESERVE} 0 ${viewWidth} ${viewHeight}`}
       style={{ display: 'block' }}
     >
       {/* Layer 1: Transition edges (background) */}

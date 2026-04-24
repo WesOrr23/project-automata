@@ -23,6 +23,8 @@
 import { Dispatch, useEffect, useRef, useState } from 'react';
 import { Automaton } from '../../engine/types';
 import {
+  actionButtonLabel,
+  actionMode,
   isReady,
   type CreationAction,
   type CreationState,
@@ -36,6 +38,13 @@ type TransitionCreatorProp = {
   creationState: CreationState;
   creationDispatch: Dispatch<CreationAction>;
   onSetTransition: (from: number, symbol: string, to: number | null) => void;
+  onReplaceTransition: (
+    oldFrom: number,
+    oldSymbol: string,
+    newFrom: number,
+    newSymbol: string,
+    newTo: number
+  ) => void;
 };
 
 /**
@@ -43,9 +52,15 @@ type TransitionCreatorProp = {
  * machine state — tell the user what to do next.
  */
 function instructionFor(state: CreationState, symbolValid: boolean): string {
-  if (state.editingExisting !== null) {
-    return 'Editing this transition. Change any slot, click Delete, or Cancel.';
+  const mode = actionMode(state);
+  if (mode === 'modify') {
+    if (!symbolValid) return `'${state.symbol}' is not in the alphabet.`;
+    return 'Click Modify to apply your changes (or Cancel to discard).';
   }
+  if (mode === 'delete') {
+    return 'Editing this transition. Change a slot to modify, or click Delete.';
+  }
+  // create mode
   if (state.source === null && state.destination === null && state.symbol === '') {
     return 'Click a circle to pick a state, or click an existing edge to edit it.';
   }
@@ -70,6 +85,7 @@ export function TransitionCreator({
   creationState: state,
   creationDispatch: dispatch,
   onSetTransition,
+  onReplaceTransition,
 }: TransitionCreatorProp) {
   const [pickerSlot, setPickerSlot] = useState<'source' | 'destination' | null>(null);
   const [pickerAnchor, setPickerAnchor] = useState<DOMRect | null>(null);
@@ -128,7 +144,8 @@ export function TransitionCreator({
 
   const symbolValid = state.symbol === '' || automaton.alphabet.has(state.symbol);
   const ready = isReady(state) && symbolValid;
-  const showDelete = state.editingExisting !== null;
+  const mode = actionMode(state);
+  const buttonLabel = actionButtonLabel(state);
 
   function openPickerForSlot(slot: 'source' | 'destination', anchorEl: HTMLElement) {
     setPickerSlot(slot);
@@ -159,7 +176,8 @@ export function TransitionCreator({
   }
 
   function handleAction() {
-    if (showDelete && state.editingExisting !== null) {
+    if (mode === 'delete') {
+      if (state.editingExisting === null) return;
       onSetTransition(
         state.editingExisting.from,
         state.editingExisting.symbol,
@@ -168,8 +186,19 @@ export function TransitionCreator({
       dispatch({ type: 'reset' });
       return;
     }
-    if (!ready) return;
-    if (state.source === null || state.destination === null) return;
+    if (!ready || state.source === null || state.destination === null) return;
+    if (mode === 'modify' && state.editingExisting !== null) {
+      onReplaceTransition(
+        state.editingExisting.from,
+        state.editingExisting.symbol,
+        state.source,
+        state.symbol,
+        state.destination
+      );
+      dispatch({ type: 'reset' });
+      return;
+    }
+    // create
     onSetTransition(state.source, state.symbol, state.destination);
     dispatch({ type: 'reset' });
   }
@@ -227,31 +256,27 @@ export function TransitionCreator({
               maxLength={1}
               aria-label="Transition symbol"
             />
-            {showDelete ? (
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={handleAction}
-              >
-                Delete
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={!ready}
-                onClick={handleAction}
-              >
-                Add
-              </button>
-            )}
+            <button
+              type="button"
+              className={
+                mode === 'delete'
+                  ? 'btn btn-danger'
+                  : mode === 'modify'
+                    ? 'btn btn-warning'
+                    : 'btn btn-primary'
+              }
+              disabled={mode === 'delete' ? false : !ready}
+              onClick={handleAction}
+            >
+              {buttonLabel}
+            </button>
           </div>
 
           <p className="transition-creator-instruction">
             {instructionFor(state, symbolValid)}
           </p>
 
-          {showDelete && (
+          {state.editingExisting !== null && (
             <button
               type="button"
               className="btn"
@@ -264,7 +289,15 @@ export function TransitionCreator({
         </div>
       )}
 
-      {pickerSlot !== null && pickerAnchor !== null && (
+      {/* Show the popover only while the picker's slot is the one
+          actively being picked. If a canvas click filled this slot
+          (advancing state.phase past it), the popover auto-dismisses
+          on the next render even though pickerSlot hasn't been cleared
+          locally yet. */}
+      {pickerSlot !== null &&
+        pickerAnchor !== null &&
+        ((pickerSlot === 'source' && state.phase === 'picking-source') ||
+          (pickerSlot === 'destination' && state.phase === 'picking-destination')) && (
         <StatePickerPopover
           options={stateOptions}
           selectedValue={

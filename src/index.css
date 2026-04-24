@@ -1240,6 +1240,17 @@ button svg {
   border-color: var(--error-stroke);
 }
 
+.btn-warning {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: #fde68a;
+  border-color: #d97706;
+}
+
 /* ─── State picker popover (anchored right of menu) ─── */
 
 .state-picker-popover {

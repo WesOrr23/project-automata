@@ -35,6 +35,13 @@ type EditPanelProp = {
   onSetStartState: (stateId: number) => void;
   onToggleAcceptState: (stateId: number) => void;
   onSetTransition: (from: number, symbol: string, to: number | null) => void;
+  onReplaceTransition: (
+    oldFrom: number,
+    oldSymbol: string,
+    newFrom: number,
+    newSymbol: string,
+    newTo: number
+  ) => void;
 };
 
 export function EditPanel({
@@ -51,6 +58,7 @@ export function EditPanel({
   onSetStartState,
   onToggleAcceptState,
   onSetTransition,
+  onReplaceTransition,
 }: EditPanelProp) {
   return (
     <>
@@ -83,6 +91,7 @@ export function EditPanel({
         creationState={creationState}
         creationDispatch={creationDispatch}
         onSetTransition={onSetTransition}
+        onReplaceTransition={onReplaceTransition}
       />
     </>
   );

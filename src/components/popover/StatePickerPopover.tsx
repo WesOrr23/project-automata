@@ -67,7 +67,13 @@ export function StatePickerPopover({
       }
     }
     function handleClick(event: MouseEvent) {
-      if (popoverRef.current?.contains(event.target as Node)) return;
+      const target = event.target as HTMLElement;
+      if (popoverRef.current?.contains(target)) return;
+      // Canvas state nodes that are currently pickable count as a valid
+      // pick path — let the state node's own click handler dispatch the
+      // pick action; closing here would race-cancel that pick before it
+      // could fire.
+      if (target.closest?.('.state-node-pickable')) return;
       onClose();
     }
     document.addEventListener('keydown', handleKey);

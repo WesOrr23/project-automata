@@ -21,8 +21,8 @@ describe('creationReducer', () => {
       expect(isReady(INITIAL_CREATION_STATE)).toBe(false);
     });
 
-    it('button label is "Pick source"', () => {
-      expect(actionButtonLabel(INITIAL_CREATION_STATE)).toBe('Pick source');
+    it('button label is "Add"', () => {
+      expect(actionButtonLabel(INITIAL_CREATION_STATE)).toBe('Add');
     });
   });
 
@@ -78,6 +78,17 @@ describe('creationReducer', () => {
       expect(state.destination).toBe(1);
       expect(state.phase).toBe('idle');
     });
+
+    it('keeps editingExisting through slot changes', () => {
+      let state = creationReducer(INITIAL_CREATION_STATE, {
+        type: 'loadExisting',
+        transition: { from: 0, to: 1, symbol: '0' },
+      });
+      state = creationReducer(state, { type: 'sourcePicked', stateId: 2 });
+      expect(state.editingExisting).toEqual({ from: 0, to: 1, symbol: '0' });
+      state = creationReducer(state, { type: 'destinationPicked', stateId: 3 });
+      expect(state.editingExisting).toEqual({ from: 0, to: 1, symbol: '0' });
+    });
   });
 
   describe('symbol input', () => {
@@ -89,14 +100,14 @@ describe('creationReducer', () => {
       expect(state.symbol).toBe('0');
     });
 
-    it('symbolChanged clears editingExisting (mutating breaks the link)', () => {
+    it('symbolChanged keeps editingExisting (slot edits do not break the edit link)', () => {
       let state = creationReducer(INITIAL_CREATION_STATE, {
         type: 'loadExisting',
         transition: { from: 0, to: 1, symbol: '0' },
       });
       expect(state.editingExisting).not.toBeNull();
       state = creationReducer(state, { type: 'symbolChanged', symbol: '1' });
-      expect(state.editingExisting).toBeNull();
+      expect(state.editingExisting).toEqual({ from: 0, to: 1, symbol: '0' });
     });
   });
 
@@ -127,37 +138,75 @@ describe('creationReducer', () => {
     });
   });
 
-  describe('action button label progression', () => {
-    it('"Pick source" when nothing filled', () => {
-      expect(actionButtonLabel(INITIAL_CREATION_STATE)).toBe('Pick source');
+  describe('action button label', () => {
+    it('"Add" in creation mode', () => {
+      expect(actionButtonLabel(INITIAL_CREATION_STATE)).toBe('Add');
     });
 
-    it('"Pick destination" when only source filled', () => {
-      const state = { ...INITIAL_CREATION_STATE, source: 0 };
-      expect(actionButtonLabel(state)).toBe('Pick destination');
-    });
-
-    it('"Type a symbol" when source + destination but no symbol', () => {
-      const state = { ...INITIAL_CREATION_STATE, source: 0, destination: 1 };
-      expect(actionButtonLabel(state)).toBe('Type a symbol');
-    });
-
-    it('"Add transition" when ready', () => {
-      const state = {
-        ...INITIAL_CREATION_STATE,
-        source: 0,
-        destination: 1,
-        symbol: '0',
-      };
-      expect(actionButtonLabel(state)).toBe('Add transition');
-    });
-
-    it('"Delete transition" when editing an existing', () => {
+    it('"Delete" when editing an existing transition with no changes', () => {
       const state = creationReducer(INITIAL_CREATION_STATE, {
         type: 'loadExisting',
         transition: { from: 0, to: 1, symbol: '0' },
       });
-      expect(actionButtonLabel(state)).toBe('Delete transition');
+      expect(actionButtonLabel(state)).toBe('Delete');
+    });
+
+    it('"Modify" when editing an existing and a slot has been changed', () => {
+      let state = creationReducer(INITIAL_CREATION_STATE, {
+        type: 'loadExisting',
+        transition: { from: 0, to: 1, symbol: '0' },
+      });
+      state = creationReducer(state, { type: 'symbolChanged', symbol: '1' });
+      expect(actionButtonLabel(state)).toBe('Modify');
+    });
+  });
+
+  describe('isModified', () => {
+    it('false when editingExisting is null', async () => {
+      const { isModified } = await import('./creationReducer');
+      expect(isModified(INITIAL_CREATION_STATE)).toBe(false);
+    });
+
+    it('false when slots match the original', async () => {
+      const { isModified } = await import('./creationReducer');
+      const state = creationReducer(INITIAL_CREATION_STATE, {
+        type: 'loadExisting',
+        transition: { from: 0, to: 1, symbol: '0' },
+      });
+      expect(isModified(state)).toBe(false);
+    });
+
+    it.each<['symbol' | 'source' | 'destination', () => any]>([
+      ['symbol', () =>
+        creationReducer(
+          creationReducer(INITIAL_CREATION_STATE, {
+            type: 'loadExisting',
+            transition: { from: 0, to: 1, symbol: '0' },
+          }),
+          { type: 'symbolChanged', symbol: '1' }
+        ),
+      ],
+      ['source', () =>
+        creationReducer(
+          creationReducer(INITIAL_CREATION_STATE, {
+            type: 'loadExisting',
+            transition: { from: 0, to: 1, symbol: '0' },
+          }),
+          { type: 'sourcePicked', stateId: 2 }
+        ),
+      ],
+      ['destination', () =>
+        creationReducer(
+          creationReducer(INITIAL_CREATION_STATE, {
+            type: 'loadExisting',
+            transition: { from: 0, to: 1, symbol: '0' },
+          }),
+          { type: 'destinationPicked', stateId: 2 }
+        ),
+      ],
+    ])('true when %s differs from original', async (_, build) => {
+      const { isModified } = await import('./creationReducer');
+      expect(isModified(build())).toBe(true);
     });
   });
 
@@ -200,7 +249,7 @@ describe('creationReducer', () => {
       expect(state.phase).toBe('idle');
       state = creationReducer(state, { type: 'symbolChanged', symbol: '0' });
       expect(isReady(state)).toBe(true);
-      expect(actionButtonLabel(state)).toBe('Add transition');
+      expect(actionButtonLabel(state)).toBe('Add');
     });
   });
 });

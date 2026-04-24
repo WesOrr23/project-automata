@@ -66,14 +66,12 @@ export function creationReducer(
 
     case 'sourcePicked':
       // After picking source, advance to destination if it's still empty,
-      // otherwise return to idle (user is editing source on a complete form).
+      // otherwise return to idle. editingExisting persists so we can detect
+      // "modified vs original" downstream — only `reset` clears it.
       return {
         ...state,
         source: action.stateId,
         phase: state.destination === null ? 'picking-destination' : 'idle',
-        // Picking a fresh source breaks the "editing existing" link — the
-        // user is now constructing a new transition.
-        editingExisting: null,
       };
 
     case 'destinationPicked':
@@ -81,11 +79,10 @@ export function creationReducer(
         ...state,
         destination: action.stateId,
         phase: 'idle',
-        editingExisting: null,
       };
 
     case 'symbolChanged':
-      return { ...state, symbol: action.symbol, editingExisting: null };
+      return { ...state, symbol: action.symbol };
 
     case 'cancel':
       return { ...state, phase: 'idle' };
@@ -112,15 +109,41 @@ export function isReady(state: CreationState): boolean {
 }
 
 /**
- * The label shown on the primary action button. Reflects what's missing
- * (or "Add"/"Delete" once the form is committable / bound to existing).
+ * When in edit mode (loaded from an existing transition), has the user
+ * modified any of the three slots away from the original? Used to flip
+ * the action button between Delete and Modify.
+ */
+export function isModified(state: CreationState): boolean {
+  if (state.editingExisting === null) return false;
+  return (
+    state.source !== state.editingExisting.from ||
+    state.destination !== state.editingExisting.to ||
+    state.symbol !== state.editingExisting.symbol
+  );
+}
+
+/**
+ * The current "mode" of the action button — drives label and color.
+ */
+export type ActionMode = 'create' | 'delete' | 'modify';
+
+export function actionMode(state: CreationState): ActionMode {
+  if (state.editingExisting === null) return 'create';
+  return isModified(state) ? 'modify' : 'delete';
+}
+
+/**
+ * The label shown on the primary action button. (Used as instruction
+ * text — see TransitionCreator's instructionFor for the contextual
+ * prose; this is just the button.)
  */
 export function actionButtonLabel(state: CreationState): string {
-  if (state.editingExisting !== null) {
-    return 'Delete transition';
+  switch (actionMode(state)) {
+    case 'delete':
+      return 'Delete';
+    case 'modify':
+      return 'Modify';
+    case 'create':
+      return 'Add';
   }
-  if (state.source === null) return 'Pick source';
-  if (state.destination === null) return 'Pick destination';
-  if (state.symbol === '') return 'Type a symbol';
-  return 'Add transition';
 }

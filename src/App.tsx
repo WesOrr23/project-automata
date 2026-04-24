@@ -325,14 +325,7 @@ function App() {
   /**
    * Set the destination of (from, symbol). Replaces any existing transition
    * for that pair. If `to` is null, removes the transition (no-op if none
-   * existed). One atomic state update — avoids the stale-closure pitfall of
-   * doing remove-then-add through two separate handler calls.
-   *
-   * Note: this is the only transition handler the table-based UI needs.
-   * The engine's addTransition/removeTransition are still available; we just
-   * bypass them for cell edits because the cell semantics are
-   * "set (from, symbol) to this destination" which doesn't fit "add" or
-   * "remove" cleanly.
+   * existed). One atomic state update.
    */
   function handleSetTransition(from: number, symbol: string, to: number | null) {
     setAutomaton((previous) => {
@@ -345,6 +338,36 @@ function App() {
       return {
         ...previous,
         transitions: [...filtered, { from, to: new Set([to]), symbol }],
+      };
+    });
+  }
+
+  /**
+   * Replace one transition with another in a single atomic update.
+   * Used by the creator form's Modify action: the user loaded an
+   * existing transition, changed one or more slots, and committed.
+   * Removes the original (oldFrom, oldSymbol) and any conflicting
+   * (newFrom, newSymbol), then adds the new one.
+   */
+  function handleReplaceTransition(
+    oldFrom: number,
+    oldSymbol: string,
+    newFrom: number,
+    newSymbol: string,
+    newTo: number
+  ) {
+    setAutomaton((previous) => {
+      const filtered = previous.transitions.filter(
+        (transition) =>
+          !(transition.from === oldFrom && transition.symbol === oldSymbol) &&
+          !(transition.from === newFrom && transition.symbol === newSymbol)
+      );
+      return {
+        ...previous,
+        transitions: [
+          ...filtered,
+          { from: newFrom, to: new Set([newTo]), symbol: newSymbol },
+        ],
       };
     });
   }
@@ -416,6 +439,7 @@ function App() {
       onSetStartState={handleSetStartState}
       onToggleAcceptState={handleToggleAcceptState}
       onSetTransition={handleSetTransition}
+      onReplaceTransition={handleReplaceTransition}
     />
   );
 
