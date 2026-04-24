@@ -57,6 +57,12 @@ export function EditPanel({
         <div
           className="editor-validation-banner"
           onClick={onDismissError}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onDismissError();
+            }
+          }}
           role="button"
           tabIndex={0}
           style={{ cursor: 'pointer' }}

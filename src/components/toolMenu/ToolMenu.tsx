@@ -36,7 +36,12 @@ export function ToolMenu({
                 {toolTabs.map((tab) => {
                     const Icon = tab.icon;
                     return (
-                        <button key={tab.id} className="tool-menu-icon" aria-label={tab.label}>
+                        <button
+                            key={tab.id}
+                            className="tool-menu-icon"
+                            aria-label={tab.label}
+                            onClick={() => onTabClick(tab.id)}
+                        >
                             <Icon size={20}/>
                         </button>
                     );

@@ -55,10 +55,17 @@ function App() {
 
   const sim = useSimulation(automaton);
 
-  // Recompute layout whenever automaton changes (debounced to absorb rapid edits)
+  // Recompute layout whenever automaton changes (debounced to absorb rapid edits).
+  // A version counter discards stale promises in case layout N-1 resolves after N.
+  const layoutVersionRef = useRef(0);
   useEffect(() => {
+    const version = ++layoutVersionRef.current;
     const timer = setTimeout(() => {
-      computeLayout(automaton).then(setAutomatonUI);
+      computeLayout(automaton).then((layout) => {
+        if (version === layoutVersionRef.current) {
+          setAutomatonUI(layout);
+        }
+      });
     }, 120);
     return () => clearTimeout(timer);
   }, [automaton]);
