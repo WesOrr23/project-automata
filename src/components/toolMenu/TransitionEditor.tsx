@@ -3,24 +3,30 @@
  *
  * Form-based controls for managing transitions:
  * - Add transition form (from, to, symbol dropdowns)
+ * - Inline error banner (right next to the form, not buried below the list)
  * - List of existing transitions with delete buttons
  */
 
 import { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, X } from 'lucide-react';
 import { Automaton } from '../../engine/types';
-import { createDefaultLabel } from '../../ui-state/types';
 
 type TransitionEditorProp = {
   automaton: Automaton;
+  displayLabels: Map<number, string>;
+  error: string | null;
   onAddTransition: (from: number, to: number, symbol: string) => string | null;
   onRemoveTransition: (from: number, to: number, symbol: string | null) => void;
+  onDismissError: () => void;
 };
 
 export function TransitionEditor({
   automaton,
+  displayLabels,
+  error,
   onAddTransition,
   onRemoveTransition,
+  onDismissError,
 }: TransitionEditorProp) {
   const sortedStates = Array.from(automaton.states).sort((a, b) => a - b);
   const sortedAlphabet = Array.from(automaton.alphabet).sort();
@@ -28,6 +34,10 @@ export function TransitionEditor({
   const [fromState, setFromState] = useState<number>(sortedStates[0] ?? 0);
   const [toState, setToState] = useState<number>(sortedStates[0] ?? 0);
   const [symbol, setSymbol] = useState<string>(sortedAlphabet[0] ?? '');
+
+  function labelFor(stateId: number): string {
+    return displayLabels.get(stateId) ?? `q${stateId}`;
+  }
 
   function handleAdd() {
     if (sortedAlphabet.length === 0) return;
@@ -47,7 +57,7 @@ export function TransitionEditor({
       <span className="label">Transitions</span>
 
       {sortedAlphabet.length === 0 ? (
-        <p className="caption">Add symbols to the alphabet in Config first.</p>
+        <p className="caption">Add symbols to the alphabet above first.</p>
       ) : (
         <>
           <div style={{ display: 'flex', gap: 'var(--space-1)', alignItems: 'center' }}>
@@ -60,7 +70,7 @@ export function TransitionEditor({
             >
               {sortedStates.map((id) => (
                 <option key={id} value={id}>
-                  {createDefaultLabel(id)}
+                  {labelFor(id)}
                 </option>
               ))}
             </select>
@@ -76,7 +86,7 @@ export function TransitionEditor({
             >
               {sortedStates.map((id) => (
                 <option key={id} value={id}>
-                  {createDefaultLabel(id)}
+                  {labelFor(id)}
                 </option>
               ))}
             </select>
@@ -105,6 +115,37 @@ export function TransitionEditor({
               <Plus size={14} />
             </button>
           </div>
+
+          {/* Error appears inline right after the form, not buried at the bottom */}
+          {error && (
+            <div
+              className="editor-validation-banner"
+              role="alert"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span style={{ flex: 1 }}>{error}</span>
+              <button
+                className="editor-row-action"
+                onClick={onDismissError}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onDismissError();
+                  }
+                }}
+                aria-label="Dismiss error"
+                title="Dismiss"
+                style={{ border: 'none', background: 'transparent', color: 'inherit' }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
         </>
       )}
 
@@ -112,20 +153,25 @@ export function TransitionEditor({
         {sortedTransitions.map((transition, index) => {
           const destinations = Array.from(transition.to).sort((a, b) => a - b);
           const symbolDisplay = transition.symbol === null ? 'ε' : transition.symbol;
-          // For DFA transitions, there is exactly one destination
-          const destinationLabel = destinations.map(createDefaultLabel).join(', ');
+          const destinationLabel = destinations.map(labelFor).join(', ');
+          const firstDestination = destinations[0];
           return (
-            <div key={`${transition.from}-${symbolDisplay}-${index}`} className="editor-row">
+            <div
+              key={`${transition.from}-${symbolDisplay}-${index}`}
+              className="editor-row show-actions-on-hover"
+            >
               <span className="editor-row-label" style={{ fontSize: 'var(--text-sm)' }}>
-                {createDefaultLabel(transition.from)} →{' '}
+                {labelFor(transition.from)} →{' '}
                 <span style={{ color: 'var(--blue-600)' }}>{symbolDisplay}</span> →{' '}
                 {destinationLabel}
               </span>
               <button
-                className="editor-row-action danger"
-                onClick={() =>
-                  onRemoveTransition(transition.from, destinations[0]!, transition.symbol)
-                }
+                className="editor-row-action danger hide-unless-hover"
+                onClick={() => {
+                  if (firstDestination !== undefined) {
+                    onRemoveTransition(transition.from, firstDestination, transition.symbol);
+                  }
+                }}
                 aria-label="Delete transition"
                 title="Delete transition"
               >

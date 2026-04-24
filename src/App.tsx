@@ -11,7 +11,7 @@ import {
 } from './engine/automaton';
 import { isRunnable, getValidationReport } from './engine/validator';
 import { Automaton } from './engine/types';
-import { AutomatonUI } from './ui-state/types';
+import { AutomatonUI, computeDisplayLabels } from './ui-state/types';
 import { AutomatonCanvas } from './components/AutomatonCanvas';
 import { InputPanel } from './components/InputPanel';
 import { SimulationControls } from './components/SimulationControls';
@@ -57,20 +57,33 @@ function App() {
 
   // Recompute layout whenever automaton changes (debounced to absorb rapid edits).
   // A version counter discards stale promises in case layout N-1 resolves after N.
+  // After layout, we rewrite each state's label to the sequential display label
+  // so the canvas and the tool menu stay consistent.
   const layoutVersionRef = useRef(0);
   useEffect(() => {
     const version = ++layoutVersionRef.current;
     const timer = setTimeout(() => {
       computeLayout(automaton).then((layout) => {
-        if (version === layoutVersionRef.current) {
-          setAutomatonUI(layout);
-        }
+        if (version !== layoutVersionRef.current) return;
+        const labels = computeDisplayLabels(automaton.states);
+        const relabeled: AutomatonUI = {
+          ...layout,
+          states: new Map(
+            Array.from(layout.states.entries()).map(([id, stateUI]) => [
+              id,
+              { ...stateUI, label: labels.get(id) ?? stateUI.label },
+            ])
+          ),
+        };
+        setAutomatonUI(relabeled);
       });
     }, 120);
     return () => clearTimeout(timer);
   }, [automaton]);
 
-  // Reset simulation when the automaton structure changes (skip initial mount)
+  // Reset simulation when the automaton structure changes (skip initial mount).
+  // Input string is kept; we filter it against the current alphabet separately
+  // so the user doesn't lose their test string just because they edited a state.
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
@@ -78,14 +91,19 @@ function App() {
       return;
     }
     sim.reset();
-    setInputString('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [automaton]);
 
-  // Also reset simulation whenever user enters the Edit tab
-  const previousAppMode = useRef<'IDLE' | 'EDITING' | 'SIMULATING'>('IDLE');
+  // If the alphabet changed (e.g. a symbol used in the input was removed),
+  // filter the input string to only contain characters still in the alphabet.
+  useEffect(() => {
+    setInputString((previous) =>
+      [...previous].filter((ch) => automaton.alphabet.has(ch)).join('')
+    );
+  }, [automaton.alphabet]);
 
-  // Derived application mode from the active tab
+  // Derived application mode from the active tab. Used to gate visual
+  // simulation effects (highlights) — NOT to trigger resets.
   const appMode: 'IDLE' | 'EDITING' | 'SIMULATING' =
     menuState.mode === 'OPEN'
       ? (menuState.activeTab === 'EDIT'
@@ -95,16 +113,9 @@ function App() {
             : 'IDLE')
       : 'IDLE';
 
-  // Entering Edit mode resets the simulation (mode exclusivity with Simulate)
-  useEffect(() => {
-    const prev = previousAppMode.current;
-    previousAppMode.current = appMode;
-    if (prev !== 'EDITING' && appMode === 'EDITING') {
-      sim.reset();
-      setInputString('');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appMode]);
+  // Display labels are sequential (q0, q1, q2) regardless of underlying IDs.
+  // This detaches stable engine identity from user-visible numbering.
+  const displayLabels = computeDisplayLabels(automaton.states);
 
   // ─── Menu state transitions ───
 
@@ -176,52 +187,64 @@ function App() {
   }
 
   // ─── Edit handlers ───
+  //
+  // Each of these uses the functional updater form `setAutomaton(prev => ...)`
+  // so rapid successive clicks see the latest automaton state rather than a
+  // stale closure. Errors thrown by engine functions are caught and surfaced
+  // via setEditError.
 
-  function runEdit(fn: () => Automaton) {
-    try {
-      const next = fn();
-      setAutomaton(next);
-      setEditError(null);
-    } catch (error) {
-      setEditError((error as Error).message);
-    }
+  function applyEdit(update: (current: Automaton) => Automaton) {
+    setAutomaton((previous) => {
+      try {
+        const next = update(previous);
+        setEditError(null);
+        return next;
+      } catch (error) {
+        setEditError((error as Error).message);
+        return previous;
+      }
+    });
   }
 
   function handleAddState() {
-    runEdit(() => addState(automaton).automaton);
+    applyEdit((prev) => addState(prev).automaton);
   }
 
   function handleRemoveState(stateId: number) {
-    runEdit(() => removeState(automaton, stateId));
+    applyEdit((prev) => removeState(prev, stateId));
   }
 
   function handleSetStartState(stateId: number) {
-    runEdit(() => setStartState(automaton, stateId));
+    applyEdit((prev) => setStartState(prev, stateId));
   }
 
   function handleToggleAcceptState(stateId: number) {
-    runEdit(() =>
-      automaton.acceptStates.has(stateId)
-        ? removeAcceptState(automaton, stateId)
-        : addAcceptState(automaton, stateId)
+    applyEdit((prev) =>
+      prev.acceptStates.has(stateId)
+        ? removeAcceptState(prev, stateId)
+        : addAcceptState(prev, stateId)
     );
   }
 
   function handleAddTransition(from: number, to: number, symbol: string): string | null {
+    // addTransition throws on duplicates, invalid states, etc. We need to
+    // return the error string synchronously for the editor UI, so we call
+    // the engine here and also apply via functional setState.
     try {
-      const next = addTransition(automaton, from, new Set([to]), symbol);
-      setAutomaton(next);
-      setEditError(null);
-      return null;
+      // Use current snapshot for the synchronous error check; the functional
+      // setState below handles the actual state transition correctly.
+      addTransition(automaton, from, new Set([to]), symbol);
     } catch (error) {
       const message = (error as Error).message;
       setEditError(message);
       return message;
     }
+    applyEdit((prev) => addTransition(prev, from, new Set([to]), symbol));
+    return null;
   }
 
   function handleRemoveTransition(from: number, to: number, symbol: string | null) {
-    runEdit(() => removeTransition(automaton, from, new Set([to]), symbol));
+    applyEdit((prev) => removeTransition(prev, from, new Set([to]), symbol));
   }
 
   // ─── Simulation handlers ───
@@ -271,10 +294,7 @@ function App() {
   const configContent = (
     <ConfigPanel
       automatonType={automaton.type}
-      alphabet={automaton.alphabet}
       onTypeChange={handleTypeChange}
-      onAlphabetAdd={handleAlphabetAdd}
-      onAlphabetRemove={handleAlphabetRemove}
       onExportJSON={handleExportJSON}
     />
   );
@@ -282,7 +302,10 @@ function App() {
   const editContent = (
     <EditPanel
       automaton={automaton}
+      displayLabels={displayLabels}
       error={editError}
+      onAlphabetAdd={handleAlphabetAdd}
+      onAlphabetRemove={handleAlphabetRemove}
       onAddState={handleAddState}
       onRemoveState={handleRemoveState}
       onSetStartState={handleSetStartState}

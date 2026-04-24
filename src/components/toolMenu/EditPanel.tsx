@@ -2,17 +2,22 @@
  * EditPanel Component
  *
  * Form-based editor for the automaton:
- * - State management (add, remove, set start, toggle accept)
- * - Transition management (add, remove)
+ * - Alphabet (symbols)
+ * - States (add, remove, start, accept)
+ * - Transitions (add, remove)
  */
 
 import { Automaton } from '../../engine/types';
+import { AlphabetEditor } from './AlphabetEditor';
 import { StateEditor } from './StateEditor';
 import { TransitionEditor } from './TransitionEditor';
 
 type EditPanelProp = {
   automaton: Automaton;
+  displayLabels: Map<number, string>;
   error: string | null;
+  onAlphabetAdd: (symbol: string) => void;
+  onAlphabetRemove: (symbol: string) => void;
   onAddState: () => void;
   onRemoveState: (stateId: number) => void;
   onSetStartState: (stateId: number) => void;
@@ -24,7 +29,10 @@ type EditPanelProp = {
 
 export function EditPanel({
   automaton,
+  displayLabels,
   error,
+  onAlphabetAdd,
+  onAlphabetRemove,
   onAddState,
   onRemoveState,
   onSetStartState,
@@ -35,10 +43,19 @@ export function EditPanel({
 }: EditPanelProp) {
   return (
     <>
+      <AlphabetEditor
+        alphabet={automaton.alphabet}
+        onAlphabetAdd={onAlphabetAdd}
+        onAlphabetRemove={onAlphabetRemove}
+      />
+
+      <div className="divider" />
+
       <StateEditor
         states={automaton.states}
         startState={automaton.startState}
         acceptStates={automaton.acceptStates}
+        displayLabels={displayLabels}
         onAddState={onAddState}
         onRemoveState={onRemoveState}
         onSetStartState={onSetStartState}
@@ -49,28 +66,12 @@ export function EditPanel({
 
       <TransitionEditor
         automaton={automaton}
+        displayLabels={displayLabels}
+        error={error}
         onAddTransition={onAddTransition}
         onRemoveTransition={onRemoveTransition}
+        onDismissError={onDismissError}
       />
-
-      {error && (
-        <div
-          className="editor-validation-banner"
-          onClick={onDismissError}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              onDismissError();
-            }
-          }}
-          role="button"
-          tabIndex={0}
-          style={{ cursor: 'pointer' }}
-          title="Click to dismiss"
-        >
-          {error}
-        </div>
-      )}
     </>
   );
 }

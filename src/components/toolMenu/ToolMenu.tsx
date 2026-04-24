@@ -28,6 +28,9 @@ export function ToolMenu({
             case 'CONFIG':  return configContent;
             case 'EDIT':    return editContent;
             case 'SIMULATE':return simulateContent;
+            default:
+                const _exhaustive: never = tabId;
+                return _exhaustive;
         }
     }
     if (state.mode === 'COLLAPSED') {
@@ -75,20 +78,32 @@ export function ToolMenu({
                 {toolTabs.map((tab) => {
                     const Icon = tab.icon;
                     const isActive = tab.id === state.activeTab;
-                    return (
-                        <div 
-                            key={tab.id} 
-                            className={`tool-menu-card ${isActive ? 'active' : 'compact'}`}
-                            onClick={isActive ? undefined : () => onTabClick(tab.id)}>
-                            <div
-                                className='tool-menu-card-header'>
-                                    <Icon size={20}/>
+                    // Active card is just a container (not interactive).
+                    // Compact cards are buttons so keyboard users can Tab + Enter to switch.
+                    if (isActive) {
+                        return (
+                            <div key={tab.id} className="tool-menu-card active">
+                                <div className="tool-menu-card-header">
+                                    <Icon size={20} />
                                     <span>{tab.label}</span>
-                            </div>
-                            {isActive && (
+                                </div>
                                 <div className="tool-menu-card-content">{contentFor(tab.id)}</div>
-                            )}
-                        </div>
+                            </div>
+                        );
+                    }
+                    return (
+                        <button
+                            key={tab.id}
+                            type="button"
+                            className="tool-menu-card compact"
+                            onClick={() => onTabClick(tab.id)}
+                            aria-label={`Open ${tab.label} tab`}
+                        >
+                            <div className="tool-menu-card-header">
+                                <Icon size={20} />
+                                <span>{tab.label}</span>
+                            </div>
+                        </button>
                     );
                 })}
             </aside>

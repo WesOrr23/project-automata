@@ -84,6 +84,70 @@ Document the convention going forward: uppercase for tab/mode identifiers ("feel
 ### Deferred — Inline flexbox styles
 Several components have `style={{ display: 'flex', ... }}` inline. Candidate for `.flex-col` / `.flex-row` utility classes. Would reduce duplication across StateEditor, TransitionEditor, ConfigPanel.
 
+### User testing findings (iter 5 post-ship)
+
+From manual testing pass:
+
+**Real bugs to fix:**
+- Sidebar grow/shrink visual glitch on mouseleave from EXPANDED → COLLAPSED. Icons momentarily render at full container width (140px) before width transition shrinks. Root cause: `aspect-ratio: 1/1` on icons combined with `width: 100%` and animated container width.
+- `.tool-menu-open` max-height causes content cutoff when transitions exceed viewport. `overflow-y: auto` on the outer aside isn't reaching the card content. Fix scroll chain.
+- Keyboard navigation: only the "new symbol" text input is reachable via Tab. Buttons should be in tab order. Investigate.
+
+**UX improvements to make:**
+- Trash / action icons should only appear on row hover (reduce visual clutter).
+- Duplicate transition error currently renders at the bottom of Edit panel — invisible when list overflows (see scroll bug). Move to a better position (toast, near the Add button, floating badge).
+- When a duplicate transition is attempted, also highlight the existing conflicting transition (in the list AND on canvas).
+- Validation messages ("state is unreachable") need more context to be actionable. Structured validation data would let UI render clickable fixes.
+- Show validation errors in Edit tab too, not just Simulate. Ideally inline with the transition section showing which transitions are missing.
+- Smooth animations between tab switches in OPEN state (currently DOM swap).
+- Detect copy-paste into the symbol input. Warn if truncated.
+- Self-loop (and bi-directional) transitions with the same from/to but different symbols should be merged visually into a single edge with comma-separated labels (e.g. `a,b`).
+
+**Structural redesigns (may need own iteration):**
+- In OPEN state, cards should be visually separate widgets — each its own card with its own shadow. Currently they share one menu container. Back button should live inside the active card's header (top-right), not floating above all three.
+- Move alphabet editor from Config tab to Edit tab. Config should be for app-level settings (preferences, toggles like "warn before delete"), not automaton structure.
+
+**Soft-reset of simulation:**
+Currently switching to Edit tab hard-resets simulation. Instead: keep input string and history, just drop the visual highlights. Only actually reset when an edit occurs. Protects against accidental tab click destroying user progress.
+
+**Future features:**
+- Custom state labels (rename states from "q0" → user-chosen).
+- Preferences: "warn before delete if there are dependent transitions", auto-layout on/off, etc.
+
+**Notification system (own iteration):**
+A global, always-accessible notification/toast system replacing scattered inline error banners:
+- Stacks in top-right corner of viewport.
+- Each notification has a short title (immediately visible) + click-to-expand description.
+- Severity: error / warning / info, colored accordingly.
+- When thrown, briefly highlights the source of the error (on canvas AND in tool menu — e.g., pulse the conflicting transition edge and the conflicting transition-list row).
+- Auto-fade the highlight after a short duration; click the notification to re-highlight.
+- Consumed via a `useNotifications()` hook backed by a React Context store — any component can `notify({severity, title, detail, target})` without prop drilling.
+- Subsumes current `editError`, `ValidationView`, and inline form errors.
+
+Architectural fit: replaces the current mixture of inline error handling with a single, composable notification layer. Matches the "make illegal states unrepresentable" philosophy by keeping error surfacing out of layout code.
+
+**Design discussion items:**
+- `nextStateId` behavior — engine doesn't reuse IDs of deleted states. After creating q0,q1,q2,q3 then deleting q3,q2,q1, the next Add gives q4 (not q1). Rationale: stable identifiers — IDs are promises, once assigned they don't point to a different state later. Alternative would be reusing deleted IDs, but that breaks the invariant. Worth discussing whether the user-visible `q#` labels should be detached from internal IDs (display "q1" for the second state by position, regardless of internal ID).
+
+### TODO — Extract `EditorRowButton` component
+Discussed during review walkthrough of StateEditor.tsx. The three action buttons (Start toggle, Accept toggle, Delete) share structural shape:
+
+```typescript
+type EditorRowButtonProp = {
+  icon: LucideIcon;
+  onClick: () => void;
+  ariaLabel: string;
+  title?: string;
+  active?: boolean;
+  danger?: boolean;
+  disabled?: boolean;
+};
+```
+
+Both `StateEditor.tsx` and `TransitionEditor.tsx` would consume this. Reduces ~40 lines of duplication and gives one place to fix any future button-behavior change.
+
+**Explicitly NOT a discriminated union** — the buttons vary only by parameter values, not by distinct data shapes. Plain object type is correct.
+
 ### Deferred — Hardcoded warning colors
 `index.css` has `#fffbeb`, `#b45309`, `#fde68a` inline for `.editor-validation-banner.warning`. Should be `--warning-bg` / `--warning-text` / `--warning-border` tokens alongside the existing `--success-*` and `--error-*` variables.
 

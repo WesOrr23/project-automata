@@ -87,13 +87,37 @@ export type AutomatonUI = {
  * Creates a label in the format "q{id}" where id is the numeric state ID.
  * This follows the standard convention in automata theory.
  *
+ * Note: prefer `computeDisplayLabels` when you have access to the full state
+ * set — it produces contiguous sequential labels (q0, q1, q2, ...) regardless
+ * of deletions, which is better UX than using raw engine IDs.
+ *
  * @param stateId - The numeric ID of the state
  * @returns A label string (e.g., "q0", "q1", "q2")
- *
- * @example
- * createDefaultLabel(0) // Returns "q0"
- * createDefaultLabel(5) // Returns "q5"
  */
 export function createDefaultLabel(stateId: number): string {
   return `q${stateId}`;
+}
+
+/**
+ * Compute sequential display labels for a set of state IDs.
+ *
+ * Engine IDs are stable but may have gaps after deletions (e.g. 0, 3, 7).
+ * The UI prefers to show users contiguous labels (q0, q1, q2) sorted by ID.
+ * This function detaches display from identity: internal IDs stay stable,
+ * but the labels the user sees are always clean.
+ *
+ * @param states - The Set of engine state IDs
+ * @returns Map from engine state ID → display label (e.g. 7 → "q2")
+ *
+ * @example
+ * computeDisplayLabels(new Set([0, 3, 7]))
+ *   // Returns Map(0→"q0", 3→"q1", 7→"q2")
+ */
+export function computeDisplayLabels(states: Set<number>): Map<number, string> {
+  const sorted = Array.from(states).sort((a, b) => a - b);
+  const labels = new Map<number, string>();
+  sorted.forEach((stateId, index) => {
+    labels.set(stateId, `q${index}`);
+  });
+  return labels;
 }

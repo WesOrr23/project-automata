@@ -170,17 +170,25 @@ body {
 }
 
 /* State 3: Open — tabs + active content, top-anchored */
+/* overflow-y:auto + explicit max-height at every nested level so transition
+ * lists and deep editor content scroll rather than overflow off-screen. */
 .tool-menu-open {
   top: var(--space-4);
+  bottom: var(--space-4);
   width: 260px;
-  max-height: calc(100vh - var(--space-6));
+  max-height: calc(100vh - var(--space-4) * 2);
   overflow-y: auto;
 }
 
 /* ─── Collapsed mode buttons (icon only) ─── */
+/* Fixed dimensions (not aspect-ratio + width:100%) so the button size doesn't
+ * jump to match the expanded container width during the 0.2s width transition
+ * on mouseleave — prevents the visible "grow then shrink" glitch.
+ */
 .tool-menu-icon {
-  width: 100%;
-  aspect-ratio: 1 / 1;
+  width: var(--space-6);
+  height: var(--space-6);
+  align-self: center;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
   background: var(--bg-button);
@@ -189,7 +197,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .tool-menu-icon:hover {
@@ -612,4 +620,43 @@ body {
 .divider {
   height: 1px;
   background: var(--border-subtle);
+}
+
+/* ─── Focus rings (keyboard accessibility) ─── */
+/* :focus-visible only shows the ring when the user is keyboard-navigating,
+ * not on mouse click. Pointer users never see focus decoration. */
+.btn:focus-visible,
+.glass-input:focus-visible,
+.speed-toggle-option:focus-visible,
+.tool-menu-icon:focus-visible,
+.tool-menu-pill:focus-visible,
+.tool-menu-back:focus-visible,
+.tool-menu-card.compact:focus-visible,
+.editor-row-action:focus-visible,
+.alphabet-badge-remove:focus-visible,
+.editor-select:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+/* ─── Hover-only row actions ─── */
+/* Actions are invisible until the row is hovered or one of its descendants
+ * has focus (so keyboard users can still reach them). */
+.show-actions-on-hover .hide-unless-hover {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.show-actions-on-hover:hover .hide-unless-hover,
+.show-actions-on-hover:focus-within .hide-unless-hover,
+.show-actions-on-hover .hide-unless-hover:focus-visible {
+  opacity: 1;
+}
+
+/* Compact tab cards are <button> now; reset default browser styling. */
+.tool-menu-card.compact {
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  width: 100%;
 }

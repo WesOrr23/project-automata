@@ -4,15 +4,18 @@
  * Form-based controls for managing states:
  * - Add state button
  * - List of existing states with start/accept toggles and delete buttons
+ *
+ * Display labels are computed upstream (see computeDisplayLabels) so the user
+ * sees contiguous q0/q1/q2 regardless of underlying engine IDs.
  */
 
 import { Plus, Trash2, CircleDot, CircleCheck, Circle } from 'lucide-react';
-import { createDefaultLabel } from '../../ui-state/types';
 
 type StateEditorProp = {
   states: Set<number>;
   startState: number;
   acceptStates: Set<number>;
+  displayLabels: Map<number, string>;
   onAddState: () => void;
   onRemoveState: (stateId: number) => void;
   onSetStartState: (stateId: number) => void;
@@ -23,6 +26,7 @@ export function StateEditor({
   states,
   startState,
   acceptStates,
+  displayLabels,
   onAddState,
   onRemoveState,
   onSetStartState,
@@ -30,6 +34,10 @@ export function StateEditor({
 }: StateEditorProp) {
   const sortedIds = Array.from(states).sort((a, b) => a - b);
   const canDelete = states.size > 1;
+
+  function labelFor(stateId: number): string {
+    return displayLabels.get(stateId) ?? `q${stateId}`;
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
@@ -50,15 +58,16 @@ export function StateEditor({
         {sortedIds.map((stateId) => {
           const isStart = stateId === startState;
           const isAccept = acceptStates.has(stateId);
+          const label = labelFor(stateId);
           return (
-            <div key={stateId} className="editor-row">
-              <span className="editor-row-label">{createDefaultLabel(stateId)}</span>
+            <div key={stateId} className="editor-row show-actions-on-hover">
+              <span className="editor-row-label">{label}</span>
 
               {/* Start toggle */}
               <button
                 className={`editor-row-action ${isStart ? 'active' : ''}`}
                 onClick={() => onSetStartState(stateId)}
-                aria-label={`Set ${createDefaultLabel(stateId)} as start state`}
+                aria-label={`Set ${label} as start state`}
                 title="Start state"
                 disabled={isStart}
               >
@@ -69,7 +78,7 @@ export function StateEditor({
               <button
                 className={`editor-row-action ${isAccept ? 'active' : ''}`}
                 onClick={() => onToggleAcceptState(stateId)}
-                aria-label={`Toggle accept state for ${createDefaultLabel(stateId)}`}
+                aria-label={`Toggle accept state for ${label}`}
                 title={isAccept ? 'Accept state (click to unset)' : 'Mark as accept state'}
               >
                 {isAccept ? <CircleCheck size={14} /> : <Circle size={14} />}
@@ -77,9 +86,9 @@ export function StateEditor({
 
               {/* Delete */}
               <button
-                className="editor-row-action danger"
+                className="editor-row-action danger hide-unless-hover"
                 onClick={() => onRemoveState(stateId)}
-                aria-label={`Delete ${createDefaultLabel(stateId)}`}
+                aria-label={`Delete ${label}${canDelete ? '' : ' (cannot delete last state)'}`}
                 title={canDelete ? 'Delete state' : 'Cannot delete last state'}
                 disabled={!canDelete}
               >
