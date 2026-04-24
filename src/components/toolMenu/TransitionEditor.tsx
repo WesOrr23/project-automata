@@ -1,26 +1,23 @@
 /**
  * TransitionEditor Component
  *
- * Renders the automaton's transition function as a table:
- *   - rows: source states
- *   - columns: alphabet symbols
- *   - cells: destination state (or empty for missing transition)
+ * Owns the state machine for editing transitions:
+ *   - rovingFocus  → which cell currently holds tabIndex=0
+ *   - openCell     → which cell's popover is open (at most one at a time)
  *
- * Each cell uses a custom dropdown (TransitionCell) with controlled popup
- * positioning, arrow-key navigation, and Escape-to-close — replacing the
- * native <select> whose popup overlapped neighbouring cells uncontrollably.
+ * Delegates layout entirely to TransitionGrid (sticky headers + fade
+ * overlays). Each cell delegates its trigger + popover to TransitionCell.
  *
- * Keyboard navigation across cells uses the "roving tabindex" pattern: only
- * one cell at a time has tabIndex=0, and arrow keys move that focus around
- * the grid. Tab into the table lands on the rovingly-focused cell; from
- * there, arrows move; Enter opens the cell's dropdown.
+ * Keyboard navigation contract:
+ *   - Navigation mode (popover closed)  → arrow keys move between cells
+ *   - Edit mode      (popover open)     → arrow keys move between options
+ *   - Only Enter / Space transitions navigation → edit
+ *   - Escape cancels edit and returns to navigation
  */
 
 import { useEffect, useState } from 'react';
 import { Automaton } from '../../engine/types';
-import { TransitionCell } from './TransitionCell';
-
-const EMPTY_VALUE = '__none__';
+import { TransitionGrid, EMPTY_VALUE } from './TransitionGrid';
 
 type TransitionEditorProp = {
   automaton: Automaton;
@@ -38,22 +35,15 @@ export function TransitionEditor({
   const sortedStates = Array.from(automaton.states).sort((a, b) => a - b);
   const sortedAlphabet = Array.from(automaton.alphabet).sort();
 
-  // Roving focus position. Coords are (rowIndex, colIndex). When the user
-  // presses arrow keys on a focused cell, we update this and (after render)
-  // focus the new cell.
   const [rovingFocus, setRovingFocus] = useState<{ row: number; col: number }>({
     row: 0,
     col: 0,
   });
   const [shouldRefocus, setShouldRefocus] = useState(false);
-
-  // Which cell's popover is currently open. At most one at a time, by design.
-  // Lifted up here (rather than per-cell internal state) so opening one cell
-  // implicitly closes any other.
   const [openCell, setOpenCell] = useState<{ row: number; col: number } | null>(null);
 
-  // Snap the roving focus to a valid position whenever the underlying data
-  // changes (e.g. user deleted the focused state).
+  // Snap roving focus inside bounds when source data shrinks (state/alphabet
+  // deletion).
   useEffect(() => {
     setRovingFocus((current) => ({
       row: Math.min(current.row, Math.max(0, sortedStates.length - 1)),
@@ -61,27 +51,54 @@ export function TransitionEditor({
     }));
   }, [sortedStates.length, sortedAlphabet.length]);
 
-  // After arrow-key navigation, programmatically focus the new cell's
-  // trigger button. Done via a flag + effect so we don't need refs to every
-  // cell.
+  // After arrow-key navigation, focus the new cell's trigger. Cells are now
+  // CSS-grid items in row-major order, so the linear index = row*cols + col.
   useEffect(() => {
     if (!shouldRefocus) return;
-    const selector = `.transition-table tbody tr:nth-child(${rovingFocus.row + 1}) td:nth-child(${rovingFocus.col + 2}) button`;
-    const target = document.querySelector<HTMLButtonElement>(selector);
-    target?.focus();
+    const buttons = document.querySelectorAll<HTMLButtonElement>(
+      '.transition-grid-data .transition-grid-cell .transition-grid-trigger'
+    );
+    const linear = rovingFocus.row * sortedAlphabet.length + rovingFocus.col;
+    buttons[linear]?.focus();
     setShouldRefocus(false);
-  }, [shouldRefocus, rovingFocus]);
+  }, [shouldRefocus, rovingFocus, sortedAlphabet.length]);
 
   function labelFor(stateId: number): string {
     return displayLabels.get(stateId) ?? `q${stateId}`;
   }
 
   function destinationOf(from: number, symbol: string): number | null {
-    const t = automaton.transitions.find(
-      (transition) => transition.from === from && transition.symbol === symbol
+    const transition = automaton.transitions.find(
+      (t) => t.from === from && t.symbol === symbol
     );
-    if (!t) return null;
-    return Array.from(t.to)[0] ?? null;
+    if (!transition) return null;
+    return Array.from(transition.to)[0] ?? null;
+  }
+
+  function handleArrowNavigate(event: React.KeyboardEvent) {
+    // While a popover is open, the cell owns arrow keys (option list
+    // navigation). Don't intercept here.
+    if (openCell !== null) return;
+
+    const { key } = event;
+    if (key !== 'ArrowUp' && key !== 'ArrowDown' && key !== 'ArrowLeft' && key !== 'ArrowRight') {
+      return;
+    }
+    const numRows = sortedStates.length;
+    const numCols = sortedAlphabet.length;
+    if (numRows === 0 || numCols === 0) return;
+
+    let { row, col } = rovingFocus;
+    // Clamp at edges (no wraparound) — pressing ArrowRight at the last
+    // column does nothing instead of jumping to the first column.
+    if (key === 'ArrowUp') row = Math.max(0, row - 1);
+    else if (key === 'ArrowDown') row = Math.min(numRows - 1, row + 1);
+    else if (key === 'ArrowLeft') col = Math.max(0, col - 1);
+    else if (key === 'ArrowRight') col = Math.min(numCols - 1, col + 1);
+
+    event.preventDefault();
+    setRovingFocus({ row, col });
+    setShouldRefocus(true);
   }
 
   function handleCellChange(from: number, symbol: string, newValue: string) {
@@ -92,40 +109,12 @@ export function TransitionEditor({
     }
   }
 
-  function handleTableKeyDown(event: React.KeyboardEvent<HTMLTableElement>) {
-    // When a popover is open, the cell IS the keyboard focus owner —
-    // arrow keys belong to the popover (navigating its options). The
-    // table-level handler must stay out of the way until the user dismisses
-    // the popover with Escape or commits with Enter.
-    if (openCell !== null) return;
-
-    // Navigation mode: arrows move the roving focus between cells.
-    const { key } = event;
-    if (key !== 'ArrowUp' && key !== 'ArrowDown' && key !== 'ArrowLeft' && key !== 'ArrowRight') {
-      return;
-    }
-    const numRows = sortedStates.length;
-    const numCols = sortedAlphabet.length;
-    if (numRows === 0 || numCols === 0) return;
-
-    let { row, col } = rovingFocus;
-    if (key === 'ArrowUp') row = (row - 1 + numRows) % numRows;
-    else if (key === 'ArrowDown') row = (row + 1) % numRows;
-    else if (key === 'ArrowLeft') col = (col - 1 + numCols) % numCols;
-    else if (key === 'ArrowRight') col = (col + 1) % numCols;
-
-    event.preventDefault();
-    setRovingFocus({ row, col });
-    setShouldRefocus(true);
-  }
-
-  // Build the option list once per render; passed by reference into each
-  // cell. Includes the empty option at the top.
+  // Pre-compute options for every cell (shared, by reference).
   const stateOptions = sortedStates.map((stateId) => ({
     value: String(stateId),
     label: labelFor(stateId),
   }));
-  const optionsWithEmpty = [{ value: EMPTY_VALUE, label: '—' }, ...stateOptions];
+  const cellOptions = [{ value: EMPTY_VALUE, label: '—' }, ...stateOptions];
 
   if (sortedAlphabet.length === 0) {
     return (
@@ -139,66 +128,37 @@ export function TransitionEditor({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
       <span className="label">Transitions</span>
-
-      <div className="transition-table-wrap">
-        <table
-          className="transition-table"
-          onKeyDown={handleTableKeyDown}
-          role="grid"
-        >
-          <thead>
-            <tr>
-              <th aria-label="Source state column header" />
-              {sortedAlphabet.map((symbol) => (
-                <th key={symbol} className="transition-table-symbol" scope="col">
-                  {symbol}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {sortedStates.map((from, rowIndex) => (
-              <tr key={from}>
-                <th scope="row" className="transition-table-source">
-                  {labelFor(from)}
-                </th>
-                {sortedAlphabet.map((symbol, colIndex) => {
-                  const destination = destinationOf(from, symbol);
-                  const value = destination === null ? EMPTY_VALUE : String(destination);
-                  const isHighlighted =
-                    highlightedTransition !== null &&
-                    highlightedTransition.from === from &&
-                    highlightedTransition.symbol === symbol &&
-                    destination === highlightedTransition.to;
-                  const isRovingFocused =
-                    rovingFocus.row === rowIndex && rovingFocus.col === colIndex;
-                  const isOpen =
-                    openCell !== null &&
-                    openCell.row === rowIndex &&
-                    openCell.col === colIndex;
-                  return (
-                    <TransitionCell
-                      key={symbol}
-                      value={value}
-                      options={optionsWithEmpty}
-                      isMissing={destination === null}
-                      isHighlighted={isHighlighted}
-                      ariaLabel={`Transition from ${labelFor(from)} on '${symbol}'`}
-                      isRovingFocused={isRovingFocused}
-                      isOpen={isOpen}
-                      onChange={(newValue) => handleCellChange(from, symbol, newValue)}
-                      onFocus={() => setRovingFocus({ row: rowIndex, col: colIndex })}
-                      onOpenChange={(open) =>
-                        setOpenCell(open ? { row: rowIndex, col: colIndex } : null)
-                      }
-                    />
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <TransitionGrid
+        rowIds={sortedStates}
+        columnSymbols={sortedAlphabet}
+        rowLabel={labelFor}
+        cellOptions={cellOptions}
+        rovingFocus={rovingFocus}
+        openCell={openCell}
+        cellAt={(rowIndex, colIndex) => {
+          const from = sortedStates[rowIndex]!;
+          const symbol = sortedAlphabet[colIndex]!;
+          const destination = destinationOf(from, symbol);
+          const value = destination === null ? EMPTY_VALUE : String(destination);
+          const isHighlighted =
+            highlightedTransition !== null &&
+            highlightedTransition.from === from &&
+            highlightedTransition.symbol === symbol &&
+            destination === highlightedTransition.to;
+          return {
+            value,
+            isMissing: destination === null,
+            isHighlighted,
+            ariaLabel: `Transition from ${labelFor(from)} on '${symbol}'`,
+            onChange: (newValue) => handleCellChange(from, symbol, newValue),
+          };
+        }}
+        onCellFocus={(row, col) => setRovingFocus({ row, col })}
+        onOpenChange={(row, col, open) =>
+          setOpenCell(open ? { row, col } : null)
+        }
+        onArrowNavigate={handleArrowNavigate}
+      />
     </div>
   );
 }

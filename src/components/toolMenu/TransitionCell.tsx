@@ -154,19 +154,19 @@ export function TransitionCell({
 
   const triggerLabel = options.find((option) => option.value === value)?.label ?? '—';
   const cellClass = [
-    'transition-table-cell',
-    isMissing ? 'transition-table-cell-missing' : '',
+    'transition-grid-cell',
+    isMissing ? 'transition-grid-cell-missing' : '',
     isHighlighted ? 'pulse-error' : '',
   ]
     .filter(Boolean)
     .join(' ');
 
   return (
-    <td className={cellClass}>
+    <div className={cellClass} role="gridcell">
       <button
         ref={triggerRef}
         type="button"
-        className="transition-table-select"
+        className="transition-grid-trigger"
         onClick={() => onOpenChange(!isOpen)}
         onFocus={onFocus}
         onKeyDown={handleTriggerKeyDown}
@@ -219,6 +219,6 @@ export function TransitionCell({
           })}
         </div>
       )}
-    </td>
+    </div>
   );
 }
