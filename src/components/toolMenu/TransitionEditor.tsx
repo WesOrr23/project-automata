@@ -6,16 +6,21 @@
  *   - columns: alphabet symbols
  *   - cells: destination state (or empty for missing transition)
  *
- * Each cell is a dropdown over the available destination states. The empty
- * option ('—') means "no transition" and removing a transition is just
- * picking '—' for that cell. Adding/replacing a transition is picking any
- * other destination.
+ * Each cell uses a custom dropdown (TransitionCell) with controlled popup
+ * positioning, arrow-key navigation, and Escape-to-close — replacing the
+ * native <select> whose popup overlapped neighbouring cells uncontrollably.
  *
- * Empty cells therefore *are* the missing transitions — no separate
- * "ghost transitions" UI needed.
+ * Keyboard navigation across cells uses the "roving tabindex" pattern: only
+ * one cell at a time has tabIndex=0, and arrow keys move that focus around
+ * the grid. Tab into the table lands on the rovingly-focused cell; from
+ * there, arrows move; Enter opens the cell's dropdown.
  */
 
+import { useEffect, useState } from 'react';
 import { Automaton } from '../../engine/types';
+import { TransitionCell } from './TransitionCell';
+
+const EMPTY_VALUE = '__none__';
 
 type TransitionEditorProp = {
   automaton: Automaton;
@@ -23,8 +28,6 @@ type TransitionEditorProp = {
   highlightedTransition: { from: number; to: number; symbol: string | null } | null;
   onSetTransition: (from: number, symbol: string, to: number | null) => void;
 };
-
-const EMPTY_VALUE = '__none__';
 
 export function TransitionEditor({
   automaton,
@@ -35,18 +38,45 @@ export function TransitionEditor({
   const sortedStates = Array.from(automaton.states).sort((a, b) => a - b);
   const sortedAlphabet = Array.from(automaton.alphabet).sort();
 
+  // Roving focus position. Coords are (rowIndex, colIndex). When the user
+  // presses arrow keys on a focused cell, we update this and (after render)
+  // focus the new cell.
+  const [rovingFocus, setRovingFocus] = useState<{ row: number; col: number }>({
+    row: 0,
+    col: 0,
+  });
+  const [shouldRefocus, setShouldRefocus] = useState(false);
+
+  // Snap the roving focus to a valid position whenever the underlying data
+  // changes (e.g. user deleted the focused state).
+  useEffect(() => {
+    setRovingFocus((current) => ({
+      row: Math.min(current.row, Math.max(0, sortedStates.length - 1)),
+      col: Math.min(current.col, Math.max(0, sortedAlphabet.length - 1)),
+    }));
+  }, [sortedStates.length, sortedAlphabet.length]);
+
+  // After arrow-key navigation, programmatically focus the new cell's
+  // trigger button. Done via a flag + effect so we don't need refs to every
+  // cell.
+  useEffect(() => {
+    if (!shouldRefocus) return;
+    const selector = `.transition-table tbody tr:nth-child(${rovingFocus.row + 1}) td:nth-child(${rovingFocus.col + 2}) button`;
+    const target = document.querySelector<HTMLButtonElement>(selector);
+    target?.focus();
+    setShouldRefocus(false);
+  }, [shouldRefocus, rovingFocus]);
+
   function labelFor(stateId: number): string {
     return displayLabels.get(stateId) ?? `q${stateId}`;
   }
 
-  /** Find the destination of the (from, symbol) transition, or null. */
   function destinationOf(from: number, symbol: string): number | null {
     const t = automaton.transitions.find(
       (transition) => transition.from === from && transition.symbol === symbol
     );
     if (!t) return null;
-    const first = Array.from(t.to)[0];
-    return first ?? null;
+    return Array.from(t.to)[0] ?? null;
   }
 
   function handleCellChange(from: number, symbol: string, newValue: string) {
@@ -57,7 +87,35 @@ export function TransitionEditor({
     }
   }
 
-  // Empty alphabet → table has no columns; render a hint instead.
+  function handleTableKeyDown(event: React.KeyboardEvent<HTMLTableElement>) {
+    // Only handle arrows; let Enter / Space / others bubble to the cell.
+    const { key } = event;
+    if (key !== 'ArrowUp' && key !== 'ArrowDown' && key !== 'ArrowLeft' && key !== 'ArrowRight') {
+      return;
+    }
+    const numRows = sortedStates.length;
+    const numCols = sortedAlphabet.length;
+    if (numRows === 0 || numCols === 0) return;
+
+    let { row, col } = rovingFocus;
+    if (key === 'ArrowUp') row = (row - 1 + numRows) % numRows;
+    else if (key === 'ArrowDown') row = (row + 1) % numRows;
+    else if (key === 'ArrowLeft') col = (col - 1 + numCols) % numCols;
+    else if (key === 'ArrowRight') col = (col + 1) % numCols;
+
+    event.preventDefault();
+    setRovingFocus({ row, col });
+    setShouldRefocus(true);
+  }
+
+  // Build the option list once per render; passed by reference into each
+  // cell. Includes the empty option at the top.
+  const stateOptions = sortedStates.map((stateId) => ({
+    value: String(stateId),
+    label: labelFor(stateId),
+  }));
+  const optionsWithEmpty = [{ value: EMPTY_VALUE, label: '—' }, ...stateOptions];
+
   if (sortedAlphabet.length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
@@ -72,59 +130,49 @@ export function TransitionEditor({
       <span className="label">Transitions</span>
 
       <div className="transition-table-wrap">
-        <table className="transition-table">
+        <table
+          className="transition-table"
+          onKeyDown={handleTableKeyDown}
+          role="grid"
+        >
           <thead>
             <tr>
               <th aria-label="Source state column header" />
               {sortedAlphabet.map((symbol) => (
-                <th key={symbol} className="transition-table-symbol">
+                <th key={symbol} className="transition-table-symbol" scope="col">
                   {symbol}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {sortedStates.map((from) => (
+            {sortedStates.map((from, rowIndex) => (
               <tr key={from}>
                 <th scope="row" className="transition-table-source">
                   {labelFor(from)}
                 </th>
-                {sortedAlphabet.map((symbol) => {
+                {sortedAlphabet.map((symbol, colIndex) => {
                   const destination = destinationOf(from, symbol);
                   const value = destination === null ? EMPTY_VALUE : String(destination);
                   const isHighlighted =
                     highlightedTransition !== null &&
                     highlightedTransition.from === from &&
                     highlightedTransition.symbol === symbol &&
-                    (destination === highlightedTransition.to);
-                  const isMissing = destination === null;
+                    destination === highlightedTransition.to;
+                  const isRovingFocused =
+                    rovingFocus.row === rowIndex && rovingFocus.col === colIndex;
                   return (
-                    <td
+                    <TransitionCell
                       key={symbol}
-                      className={[
-                        'transition-table-cell',
-                        isMissing ? 'transition-table-cell-missing' : '',
-                        isHighlighted ? 'pulse-error' : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                    >
-                      <select
-                        className="transition-table-select"
-                        value={value}
-                        onChange={(event) =>
-                          handleCellChange(from, symbol, event.target.value)
-                        }
-                        aria-label={`Transition from ${labelFor(from)} on '${symbol}'`}
-                      >
-                        <option value={EMPTY_VALUE}>—</option>
-                        {sortedStates.map((target) => (
-                          <option key={target} value={target}>
-                            {labelFor(target)}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
+                      value={value}
+                      options={optionsWithEmpty}
+                      isMissing={destination === null}
+                      isHighlighted={isHighlighted}
+                      ariaLabel={`Transition from ${labelFor(from)} on '${symbol}'`}
+                      isRovingFocused={isRovingFocused}
+                      onChange={(newValue) => handleCellChange(from, symbol, newValue)}
+                      onFocus={() => setRovingFocus({ row: rowIndex, col: colIndex })}
+                    />
                   );
                 })}
               </tr>
