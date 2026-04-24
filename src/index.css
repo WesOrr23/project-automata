@@ -1199,8 +1199,21 @@ button svg {
 
 .transition-creator-symbol-input.invalid {
   border-color: var(--error-stroke);
-  background: var(--error-bg);
-  color: var(--error-text);
+  /* Background and text color stay normal — only the border conveys
+   * the validation state, so the user's typed character remains
+   * comfortably readable. */
+}
+
+.transition-creator-symbol-input.invalid:focus,
+.transition-creator-symbol-input.invalid:focus-visible {
+  border-color: var(--error-stroke);
+  /* Override the global blue focus ring (both box-shadow and outline)
+   * so an invalid input doesn't get a blue outer ring + red inner
+   * border at the same time. */
+  outline-color: var(--error-stroke);
+  box-shadow:
+    inset 0 1px 2px rgba(15, 23, 42, 0.03),
+    0 0 0 3px rgba(220, 38, 38, 0.15);
 }
 
 .transition-creator-action-row .btn {
@@ -1293,6 +1306,29 @@ button svg {
 
 .state-picker-popover-option[aria-selected='true'].highlighted {
   background: var(--blue-600);
+}
+
+/* ─── Canvas state nodes in pick mode ─── */
+/* When the transition creator is asking for a state, every state node on
+ * the canvas becomes a clickable target. Subtle pulse + cursor:pointer
+ * tells the user "click one of these." */
+
+.state-node-pickable circle {
+  transition: stroke-width 0.15s ease, filter 0.15s ease;
+}
+
+.state-node-pickable:hover circle {
+  stroke-width: 4;
+  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.5));
+}
+
+@keyframes state-node-pickable-breath {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(59, 130, 246, 0)); }
+  50%      { filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.45)); }
+}
+
+.state-node-pickable circle:not(:hover) {
+  animation: state-node-pickable-breath 2s ease-in-out infinite;
 }
 
 /* ─── Source highlighting (notification target pulse) ─── */

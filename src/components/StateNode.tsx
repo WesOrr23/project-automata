@@ -32,6 +32,15 @@ type StateNodeProp = {
 
   /** Whether this state is the active highlight target of a notification */
   isHighlighted?: boolean;
+
+  /**
+   * Whether the canvas is in "pick a state" mode. Drives the cursor and
+   * hover affordance so the user knows the state node is clickable.
+   */
+  isPickable?: boolean;
+
+  /** Called when the state is clicked while pickable. */
+  onPick?: () => void;
 };
 
 /**
@@ -51,6 +60,8 @@ export function StateNode({
   isActive = false,
   resultStatus = null,
   isHighlighted = false,
+  isPickable = false,
+  onPick,
 }: StateNodeProp) {
   // Determine fill and stroke colors based on simulation state
   // Priority: resultStatus > isActive > default
@@ -78,8 +89,32 @@ export function StateNode({
 
   const highlightClass = isHighlighted ? 'pulse-canvas pulse-canvas-error' : undefined;
 
+  // Combined classes: highlight pulse (notification) + pickable affordance.
+  const groupClassNames = [
+    isPickable ? 'state-node-pickable' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <g data-state-id={stateId}>
+    <g
+      data-state-id={stateId}
+      className={groupClassNames}
+      onClick={isPickable ? onPick : undefined}
+      role={isPickable ? 'button' : undefined}
+      tabIndex={isPickable ? 0 : undefined}
+      onKeyDown={
+        isPickable && onPick
+          ? (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onPick();
+              }
+            }
+          : undefined
+      }
+      style={isPickable ? { cursor: 'pointer' } : undefined}
+    >
       {/* Outer circle (always present) */}
       <circle
         cx={x}

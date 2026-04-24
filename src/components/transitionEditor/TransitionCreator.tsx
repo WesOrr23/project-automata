@@ -20,13 +20,12 @@
  *   loadExisting — used in Phase 3), Add becomes Delete.
  */
 
-import { useReducer, useRef, useState } from 'react';
+import { Dispatch, useEffect, useRef, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Automaton } from '../../engine/types';
 import {
-  creationReducer,
-  INITIAL_CREATION_STATE,
   isReady,
+  type CreationAction,
   type CreationState,
 } from './creationReducer';
 import { MiniTransitionSVG } from './MiniTransitionSVG';
@@ -35,6 +34,8 @@ import { StatePickerPopover, type PickerOption } from '../popover/StatePickerPop
 type TransitionCreatorProp = {
   automaton: Automaton;
   displayLabels: Map<number, string>;
+  creationState: CreationState;
+  creationDispatch: Dispatch<CreationAction>;
   onSetTransition: (from: number, symbol: string, to: number | null) => void;
 };
 
@@ -64,14 +65,38 @@ function instructionFor(state: CreationState, symbolValid: boolean): string {
 export function TransitionCreator({
   automaton,
   displayLabels,
+  creationState: state,
+  creationDispatch: dispatch,
   onSetTransition,
 }: TransitionCreatorProp) {
-  const [state, dispatch] = useReducer(creationReducer, INITIAL_CREATION_STATE);
-
   const [pickerSlot, setPickerSlot] = useState<'source' | 'destination' | null>(null);
   const [pickerAnchor, setPickerAnchor] = useState<DOMRect | null>(null);
 
   const symbolInputRef = useRef<HTMLInputElement>(null);
+
+  // If the parent dispatched a phase change to non-picking (e.g. via a
+  // canvas click), close the popover too. Keeps popup-mode and canvas-mode
+  // consistent.
+  useEffect(() => {
+    if (state.phase !== 'picking-source' && state.phase !== 'picking-destination') {
+      setPickerSlot(null);
+      setPickerAnchor(null);
+    }
+  }, [state.phase]);
+
+  // Auto-focus the symbol input when both source + destination are filled
+  // (so the user lands directly in the symbol field after the second pick,
+  // whether picked via popover or via canvas).
+  useEffect(() => {
+    if (
+      state.source !== null &&
+      state.destination !== null &&
+      state.symbol === '' &&
+      state.editingExisting === null
+    ) {
+      symbolInputRef.current?.focus();
+    }
+  }, [state.source, state.destination, state.symbol, state.editingExisting]);
 
   const sortedStates = Array.from(automaton.states).sort((a, b) => a - b);
   const sortedAlphabet = Array.from(automaton.alphabet).sort();
@@ -105,20 +130,16 @@ export function TransitionCreator({
 
   function handlePick(value: string) {
     const stateId = Number(value);
-    const wasPickingSource = pickerSlot === 'source';
-    const wasPickingDestination = pickerSlot === 'destination';
-    if (wasPickingSource) {
+    if (pickerSlot === 'source') {
       dispatch({ type: 'sourcePicked', stateId });
-    } else if (wasPickingDestination) {
+    } else if (pickerSlot === 'destination') {
       dispatch({ type: 'destinationPicked', stateId });
     }
     setPickerSlot(null);
     setPickerAnchor(null);
-    // After completing the destination pick (or completing source when
-    // destination was already filled), focus the symbol input.
-    if (wasPickingDestination || (wasPickingSource && state.destination !== null)) {
-      setTimeout(() => symbolInputRef.current?.focus(), 0);
-    }
+    // Focus the symbol input automatically when both slots are filled —
+    // handled by the useEffect above so it works for both popover picks
+    // and canvas picks.
   }
 
   function handleAction() {

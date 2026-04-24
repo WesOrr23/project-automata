@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useReducer } from 'react';
 import {
   createAutomaton,
   addState,
@@ -21,6 +21,10 @@ import { ToolMenuState, ToolTabID } from './components/toolMenu/types';
 import { NotificationStack } from './notifications/NotificationStack';
 import { useNotifications } from './notifications/useNotifications';
 import type { NotificationTarget } from './notifications/types';
+import {
+  creationReducer,
+  INITIAL_CREATION_STATE,
+} from './components/transitionEditor/creationReducer';
 import { computeLayout } from './ui-state/utils';
 import { useSimulation } from './hooks/useSimulation';
 
@@ -56,6 +60,36 @@ function App() {
 
   const sim = useSimulation(automaton);
   const { highlightedTarget, notify } = useNotifications();
+
+  // Transition creation state machine — lifted here so the canvas can
+  // dispatch state-picks into it (Phase 2). TransitionCreator becomes a
+  // controlled component, taking state + dispatch as props.
+  const [creationState, creationDispatch] = useReducer(
+    creationReducer,
+    INITIAL_CREATION_STATE
+  );
+
+  // Canvas enters "pick a state" mode while the form is in a picking phase.
+  const canvasPickMode: 'state' | null =
+    creationState.phase === 'picking-source' ||
+    creationState.phase === 'picking-destination'
+      ? 'state'
+      : null;
+
+  function handleCanvasPickState(stateId: number) {
+    if (creationState.phase === 'picking-source') {
+      creationDispatch({ type: 'sourcePicked', stateId });
+    } else if (creationState.phase === 'picking-destination') {
+      creationDispatch({ type: 'destinationPicked', stateId });
+    }
+  }
+
+  // Reset the creation form whenever the automaton structure changes
+  // (states/alphabet/transitions). Avoids the form referencing IDs or
+  // symbols that no longer exist.
+  useEffect(() => {
+    creationDispatch({ type: 'reset' });
+  }, [automaton]);
 
   // Derive per-component highlight props from the active notification target.
   // Each component only cares about one kind of target; everything else stays
@@ -345,6 +379,8 @@ function App() {
       displayLabels={displayLabels}
       highlightedStateId={highlightedStateId}
       highlightedSymbol={highlightedSymbol}
+      creationState={creationState}
+      creationDispatch={creationDispatch}
       onAlphabetAdd={handleAlphabetAdd}
       onAlphabetRemove={handleAlphabetRemove}
       onAddState={handleAddState}
@@ -412,6 +448,8 @@ function App() {
             nextTransition={appMode === 'SIMULATING' ? sim.nextTransition : null}
             highlightedStateId={highlightedStateId}
             highlightedTransition={highlightedTransition}
+            pickMode={canvasPickMode}
+            onPickState={handleCanvasPickState}
           />
         )}
       </main>

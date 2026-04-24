@@ -34,6 +34,15 @@ type AutomatonCanvasProp = {
 
   /** Transition currently highlighted by an active notification target */
   highlightedTransition?: { from: number; to: number; symbol: string | null } | null;
+
+  /**
+   * When set to 'state', state nodes become clickable for picking
+   * (used by TransitionCreator while filling source/destination slots).
+   */
+  pickMode?: 'state' | null;
+
+  /** Called when the user clicks a state node while pickMode === 'state'. */
+  onPickState?: (stateId: number) => void;
 };
 
 export function AutomatonCanvas({
@@ -44,6 +53,8 @@ export function AutomatonCanvas({
   nextTransition,
   highlightedStateId,
   highlightedTransition,
+  pickMode,
+  onPickState,
 }: AutomatonCanvasProp) {
   return (
     <svg
@@ -89,6 +100,7 @@ export function AutomatonCanvas({
         const stateResultStatus = isActive ? (resultStatus ?? null) : null;
 
         const isHighlighted = stateUI.id === highlightedStateId;
+        const isPickable = pickMode === 'state';
 
         return (
           <StateNode
@@ -102,6 +114,8 @@ export function AutomatonCanvas({
             isActive={isActive}
             resultStatus={stateResultStatus}
             isHighlighted={isHighlighted}
+            isPickable={isPickable}
+            onPick={isPickable && onPickState ? () => onPickState(stateUI.id) : undefined}
           />
         );
       })}
