@@ -1,11 +1,23 @@
-import { useState, useEffect } from 'react';
-import { createAutomaton, addState, addTransition, addAcceptState } from './engine/automaton';
+import { useState, useEffect, useRef } from 'react';
+import {
+  createAutomaton,
+  addState,
+  removeState,
+  addTransition,
+  removeTransition,
+  setStartState,
+  addAcceptState,
+  removeAcceptState,
+} from './engine/automaton';
+import { isRunnable, getValidationReport } from './engine/validator';
 import { Automaton } from './engine/types';
 import { AutomatonUI } from './ui-state/types';
 import { AutomatonCanvas } from './components/AutomatonCanvas';
 import { InputPanel } from './components/InputPanel';
 import { SimulationControls } from './components/SimulationControls';
 import { ToolMenu } from './components/toolMenu/ToolMenu';
+import { ConfigPanel } from './components/toolMenu/ConfigPanel';
+import { EditPanel } from './components/toolMenu/EditPanel';
 import { ToolMenuState, ToolTabID } from './components/toolMenu/types';
 import { computeLayout } from './ui-state/utils';
 import { useSimulation } from './hooks/useSimulation';
@@ -35,16 +47,43 @@ function buildSampleDFA(): Automaton {
 }
 
 function App() {
-  const [automaton] = useState<Automaton>(() => buildSampleDFA());
+  const [automaton, setAutomaton] = useState<Automaton>(() => buildSampleDFA());
   const [automatonUI, setAutomatonUI] = useState<AutomatonUI | null>(null);
   const [inputString, setInputString] = useState('');
   const [menuState, setMenuState] = useState<ToolMenuState>({ mode: 'COLLAPSED' });
+  const [editError, setEditError] = useState<string | null>(null);
 
   const sim = useSimulation(automaton);
 
+  // Recompute layout whenever automaton changes (debounced to absorb rapid edits)
   useEffect(() => {
-    computeLayout(automaton).then(setAutomatonUI);
+    const timer = setTimeout(() => {
+      computeLayout(automaton).then(setAutomatonUI);
+    }, 120);
+    return () => clearTimeout(timer);
   }, [automaton]);
+
+  // Reset simulation when the automaton structure changes (skip initial mount)
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    sim.reset();
+    setInputString('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [automaton]);
+
+  // Derived application mode from the active tab
+  const appMode: 'IDLE' | 'EDITING' | 'SIMULATING' =
+    menuState.mode === 'OPEN'
+      ? (menuState.activeTab === 'EDIT'
+          ? 'EDITING'
+          : menuState.activeTab === 'SIMULATE'
+            ? 'SIMULATING'
+            : 'IDLE')
+      : 'IDLE';
 
   // ─── Menu state transitions ───
 
@@ -57,11 +96,111 @@ function App() {
   }
 
   function handleTabClick(tab: ToolTabID) {
+    setEditError(null);
     setMenuState({ mode: 'OPEN', activeTab: tab });
   }
 
   function handleCollapse() {
     setMenuState({ mode: 'COLLAPSED' });
+  }
+
+  // ─── Config handlers ───
+
+  function handleTypeChange(type: 'DFA' | 'NFA') {
+    setAutomaton((prev) => ({ ...prev, type }));
+  }
+
+  function handleAlphabetAdd(symbol: string) {
+    setAutomaton((prev) => ({
+      ...prev,
+      alphabet: new Set([...prev.alphabet, symbol]),
+    }));
+  }
+
+  function handleAlphabetRemove(symbol: string) {
+    setAutomaton((prev) => {
+      if (prev.alphabet.size <= 1) return prev;
+      const newAlphabet = new Set(prev.alphabet);
+      newAlphabet.delete(symbol);
+      // Cascade: drop transitions that referenced the removed symbol
+      const newTransitions = prev.transitions.filter((t) => t.symbol !== symbol);
+      return { ...prev, alphabet: newAlphabet, transitions: newTransitions };
+    });
+  }
+
+  function handleExportJSON() {
+    const serializable = {
+      type: automaton.type,
+      states: Array.from(automaton.states).sort((a, b) => a - b),
+      alphabet: Array.from(automaton.alphabet).sort(),
+      transitions: automaton.transitions.map((t) => ({
+        from: t.from,
+        to: Array.from(t.to).sort((a, b) => a - b),
+        symbol: t.symbol,
+      })),
+      startState: automaton.startState,
+      acceptStates: Array.from(automaton.acceptStates).sort((a, b) => a - b),
+      nextStateId: automaton.nextStateId,
+    };
+    const json = JSON.stringify(serializable, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'automaton.json';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  }
+
+  // ─── Edit handlers ───
+
+  function runEdit(fn: () => Automaton) {
+    try {
+      const next = fn();
+      setAutomaton(next);
+      setEditError(null);
+    } catch (error) {
+      setEditError((error as Error).message);
+    }
+  }
+
+  function handleAddState() {
+    runEdit(() => addState(automaton).automaton);
+  }
+
+  function handleRemoveState(stateId: number) {
+    runEdit(() => removeState(automaton, stateId));
+  }
+
+  function handleSetStartState(stateId: number) {
+    runEdit(() => setStartState(automaton, stateId));
+  }
+
+  function handleToggleAcceptState(stateId: number) {
+    runEdit(() =>
+      automaton.acceptStates.has(stateId)
+        ? removeAcceptState(automaton, stateId)
+        : addAcceptState(automaton, stateId)
+    );
+  }
+
+  function handleAddTransition(from: number, to: number, symbol: string): string | null {
+    try {
+      const next = addTransition(automaton, from, new Set([to]), symbol);
+      setAutomaton(next);
+      setEditError(null);
+      return null;
+    } catch (error) {
+      const message = (error as Error).message;
+      setEditError(message);
+      return message;
+    }
+  }
+
+  function handleRemoveTransition(from: number, to: number, symbol: string | null) {
+    runEdit(() => removeTransition(automaton, from, new Set([to]), symbol));
   }
 
   // ─── Simulation handlers ───
@@ -108,11 +247,34 @@ function App() {
 
   // ─── Panel content ───
 
-  const configContent = <p className="caption">Config coming soon.</p>;
+  const configContent = (
+    <ConfigPanel
+      automatonType={automaton.type}
+      alphabet={automaton.alphabet}
+      onTypeChange={handleTypeChange}
+      onAlphabetAdd={handleAlphabetAdd}
+      onAlphabetRemove={handleAlphabetRemove}
+      onExportJSON={handleExportJSON}
+    />
+  );
 
-  const editContent = <p className="caption">Edit coming soon.</p>;
+  const editContent = (
+    <EditPanel
+      automaton={automaton}
+      error={editError}
+      onAddState={handleAddState}
+      onRemoveState={handleRemoveState}
+      onSetStartState={handleSetStartState}
+      onToggleAcceptState={handleToggleAcceptState}
+      onAddTransition={handleAddTransition}
+      onRemoveTransition={handleRemoveTransition}
+      onDismissError={() => setEditError(null)}
+    />
+  );
 
-  const simulateContent = (
+  // Simulate content: gate on validation
+  const runnable = isRunnable(automaton);
+  const simulateContent = runnable ? (
     <>
       <InputPanel
         alphabet={automaton.alphabet}
@@ -136,6 +298,8 @@ function App() {
         onJumpTo={handleJumpTo}
       />
     </>
+  ) : (
+    <ValidationView automaton={automaton} />
   );
 
   return (
@@ -158,12 +322,36 @@ function App() {
           <AutomatonCanvas
             automaton={automaton}
             automatonUI={automatonUI}
-            activeStateIds={sim.currentStateIds}
-            resultStatus={resultStatus}
-            nextTransition={sim.nextTransition}
+            activeStateIds={appMode === 'SIMULATING' ? sim.currentStateIds : undefined}
+            resultStatus={appMode === 'SIMULATING' ? resultStatus : null}
+            nextTransition={appMode === 'SIMULATING' ? sim.nextTransition : null}
           />
         )}
       </main>
+    </>
+  );
+}
+
+/**
+ * Shows validation problems that prevent simulation (e.g. incomplete DFA).
+ */
+function ValidationView({ automaton }: { automaton: Automaton }) {
+  const report = getValidationReport(automaton);
+  return (
+    <>
+      <p className="caption">
+        This automaton isn't ready to simulate. Fix the issues below in the Edit tab.
+      </p>
+      {report.errors.map((message, index) => (
+        <div key={`error-${index}`} className="editor-validation-banner">
+          {message}
+        </div>
+      ))}
+      {report.warnings.map((message, index) => (
+        <div key={`warning-${index}`} className="editor-validation-banner warning">
+          {message}
+        </div>
+      ))}
     </>
   );
 }

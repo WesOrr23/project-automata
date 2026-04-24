@@ -290,6 +290,152 @@ body {
   gap: var(--space-3);
 }
 
+/* ─── Alphabet badges (Config tab) ─── */
+.alphabet-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.alphabet-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-1) 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--blue-50);
+  border: 1px solid var(--blue-200);
+  color: var(--blue-700);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+
+.alphabet-badge-symbol {
+  line-height: 1;
+}
+
+.alphabet-badge-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-4);
+  height: var(--space-4);
+  border-radius: var(--radius-pill);
+  border: none;
+  background: transparent;
+  color: var(--blue-600);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.alphabet-badge-remove:hover:not(:disabled) {
+  background: var(--blue-200);
+  color: var(--error-text);
+}
+
+.alphabet-badge-remove:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ─── State editor list rows (Edit tab) ─── */
+.editor-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.editor-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+}
+
+.editor-row-label {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-heading);
+}
+
+.editor-row-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-5);
+  height: var(--space-5);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-button);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.editor-row-action:hover:not(:disabled) {
+  background: var(--bg-button-hover);
+  color: var(--text-body);
+}
+
+.editor-row-action:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.editor-row-action.active {
+  background: var(--blue-500);
+  color: white;
+  border-color: var(--blue-600);
+}
+
+.editor-row-action.active:hover:not(:disabled) {
+  background: var(--blue-600);
+}
+
+.editor-row-action.danger:hover:not(:disabled) {
+  background: var(--error-bg);
+  color: var(--error-text);
+  border-color: var(--error-border);
+}
+
+.editor-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.editor-select {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-input);
+  color: var(--text-heading);
+  cursor: pointer;
+}
+
+.editor-validation-banner {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--error-bg);
+  color: var(--error-text);
+  border: 1px solid var(--error-border);
+  font-size: var(--text-sm);
+}
+
+.editor-validation-banner.warning {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
 /* ─── Canvas Area ─── */
 
 .canvas-area {
