@@ -381,10 +381,20 @@ body {
 }
 
 .transition-table {
-  border-collapse: separate;
-  border-spacing: var(--space-1);
+  /* border-collapse: collapse so the sticky source column is adjacent to the
+   * first data cell with no border-spacing gap. The visual breathing room
+   * between source and data is provided by the sticky's padding-right plus a
+   * 1px border-right divider. Without this, border-spacing creates a 4px
+   * "no-cell's-land" that data cells can scroll into. */
+  border-collapse: collapse;
   font-family: var(--font-mono);
   font-size: var(--text-sm);
+}
+
+/* Manual spacing between cells, since border-collapse:collapse removed it. */
+.transition-table tbody td,
+.transition-table tbody th {
+  padding: 2px 2px;
 }
 
 .transition-table th,
@@ -403,24 +413,28 @@ body {
   text-align: right;
   font-weight: var(--weight-bold);
   color: var(--text-heading);
-  padding-right: var(--space-2);
-  padding-left: var(--space-1);
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2);
   white-space: nowrap;
   /* Sticky-left so source state labels stay visible while scrolling
-   * horizontally through wide alphabets. */
+   * horizontally through wide alphabets. The 1px right border separates
+   * the sticky column from data cells; the padding-right provides
+   * breathing room so the label and the first data cell never visually
+   * touch even at scroll=0. */
   position: sticky;
   left: 0;
   z-index: 1;
   background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
 }
 
-/* Same trick for the empty top-left corner so it doesn't show table content
- * scrolling underneath it. */
+/* Same treatment for the empty top-left corner so it doesn't show table
+ * content scrolling underneath it. */
 .transition-table thead th:first-child {
   position: sticky;
   left: 0;
   z-index: 2;
   background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
 }
 
 .transition-table-cell {

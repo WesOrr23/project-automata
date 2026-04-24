@@ -117,12 +117,11 @@ export function TransitionCell({
   }, [isOpen]);
 
   function handleTriggerKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
-    if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown') {
-      // Note: ArrowDown here opens the popover from a closed cell. ArrowDown
-      // for cross-cell navigation only triggers if the cell is closed AND
-      // the parent's handler runs first — handled by parent's keydown order.
-      // For now, opening on ArrowDown matches typical combobox behaviour.
-      if (event.key === 'ArrowDown' && isOpen) return; // let popover handle it
+    // Per the navigation contract:
+    //   navigation mode (cell focused, popover closed) → arrows move cells
+    //   edit mode      (popover open)                  → arrows move options
+    // Only Enter / Space transitions from navigation → edit.
+    if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       event.stopPropagation();
       onOpenChange(true);

@@ -93,7 +93,13 @@ export function TransitionEditor({
   }
 
   function handleTableKeyDown(event: React.KeyboardEvent<HTMLTableElement>) {
-    // Only handle arrows; let Enter / Space / others bubble to the cell.
+    // When a popover is open, the cell IS the keyboard focus owner —
+    // arrow keys belong to the popover (navigating its options). The
+    // table-level handler must stay out of the way until the user dismisses
+    // the popover with Escape or commits with Enter.
+    if (openCell !== null) return;
+
+    // Navigation mode: arrows move the roving focus between cells.
     const { key } = event;
     if (key !== 'ArrowUp' && key !== 'ArrowDown' && key !== 'ArrowLeft' && key !== 'ArrowRight') {
       return;
@@ -111,9 +117,6 @@ export function TransitionEditor({
     event.preventDefault();
     setRovingFocus({ row, col });
     setShouldRefocus(true);
-    // Moving via arrow keys implicitly closes any open popover so it
-    // doesn't trail behind the focused cell.
-    setOpenCell(null);
   }
 
   // Build the option list once per render; passed by reference into each
