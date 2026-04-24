@@ -11,8 +11,9 @@ export default defineConfig({
     // Use describe(), it(), expect() without importing them
     globals: true,
 
-    // Use Node environment for engine tests (pure TypeScript logic)
-    // When we add React component tests later, we'll need 'jsdom'
+    // Default to Node environment for engine tests (pure TypeScript logic).
+    // React component / hook tests opt into jsdom via a per-file pragma:
+    //   /** @vitest-environment jsdom */
     environment: 'node',
   },
 })

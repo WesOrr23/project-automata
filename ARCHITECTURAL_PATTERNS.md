@@ -305,6 +305,33 @@ const newAutomaton = addState(automaton).automaton;
 
 ---
 
+## 16. Global notification store with source highlighting (iter 6)
+
+**The rule.** All user-facing errors, warnings, and successes flow through a single React Context-backed store. The store also tracks one "highlighted target" — a reference to a state, transition, or alphabet symbol — that components observing the store visually pulse. Any component can `notify({...})` via `useNotifications()`.
+
+**Why.**
+- One UI surface for all messaging — users always look in the same place.
+- Source-of-error highlighting is automatic: tag a notification with a target, and the matching row + canvas element pulse for ~2s.
+- Inline error banners scattered across editor panels disappear; their replacement is a single stack of toasts in the top-right.
+- Decouples error reporting from layout — errors don't have to live near the form that produced them.
+
+**Where.**
+- `src/notifications/types.ts` — `Notification`, `NotificationSeverity`, `NotificationTarget` (discriminated union over state / transition / alphabet).
+- `src/notifications/NotificationContext.tsx` — `NotificationProvider` owns the store; manages auto-dismiss timers and highlight timeouts.
+- `src/notifications/useNotifications.ts` — hook that throws helpfully if used outside the provider.
+- `src/notifications/NotificationStack.tsx` + `NotificationToast.tsx` — fixed top-right UI.
+- `src/main.tsx` — wraps `<App />` in `<NotificationProvider>`.
+- `src/App.tsx` — derives `highlightedStateId` / `highlightedTransition` / `highlightedSymbol` from the store and passes each to the matching component. `applyEdit()` uses pre-check + functional updater so error notifications don't fire twice under StrictMode.
+- `src/components/AutomatonCanvas.tsx`, `StateNode.tsx`, `TransitionEdge.tsx` — receive highlight props, apply pulse-canvas SVG class.
+- `src/components/toolMenu/StateEditor.tsx`, `TransitionEditor.tsx`, `AlphabetEditor.tsx` — receive highlight props, apply pulse-error class to the matching row.
+
+**Mistakes to avoid.**
+- **Calling `notify()` inside a state updater.** State updaters are pure; under StrictMode dev they run twice → notifications fire twice. Always pre-check synchronously, then commit via `setState` if no error.
+- **Holding error state in multiple places.** `editError` and an inline banner duplicate the notification system. Pick one source of truth.
+- **Skipping the `target` when one is meaningful.** A toast that says "duplicate transition" without highlighting *which* transition is half useful. Always include a target when the user could ask "where?"
+
+---
+
 ## Patterns we *haven't* needed yet (watch for them)
 
 These aren't in the codebase but are likely to appear in future iterations:
