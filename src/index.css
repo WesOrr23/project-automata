@@ -138,61 +138,156 @@ body {
   min-height: 100vh;
 }
 
-/* ─── Floating Sidebar ─── */
+/* ─── Tool Menu (3-state sidebar) ─── */
 
-.sidebar {
+.tool-menu {
   position: fixed;
-  top: var(--space-4);
   left: var(--space-4);
-  width: var(--sidebar-width);
-  max-height: calc(100vh - var(--space-6));
-  overflow-y: auto;
-  background: var(--bg-sidebar);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  padding: var(--space-4);
+  z-index: 10;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  z-index: 10;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  gap: var(--space-2);
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-2);
+  transition: width 0.2s ease, max-height 0.2s ease;
 }
 
-.sidebar.collapsed {
-  transform: translateX(calc(-1 * var(--sidebar-width) - var(--space-4)));
-  opacity: 0;
-  pointer-events: none;
+/* State 1: Collapsed — narrow icon strip, vertically centered */
+.tool-menu-collapsed {
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--space-7);
 }
 
-.sidebar-toggle {
-  position: fixed;
+/* State 2: Expanded — icons + labels, vertically centered */
+.tool-menu-expanded {
+  top: 50%;
+  transform: translateY(-50%);
+  width: 140px;
+}
+
+/* State 3: Open — tabs + active content, top-anchored */
+.tool-menu-open {
   top: var(--space-4);
-  left: var(--space-4);
-  z-index: 11;
-  width: var(--space-6);
-  height: var(--space-6);
+  width: 260px;
+  max-height: calc(100vh - var(--space-6));
+  overflow-y: auto;
+}
+
+/* ─── Collapsed mode buttons (icon only) ─── */
+.tool-menu-icon {
+  width: 100%;
+  aspect-ratio: 1 / 1;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
-  background: var(--bg-sidebar);
-  box-shadow: var(--shadow-md);
+  background: var(--bg-button);
+  color: var(--text-body);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--text-base);
-  color: var(--text-secondary);
   transition: all 0.15s ease;
 }
 
-.sidebar-toggle:hover {
+.tool-menu-icon:hover {
+  background: var(--bg-button-hover);
+  color: var(--blue-600);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+/* ─── Expanded mode pills (icon + label) ─── */
+.tool-menu-pill {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-button);
+  color: var(--text-heading);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.tool-menu-pill:hover {
+  background: var(--bg-button-hover);
+  color: var(--blue-600);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+/* ─── Back button (open mode) ─── */
+.tool-menu-back {
+  align-self: flex-start;
+  width: var(--space-5);
+  height: var(--space-5);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-button);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.tool-menu-back:hover {
   background: var(--bg-button-hover);
   color: var(--text-body);
 }
 
-.sidebar-toggle.hidden {
-  opacity: 0;
-  pointer-events: none;
+/* ─── Open mode tab cards ─── */
+.tool-menu-card {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-button);
+  overflow: hidden;
+  transition: all 0.15s ease;
+}
+
+.tool-menu-card.compact {
+  cursor: pointer;
+}
+
+.tool-menu-card.compact:hover {
+  background: var(--bg-button-hover);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.tool-menu-card.active {
+  background: var(--bg-sidebar);
+  border-color: var(--blue-300);
+  box-shadow: var(--shadow-sm);
+}
+
+.tool-menu-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  color: var(--text-heading);
+}
+
+.tool-menu-card.active .tool-menu-card-header {
+  color: var(--blue-700);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.tool-menu-card-content {
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 /* ─── Canvas Area ─── */

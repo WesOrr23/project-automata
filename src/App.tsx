@@ -5,6 +5,8 @@ import { AutomatonUI } from './ui-state/types';
 import { AutomatonCanvas } from './components/AutomatonCanvas';
 import { InputPanel } from './components/InputPanel';
 import { SimulationControls } from './components/SimulationControls';
+import { ToolMenu } from './components/toolMenu/ToolMenu';
+import { ToolMenuState, ToolTabID } from './components/toolMenu/types';
 import { computeLayout } from './ui-state/utils';
 import { useSimulation } from './hooks/useSimulation';
 
@@ -33,21 +35,37 @@ function buildSampleDFA(): Automaton {
 }
 
 function App() {
-  const [dfa] = useState<Automaton>(() => buildSampleDFA());
+  const [automaton] = useState<Automaton>(() => buildSampleDFA());
   const [automatonUI, setAutomatonUI] = useState<AutomatonUI | null>(null);
   const [inputString, setInputString] = useState('');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [menuState, setMenuState] = useState<ToolMenuState>({ mode: 'COLLAPSED' });
 
-  const sim = useSimulation(dfa);
+  const sim = useSimulation(automaton);
 
   useEffect(() => {
-    computeLayout(dfa).then(setAutomatonUI);
-  }, [dfa]);
+    computeLayout(automaton).then(setAutomatonUI);
+  }, [automaton]);
 
-  /**
-   * Handle input changes — always allowed.
-   * If a simulation is active, auto-reset it when input changes.
-   */
+  // ─── Menu state transitions ───
+
+  function handleHoverEnter() {
+    setMenuState((current) => (current.mode === 'COLLAPSED' ? { mode: 'EXPANDED' } : current));
+  }
+
+  function handleHoverLeave() {
+    setMenuState((current) => (current.mode === 'EXPANDED' ? { mode: 'COLLAPSED' } : current));
+  }
+
+  function handleTabClick(tab: ToolTabID) {
+    setMenuState({ mode: 'OPEN', activeTab: tab });
+  }
+
+  function handleCollapse() {
+    setMenuState({ mode: 'COLLAPSED' });
+  }
+
+  // ─── Simulation handlers ───
+
   function handleInputChange(value: string) {
     if (sim.simulation !== null) {
       sim.reset();
@@ -55,10 +73,6 @@ function App() {
     setInputString(value);
   }
 
-  /**
-   * Ensure simulation is initialized before stepping/playing.
-   * Re-initializes if finished (for replay).
-   */
   function ensureInitialized(): boolean {
     if (inputString.length === 0) return false;
     if (sim.simulation === null || sim.status === 'finished') {
@@ -82,11 +96,6 @@ function App() {
     sim.run();
   }
 
-  /**
-   * Handle clicking a consumed character to jump to that history position.
-   * Character at index N was consumed by the transition from step N to step N+1,
-   * so clicking it jumps to step N (the state before that character was consumed).
-   */
   function handleJumpTo(characterIndex: number) {
     if (inputString.length === 0) return;
     sim.jumpTo(characterIndex, inputString);
@@ -97,70 +106,57 @@ function App() {
       ? (sim.accepted ? 'accepted' : 'rejected')
       : null;
 
+  // ─── Panel content ───
+
+  const configContent = <p className="caption">Config coming soon.</p>;
+
+  const editContent = <p className="caption">Edit coming soon.</p>;
+
+  const simulateContent = (
+    <>
+      <InputPanel
+        alphabet={automaton.alphabet}
+        input={inputString}
+        onInputChange={handleInputChange}
+      />
+      <SimulationControls
+        status={sim.status}
+        hasSimulation={sim.simulation !== null}
+        hasInput={inputString.length > 0}
+        accepted={sim.accepted}
+        speed={sim.speed}
+        input={inputString}
+        consumedCount={sim.consumedCount}
+        onStep={handleStep}
+        onPlay={handlePlay}
+        onPause={sim.pause}
+        onStepBack={sim.stepBack}
+        canStepBack={sim.canStepBack}
+        onSpeedChange={sim.setSpeed}
+        onJumpTo={handleJumpTo}
+      />
+    </>
+  );
+
   return (
     <>
-      {/* Sidebar toggle — visible when collapsed */}
-      <button
-        className={`sidebar-toggle ${sidebarCollapsed ? '' : 'hidden'}`}
-        onClick={() => setSidebarCollapsed(false)}
-        aria-label="Open controls"
-      >
-        ›
-      </button>
+      <ToolMenu
+        state={menuState}
+        onHoverEvent={handleHoverEnter}
+        onHoverLeave={handleHoverLeave}
+        onTabClick={handleTabClick}
+        onCollapse={handleCollapse}
+        configContent={configContent}
+        editContent={editContent}
+        simulateContent={simulateContent}
+      />
 
-      {/* Floating sidebar */}
-      <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span className="label">Simulate</span>
-          <button
-            className="sidebar-toggle"
-            onClick={() => setSidebarCollapsed(true)}
-            aria-label="Close controls"
-            style={{
-              position: 'static',
-              width: 'var(--space-5)',
-              height: 'var(--space-5)',
-              fontSize: 'var(--text-sm)',
-            }}
-          >
-            ‹
-          </button>
-        </div>
-
-        <div className="divider" />
-
-        <InputPanel
-          alphabet={dfa.alphabet}
-          input={inputString}
-          onInputChange={handleInputChange}
-        />
-
-        <SimulationControls
-          status={sim.status}
-          hasSimulation={sim.simulation !== null}
-          hasInput={inputString.length > 0}
-          accepted={sim.accepted}
-          speed={sim.speed}
-          input={inputString}
-          consumedCount={sim.consumedCount}
-          onStep={handleStep}
-          onPlay={handlePlay}
-          onPause={sim.pause}
-          onStepBack={sim.stepBack}
-          canStepBack={sim.canStepBack}
-          onSpeedChange={sim.setSpeed}
-          onJumpTo={handleJumpTo}
-        />
-      </aside>
-
-      {/* Full viewport canvas */}
       <main className="canvas-area">
         {automatonUI === null ? (
           <p className="caption">Loading...</p>
         ) : (
           <AutomatonCanvas
-            automaton={dfa}
+            automaton={automaton}
             automatonUI={automatonUI}
             activeStateIds={sim.currentStateIds}
             resultStatus={resultStatus}
