@@ -138,7 +138,7 @@ export function TransitionEditor({
         </>
       )}
 
-      <div className="editor-list">
+      <div className="editor-list editor-list-scroll">
         {sortedTransitions.map((transition, index) => {
           const destinations = Array.from(transition.to).sort((a, b) => a - b);
           const symbolDisplay = transition.symbol === null ? 'ε' : transition.symbol;

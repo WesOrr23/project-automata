@@ -114,6 +114,23 @@ Currently switching to Edit tab hard-resets simulation. Instead: keep input stri
 - Custom state labels (rename states from "q0" → user-chosen).
 - Preferences: "warn before delete if there are dependent transitions", auto-layout on/off, etc.
 
+**Ghost transitions (own iteration — DFA only):**
+A "ghost mode" toggle that visualizes missing required transitions on the canvas. Two implementation tiers:
+
+- *Tier 1 (small, doable now):* Badge on each state showing missing-symbol count, e.g. `q0 ⚠1`. Click/hover reveals the specific symbols. Uses `getMissingTransitions()` which already exists.
+- *Tier 2 (own feature):* Faded grey edges from each state for each missing symbol, routed to a placeholder target (single "?" position outside the graph, or self-loop with a `?` label). Off by default. Pre-cooked into the GraphViz feed.
+
+NFAs don't need this — completeness isn't required.
+
+**Auto-increment transition form:**
+After successfully adding a transition (`q0 → q0 on '0'`), advance the form's symbol/from/to to the next undefined transition: `q0 → q0 on '1'`, then `q0 → q1 on '0'`, etc. Cycles through all (state, symbol) pairs. Optional preference toggle in Config.
+
+**Custom dropdowns:**
+Native `<select>` feels dated against the rest of the design. Replace with a styled custom dropdown (or use a headless library). Keep keyboard accessibility.
+
+**Empty-string simulation:**
+No way to test the empty string currently — the input must have at least one character. Allow Play with empty input; the simulation just checks if start state is an accept state.
+
 **Notification system (own iteration):**
 A global, always-accessible notification/toast system replacing scattered inline error banners:
 - Stacks in top-right corner of viewport.

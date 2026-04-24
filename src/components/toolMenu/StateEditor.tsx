@@ -67,9 +67,14 @@ export function StateEditor({
               key={stateId}
               className={`editor-row show-actions-on-hover ${isHighlighted ? 'pulse-error' : ''}`}
             >
-              <span className="editor-row-label">{label}</span>
+              {/* Label takes natural width so Start/Accept anchor right after
+                  it instead of being pushed to the right edge by flex:1. */}
+              <span className="editor-row-label" style={{ flex: '0 0 auto' }}>
+                {label}
+              </span>
 
-              {/* Start toggle */}
+              {/* Start + Accept anchored next to label so they don't shift
+                  when Trash appears/disappears on hover. */}
               <button
                 className={`editor-row-action ${isStart ? 'active' : ''}`}
                 onClick={() => onSetStartState(stateId)}
@@ -80,7 +85,6 @@ export function StateEditor({
                 <CircleDot size={14} />
               </button>
 
-              {/* Accept toggle */}
               <button
                 className={`editor-row-action ${isAccept ? 'active' : ''}`}
                 onClick={() => onToggleAcceptState(stateId)}
@@ -90,7 +94,11 @@ export function StateEditor({
                 {isAccept ? <CircleCheck size={14} /> : <Circle size={14} />}
               </button>
 
-              {/* Delete */}
+              {/* Spacer pushes Trash to the right edge */}
+              <span style={{ flex: 1 }} aria-hidden="true" />
+
+              {/* Trash sits in its own reserved slot at the right; visibility
+                  toggles on hover so the slot is always there. */}
               <button
                 className="editor-row-action danger hide-unless-hover"
                 onClick={() => onRemoveState(stateId)}

@@ -360,6 +360,16 @@ body {
   gap: var(--space-1);
 }
 
+/* Scrollable variant — used for the transitions list so a long list doesn't
+ * grow the whole edit pane and crush the Configure / Simulate cards below. */
+.editor-list-scroll {
+  max-height: 280px;
+  overflow-y: auto;
+  /* Scrollbar gutter reserves space so the list doesn't reflow when a
+   * scrollbar appears. */
+  scrollbar-gutter: stable;
+}
+
 .editor-row {
   display: flex;
   align-items: center;
@@ -646,21 +656,24 @@ body {
 }
 
 /* ─── Hover-only row actions ─── */
-/* Actions are removed from the layout until the row is hovered or one of its
- * descendants has focus. `display: none` (instead of visibility/opacity)
- * eliminates ghosting from background bleed-through and ensures the hidden
- * button can't capture pointer events.
+/* Hidden actions still occupy layout space (visibility:hidden, not
+ * display:none) so the visible buttons next to them never shift when the
+ * trash appears or disappears. Opacity transition is explicitly disabled on
+ * these so we never see a half-faded "ghost" mid-transition.
  *
- * The row is flex with align-items:center, so removing the action doesn't
- * change row height — only the trailing whitespace.
+ * Pointer-events:none guarantees a hidden trash can't be clicked even if
+ * the cursor is over its slot.
  */
 .show-actions-on-hover .hide-unless-hover {
-  display: none;
+  visibility: hidden;
+  pointer-events: none;
+  transition: none;
 }
 
 .show-actions-on-hover:hover .hide-unless-hover,
 .show-actions-on-hover:focus-within .hide-unless-hover {
-  display: flex;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 /* Compact tab cards are <button> now; reset default browser styling. */
