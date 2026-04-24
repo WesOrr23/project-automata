@@ -47,6 +47,11 @@ export function TransitionEditor({
   });
   const [shouldRefocus, setShouldRefocus] = useState(false);
 
+  // Which cell's popover is currently open. At most one at a time, by design.
+  // Lifted up here (rather than per-cell internal state) so opening one cell
+  // implicitly closes any other.
+  const [openCell, setOpenCell] = useState<{ row: number; col: number } | null>(null);
+
   // Snap the roving focus to a valid position whenever the underlying data
   // changes (e.g. user deleted the focused state).
   useEffect(() => {
@@ -106,6 +111,9 @@ export function TransitionEditor({
     event.preventDefault();
     setRovingFocus({ row, col });
     setShouldRefocus(true);
+    // Moving via arrow keys implicitly closes any open popover so it
+    // doesn't trail behind the focused cell.
+    setOpenCell(null);
   }
 
   // Build the option list once per render; passed by reference into each
@@ -161,6 +169,10 @@ export function TransitionEditor({
                     destination === highlightedTransition.to;
                   const isRovingFocused =
                     rovingFocus.row === rowIndex && rovingFocus.col === colIndex;
+                  const isOpen =
+                    openCell !== null &&
+                    openCell.row === rowIndex &&
+                    openCell.col === colIndex;
                   return (
                     <TransitionCell
                       key={symbol}
@@ -170,8 +182,12 @@ export function TransitionEditor({
                       isHighlighted={isHighlighted}
                       ariaLabel={`Transition from ${labelFor(from)} on '${symbol}'`}
                       isRovingFocused={isRovingFocused}
+                      isOpen={isOpen}
                       onChange={(newValue) => handleCellChange(from, symbol, newValue)}
                       onFocus={() => setRovingFocus({ row: rowIndex, col: colIndex })}
+                      onOpenChange={(open) =>
+                        setOpenCell(open ? { row: rowIndex, col: colIndex } : null)
+                      }
                     />
                   );
                 })}

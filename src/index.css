@@ -404,7 +404,23 @@ body {
   font-weight: var(--weight-bold);
   color: var(--text-heading);
   padding-right: var(--space-2);
+  padding-left: var(--space-1);
   white-space: nowrap;
+  /* Sticky-left so source state labels stay visible while scrolling
+   * horizontally through wide alphabets. */
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--bg-sidebar);
+}
+
+/* Same trick for the empty top-left corner so it doesn't show table content
+ * scrolling underneath it. */
+.transition-table thead th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--bg-sidebar);
 }
 
 .transition-table-cell {
