@@ -84,6 +84,34 @@ function App() {
     }
   }
 
+  /**
+   * Click an existing transition on the canvas → load it into the
+   * creator form for editing or deletion. Only active in EDITING mode
+   * so that simulation clicks (currently nothing, but future-proof) and
+   * idle hover don't trigger it.
+   *
+   * The mini SVG only knows DFA transitions (single destination). For
+   * an NFA transition with multiple destinations, we load the matching
+   * single (from, to, symbol) tuple — the edge the user clicked.
+   */
+  function handleCanvasEdgeClick(transition: {
+    from: number;
+    to: number;
+    symbol: string | null;
+  }) {
+    // ε-transitions can't be edited via the form (it requires a symbol);
+    // skip them gracefully.
+    if (transition.symbol === null) return;
+    creationDispatch({
+      type: 'loadExisting',
+      transition: {
+        from: transition.from,
+        to: transition.to,
+        symbol: transition.symbol,
+      },
+    });
+  }
+
   // Reset the creation form whenever the automaton structure changes
   // (states/alphabet/transitions). Avoids the form referencing IDs or
   // symbols that no longer exist.
@@ -450,6 +478,7 @@ function App() {
             highlightedTransition={highlightedTransition}
             pickMode={canvasPickMode}
             onPickState={handleCanvasPickState}
+            onEdgeClick={appMode === 'EDITING' ? handleCanvasEdgeClick : undefined}
           />
         )}
       </main>

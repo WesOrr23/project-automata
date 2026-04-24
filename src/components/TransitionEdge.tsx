@@ -27,6 +27,9 @@ type TransitionEdgeProp = {
 
   /** Whether this transition is the active highlight target of a notification */
   isHighlighted?: boolean;
+
+  /** Called when the user clicks this edge (loads it into the creator form). */
+  onEdgeClick?: () => void;
 };
 
 const STROKE_WIDTH = 2;
@@ -41,6 +44,7 @@ export function TransitionEdge(props: TransitionEdgeProp) {
     labelPosition,
     isNextTransition = false,
     isHighlighted = false,
+    onEdgeClick,
   } = props;
 
   // Highlight (notification target) wins over next-transition (simulation).
@@ -63,9 +67,25 @@ export function TransitionEdge(props: TransitionEdgeProp) {
 
   const displaySymbol = symbol === null ? 'ε' : symbol;
 
+  const groupClass = onEdgeClick ? 'transition-edge-clickable' : undefined;
+
   return (
-    <g>
-      {/* Edge spline path */}
+    <g
+      className={groupClass}
+      onClick={onEdgeClick}
+      style={onEdgeClick ? { cursor: 'pointer' } : undefined}
+    >
+      {/* Edge spline path. The visible stroke is the colored one;
+       * a wider transparent stroke beneath it gives a generous click
+       * target on thin edges. */}
+      {onEdgeClick && (
+        <path
+          d={pathData}
+          fill="none"
+          stroke="transparent"
+          strokeWidth={14}
+        />
+      )}
       <path
         d={pathData}
         fill="none"

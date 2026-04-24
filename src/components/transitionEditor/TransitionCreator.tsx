@@ -21,7 +21,6 @@
  */
 
 import { Dispatch, useEffect, useRef, useState } from 'react';
-import { Trash2 } from 'lucide-react';
 import { Automaton } from '../../engine/types';
 import {
   isReady,
@@ -45,7 +44,10 @@ type TransitionCreatorProp = {
  */
 function instructionFor(state: CreationState, symbolValid: boolean): string {
   if (state.editingExisting !== null) {
-    return 'Editing this transition. Change any slot or click Delete.';
+    return 'Editing this transition. Change any slot, click Delete, or Cancel.';
+  }
+  if (state.source === null && state.destination === null && state.symbol === '') {
+    return 'Click a circle to pick a state, or click an existing edge to edit it.';
   }
   if (state.source === null) {
     return 'Click the left circle to pick the source state.';
@@ -164,12 +166,6 @@ export function TransitionCreator({
     }
   }
 
-  // Existing transitions list — TEMPORARY (Phase 3 removes).
-  const sortedTransitions = [...automaton.transitions].sort((a, b) => {
-    if (a.from !== b.from) return a.from - b.from;
-    return (a.symbol ?? '').localeCompare(b.symbol ?? '');
-  });
-
   const sourceLabel = state.source !== null ? labelFor(state.source) : null;
   const destinationLabel =
     state.destination !== null ? labelFor(state.destination) : null;
@@ -272,38 +268,6 @@ export function TransitionCreator({
         />
       )}
 
-      {/* Temporary current-transitions list — Phase 3 removes. */}
-      {sortedTransitions.length > 0 && (
-        <div className="transition-creator-temp-list">
-          <span className="caption">Current transitions (click trash to delete)</span>
-          {sortedTransitions.map((t, index) => {
-            const dest = Array.from(t.to)[0];
-            if (dest === undefined) return null;
-            return (
-              <div
-                key={`${t.from}-${t.symbol}-${index}`}
-                className="transition-creator-temp-row"
-              >
-                <span>
-                  {labelFor(t.from)} →{' '}
-                  <span style={{ color: 'var(--blue-600)' }}>
-                    {t.symbol === null ? 'ε' : t.symbol}
-                  </span>{' '}
-                  → {labelFor(dest)}
-                </span>
-                <button
-                  className="editor-row-action danger"
-                  onClick={() => onSetTransition(t.from, t.symbol ?? '', null)}
-                  aria-label={`Delete transition ${labelFor(t.from)} ${t.symbol ?? 'ε'} ${labelFor(dest)}`}
-                  title="Delete"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }

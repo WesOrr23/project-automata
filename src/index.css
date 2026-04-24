@@ -1308,6 +1308,15 @@ button svg {
   background: var(--blue-600);
 }
 
+/* ─── Canvas transition edges (clickable when in Edit tab) ─── */
+.transition-edge-clickable path {
+  transition: stroke-width 0.12s ease;
+}
+
+.transition-edge-clickable:hover path {
+  stroke-width: 4;
+}
+
 /* ─── Canvas state nodes in pick mode ─── */
 /* When the transition creator is asking for a state, every state node on
  * the canvas becomes a clickable target. Subtle pulse + cursor:pointer

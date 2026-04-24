@@ -43,6 +43,12 @@ type AutomatonCanvasProp = {
 
   /** Called when the user clicks a state node while pickMode === 'state'. */
   onPickState?: (stateId: number) => void;
+
+  /**
+   * Called when the user clicks an existing transition edge on the canvas.
+   * Loads it into the creator form for editing/deletion.
+   */
+  onEdgeClick?: (transition: { from: number; to: number; symbol: string | null }) => void;
 };
 
 export function AutomatonCanvas({
@@ -55,6 +61,7 @@ export function AutomatonCanvas({
   highlightedTransition,
   pickMode,
   onPickState,
+  onEdgeClick,
 }: AutomatonCanvasProp) {
   return (
     <svg
@@ -87,6 +94,16 @@ export function AutomatonCanvas({
             labelPosition={transition.labelPosition}
             isNextTransition={isNextTransition}
             isHighlighted={isHighlighted}
+            onEdgeClick={
+              onEdgeClick
+                ? () =>
+                    onEdgeClick({
+                      from: transition.fromStateId,
+                      to: transition.toStateId,
+                      symbol: transition.symbol,
+                    })
+                : undefined
+            }
           />
         );
       })}
