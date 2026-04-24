@@ -86,6 +86,20 @@ export function TransitionCreator({
     }
   }, [state.phase]);
 
+  // Escape — global abort. Closes the popover (if open) and resets the
+  // form to its initial state. The popover has its own Escape listener
+  // for closing itself; this one resets the underlying state machine.
+  useEffect(() => {
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      setPickerSlot(null);
+      setPickerAnchor(null);
+      dispatch({ type: 'reset' });
+    }
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [dispatch]);
+
   // Auto-focus the symbol input when both source + destination are filled
   // (so the user lands directly in the symbol field after the second pick,
   // whether picked via popover or via canvas).

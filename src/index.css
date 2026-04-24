@@ -1240,27 +1240,6 @@ button svg {
   border-color: var(--error-stroke);
 }
 
-/* Temporary list (Phase 1 only) */
-.transition-creator-temp-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding-top: var(--space-2);
-  border-top: 1px dashed var(--border-subtle);
-}
-
-.transition-creator-temp-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-2);
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  background: var(--bg-input);
-  border-radius: var(--radius-sm);
-}
-
 /* ─── State picker popover (anchored right of menu) ─── */
 
 .state-picker-popover {
