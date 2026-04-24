@@ -16,6 +16,7 @@ type StateEditorProp = {
   startState: number;
   acceptStates: Set<number>;
   displayLabels: Map<number, string>;
+  highlightedStateId: number | null;
   onAddState: () => void;
   onRemoveState: (stateId: number) => void;
   onSetStartState: (stateId: number) => void;
@@ -27,6 +28,7 @@ export function StateEditor({
   startState,
   acceptStates,
   displayLabels,
+  highlightedStateId,
   onAddState,
   onRemoveState,
   onSetStartState,
@@ -59,8 +61,12 @@ export function StateEditor({
           const isStart = stateId === startState;
           const isAccept = acceptStates.has(stateId);
           const label = labelFor(stateId);
+          const isHighlighted = stateId === highlightedStateId;
           return (
-            <div key={stateId} className="editor-row show-actions-on-hover">
+            <div
+              key={stateId}
+              className={`editor-row show-actions-on-hover ${isHighlighted ? 'pulse-error' : ''}`}
+            >
               <span className="editor-row-label">{label}</span>
 
               {/* Start toggle */}

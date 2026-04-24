@@ -11,12 +11,14 @@ import { X } from 'lucide-react';
 
 type AlphabetEditorProp = {
   alphabet: Set<string>;
+  highlightedSymbol: string | null;
   onAlphabetAdd: (symbol: string) => void;
   onAlphabetRemove: (symbol: string) => void;
 };
 
 export function AlphabetEditor({
   alphabet,
+  highlightedSymbol,
   onAlphabetAdd,
   onAlphabetRemove,
 }: AlphabetEditorProp) {
@@ -68,7 +70,10 @@ export function AlphabetEditor({
 
       <div className="alphabet-badges">
         {sortedAlphabet.map((symbol) => (
-          <span key={symbol} className="alphabet-badge">
+          <span
+            key={symbol}
+            className={`alphabet-badge ${symbol === highlightedSymbol ? 'pulse-error' : ''}`}
+          >
             <span className="alphabet-badge-symbol">{symbol}</span>
             <button
               className="alphabet-badge-remove"

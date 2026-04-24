@@ -24,16 +24,33 @@ type TransitionEdgeProp = {
 
   /** Whether this transition is the next one to be taken during simulation */
   isNextTransition?: boolean;
+
+  /** Whether this transition is the active highlight target of a notification */
+  isHighlighted?: boolean;
 };
 
 const STROKE_WIDTH = 2;
 const ARROWHEAD_SIZE = 8;
 
 export function TransitionEdge(props: TransitionEdgeProp) {
-  const { pathData, symbol, arrowheadPosition, arrowheadAngle, labelPosition, isNextTransition = false } = props;
+  const {
+    pathData,
+    symbol,
+    arrowheadPosition,
+    arrowheadAngle,
+    labelPosition,
+    isNextTransition = false,
+    isHighlighted = false,
+  } = props;
 
-  const edgeColor = isNextTransition ? '#2563eb' : '#334155'; // --blue-600 : --text-body
-  const edgeStrokeWidth = isNextTransition ? 3 : STROKE_WIDTH;
+  // Highlight (notification target) wins over next-transition (simulation).
+  let edgeColor = isNextTransition ? '#2563eb' : '#334155'; // --blue-600 : --text-body
+  let edgeStrokeWidth = isNextTransition ? 3 : STROKE_WIDTH;
+  if (isHighlighted) {
+    edgeColor = '#dc2626'; // --error-stroke
+    edgeStrokeWidth = 3;
+  }
+  const highlightClass = isHighlighted ? 'pulse-canvas pulse-canvas-error' : undefined;
 
   // Calculate arrowhead triangle points from angle
   const arrowheadAngle1 = arrowheadAngle + Math.PI - Math.PI / 6;
@@ -54,6 +71,7 @@ export function TransitionEdge(props: TransitionEdgeProp) {
         fill="none"
         stroke={edgeColor}
         strokeWidth={edgeStrokeWidth}
+        className={highlightClass}
       />
 
       {/* Arrowhead */}

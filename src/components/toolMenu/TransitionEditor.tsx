@@ -15,6 +15,7 @@ type TransitionEditorProp = {
   automaton: Automaton;
   displayLabels: Map<number, string>;
   error: string | null;
+  highlightedTransition: { from: number; to: number; symbol: string | null } | null;
   onAddTransition: (from: number, to: number, symbol: string) => string | null;
   onRemoveTransition: (from: number, to: number, symbol: string | null) => void;
   onDismissError: () => void;
@@ -24,6 +25,7 @@ export function TransitionEditor({
   automaton,
   displayLabels,
   error,
+  highlightedTransition,
   onAddTransition,
   onRemoveTransition,
   onDismissError,
@@ -155,10 +157,15 @@ export function TransitionEditor({
           const symbolDisplay = transition.symbol === null ? 'ε' : transition.symbol;
           const destinationLabel = destinations.map(labelFor).join(', ');
           const firstDestination = destinations[0];
+          const isHighlighted =
+            highlightedTransition !== null &&
+            highlightedTransition.from === transition.from &&
+            firstDestination === highlightedTransition.to &&
+            highlightedTransition.symbol === transition.symbol;
           return (
             <div
               key={`${transition.from}-${symbolDisplay}-${index}`}
-              className="editor-row show-actions-on-hover"
+              className={`editor-row show-actions-on-hover ${isHighlighted ? 'pulse-error' : ''}`}
             >
               <span className="editor-row-label" style={{ fontSize: 'var(--text-sm)' }}>
                 {labelFor(transition.from)} →{' '}

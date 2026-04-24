@@ -5,6 +5,9 @@
  * - Alphabet (symbols)
  * - States (add, remove, start, accept)
  * - Transitions (add, remove)
+ *
+ * Highlight props (from notification system) are passed through to the
+ * matching child editor so the user can see which row is being referenced.
  */
 
 import { Automaton } from '../../engine/types';
@@ -16,6 +19,9 @@ type EditPanelProp = {
   automaton: Automaton;
   displayLabels: Map<number, string>;
   error: string | null;
+  highlightedStateId: number | null;
+  highlightedTransition: { from: number; to: number; symbol: string | null } | null;
+  highlightedSymbol: string | null;
   onAlphabetAdd: (symbol: string) => void;
   onAlphabetRemove: (symbol: string) => void;
   onAddState: () => void;
@@ -31,6 +37,9 @@ export function EditPanel({
   automaton,
   displayLabels,
   error,
+  highlightedStateId,
+  highlightedTransition,
+  highlightedSymbol,
   onAlphabetAdd,
   onAlphabetRemove,
   onAddState,
@@ -45,6 +54,7 @@ export function EditPanel({
     <>
       <AlphabetEditor
         alphabet={automaton.alphabet}
+        highlightedSymbol={highlightedSymbol}
         onAlphabetAdd={onAlphabetAdd}
         onAlphabetRemove={onAlphabetRemove}
       />
@@ -56,6 +66,7 @@ export function EditPanel({
         startState={automaton.startState}
         acceptStates={automaton.acceptStates}
         displayLabels={displayLabels}
+        highlightedStateId={highlightedStateId}
         onAddState={onAddState}
         onRemoveState={onRemoveState}
         onSetStartState={onSetStartState}
@@ -68,6 +79,7 @@ export function EditPanel({
         automaton={automaton}
         displayLabels={displayLabels}
         error={error}
+        highlightedTransition={highlightedTransition}
         onAddTransition={onAddTransition}
         onRemoveTransition={onRemoveTransition}
         onDismissError={onDismissError}

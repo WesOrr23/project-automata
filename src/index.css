@@ -811,3 +811,66 @@ button svg {
     transform: translateX(0);
   }
 }
+
+/* ─── Source highlighting (notification target pulse) ─── */
+
+@keyframes pulse-error {
+  0%   { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.55); }
+  50%  { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+
+@keyframes pulse-warning {
+  0%   { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.55); }
+  50%  { box-shadow: 0 0 0 6px rgba(217, 119, 6, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
+}
+
+/* Editor row pulse (state, transition, alphabet badge). Plays twice across
+ * the highlight duration. Background colour shift makes it visible even when
+ * the row's box-shadow isn't easy to see against the surrounding container. */
+.editor-row.pulse-error,
+.alphabet-badge.pulse-error,
+.editor-row.pulse-warning,
+.alphabet-badge.pulse-warning {
+  animation-duration: 1s;
+  animation-iteration-count: 2;
+  animation-timing-function: ease-out;
+  position: relative;
+  z-index: 1;
+}
+
+.editor-row.pulse-error,
+.alphabet-badge.pulse-error {
+  animation-name: pulse-error;
+  background: var(--error-bg);
+  border-color: var(--error-border);
+}
+
+.editor-row.pulse-warning,
+.alphabet-badge.pulse-warning {
+  animation-name: pulse-warning;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+/* SVG circle / path pulse for canvas elements. Uses CSS variables so we can
+ * scale the colour per severity. */
+@keyframes pulse-stroke {
+  0%   { stroke-width: 2; }
+  50%  { stroke-width: 5; }
+  100% { stroke-width: 2; }
+}
+
+.pulse-canvas {
+  animation: pulse-stroke 0.7s ease-in-out 2;
+  transition: stroke 0.15s ease;
+}
+
+.pulse-canvas-error {
+  stroke: var(--error-stroke) !important;
+}
+
+.pulse-canvas-warning {
+  stroke: #d97706 !important;
+}

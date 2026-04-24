@@ -28,6 +28,12 @@ type AutomatonCanvasProp = {
 
   /** The next transition to be taken (for edge highlighting) */
   nextTransition?: { fromStateId: number; toStateId: number; symbol: string } | null;
+
+  /** State ID currently highlighted by an active notification target */
+  highlightedStateId?: number | null;
+
+  /** Transition currently highlighted by an active notification target */
+  highlightedTransition?: { from: number; to: number; symbol: string | null } | null;
 };
 
 export function AutomatonCanvas({
@@ -36,6 +42,8 @@ export function AutomatonCanvas({
   activeStateIds,
   resultStatus,
   nextTransition,
+  highlightedStateId,
+  highlightedTransition,
 }: AutomatonCanvasProp) {
   return (
     <svg
@@ -51,6 +59,13 @@ export function AutomatonCanvas({
           && transition.toStateId === nextTransition.toStateId
           && transition.symbol === nextTransition.symbol;
 
+        const isHighlighted =
+          highlightedTransition !== null
+          && highlightedTransition !== undefined
+          && transition.fromStateId === highlightedTransition.from
+          && transition.toStateId === highlightedTransition.to
+          && transition.symbol === highlightedTransition.symbol;
+
         return (
           <TransitionEdge
             key={`transition-${index}`}
@@ -60,6 +75,7 @@ export function AutomatonCanvas({
             arrowheadAngle={transition.arrowheadAngle}
             labelPosition={transition.labelPosition}
             isNextTransition={isNextTransition}
+            isHighlighted={isHighlighted}
           />
         );
       })}
@@ -72,6 +88,8 @@ export function AutomatonCanvas({
         // Only show result status on the active (current) state
         const stateResultStatus = isActive ? (resultStatus ?? null) : null;
 
+        const isHighlighted = stateUI.id === highlightedStateId;
+
         return (
           <StateNode
             key={`state-${stateUI.id}`}
@@ -83,6 +101,7 @@ export function AutomatonCanvas({
             isAccept={isAccept}
             isActive={isActive}
             resultStatus={stateResultStatus}
+            isHighlighted={isHighlighted}
           />
         );
       })}

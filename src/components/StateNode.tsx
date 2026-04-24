@@ -29,6 +29,9 @@ type StateNodeProp = {
 
   /** Result status for final state highlighting after simulation completes */
   resultStatus?: 'accepted' | 'rejected' | null;
+
+  /** Whether this state is the active highlight target of a notification */
+  isHighlighted?: boolean;
 };
 
 /**
@@ -47,6 +50,7 @@ export function StateNode({
   isAccept,
   isActive = false,
   resultStatus = null,
+  isHighlighted = false,
 }: StateNodeProp) {
   // Determine fill and stroke colors based on simulation state
   // Priority: resultStatus > isActive > default
@@ -66,6 +70,14 @@ export function StateNode({
     strokeColor = '#2563eb'; // --blue-600
   }
 
+  // When this state is the active highlight target, override stroke to the
+  // notification severity color and run the pulse animation.
+  if (isHighlighted) {
+    strokeColor = '#dc2626'; // --error-stroke
+  }
+
+  const highlightClass = isHighlighted ? 'pulse-canvas pulse-canvas-error' : undefined;
+
   return (
     <g data-state-id={stateId}>
       {/* Outer circle (always present) */}
@@ -76,6 +88,7 @@ export function StateNode({
         fill={fillColor}
         stroke={strokeColor}
         strokeWidth={STROKE_WIDTH}
+        className={highlightClass}
       />
 
       {/* Inner circle (only for accept states) */}

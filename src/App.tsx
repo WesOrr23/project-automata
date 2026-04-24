@@ -20,6 +20,7 @@ import { ConfigPanel } from './components/toolMenu/ConfigPanel';
 import { EditPanel } from './components/toolMenu/EditPanel';
 import { ToolMenuState, ToolTabID } from './components/toolMenu/types';
 import { NotificationStack } from './notifications/NotificationStack';
+import { useNotifications } from './notifications/useNotifications';
 import { computeLayout } from './ui-state/utils';
 import { useSimulation } from './hooks/useSimulation';
 
@@ -55,6 +56,23 @@ function App() {
   const [editError, setEditError] = useState<string | null>(null);
 
   const sim = useSimulation(automaton);
+  const { highlightedTarget } = useNotifications();
+
+  // Derive per-component highlight props from the active notification target.
+  // Each component only cares about one kind of target; everything else stays
+  // null so React can early-bail on equality.
+  const highlightedStateId =
+    highlightedTarget?.kind === 'state' ? highlightedTarget.stateId : null;
+  const highlightedTransition =
+    highlightedTarget?.kind === 'transition'
+      ? {
+          from: highlightedTarget.from,
+          to: highlightedTarget.to,
+          symbol: highlightedTarget.symbol,
+        }
+      : null;
+  const highlightedSymbol =
+    highlightedTarget?.kind === 'alphabet' ? highlightedTarget.symbol : null;
 
   // Recompute layout whenever automaton changes (debounced to absorb rapid edits).
   // A version counter discards stale promises in case layout N-1 resolves after N.
@@ -305,6 +323,9 @@ function App() {
       automaton={automaton}
       displayLabels={displayLabels}
       error={editError}
+      highlightedStateId={highlightedStateId}
+      highlightedTransition={highlightedTransition}
+      highlightedSymbol={highlightedSymbol}
       onAlphabetAdd={handleAlphabetAdd}
       onAlphabetRemove={handleAlphabetRemove}
       onAddState={handleAddState}
@@ -372,6 +393,8 @@ function App() {
             activeStateIds={appMode === 'SIMULATING' ? sim.currentStateIds : undefined}
             resultStatus={appMode === 'SIMULATING' ? resultStatus : null}
             nextTransition={appMode === 'SIMULATING' ? sim.nextTransition : null}
+            highlightedStateId={highlightedStateId}
+            highlightedTransition={highlightedTransition}
           />
         )}
       </main>
