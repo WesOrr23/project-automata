@@ -75,6 +75,9 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [automaton]);
 
+  // Also reset simulation whenever user enters the Edit tab
+  const previousAppMode = useRef<'IDLE' | 'EDITING' | 'SIMULATING'>('IDLE');
+
   // Derived application mode from the active tab
   const appMode: 'IDLE' | 'EDITING' | 'SIMULATING' =
     menuState.mode === 'OPEN'
@@ -84,6 +87,17 @@ function App() {
             ? 'SIMULATING'
             : 'IDLE')
       : 'IDLE';
+
+  // Entering Edit mode resets the simulation (mode exclusivity with Simulate)
+  useEffect(() => {
+    const prev = previousAppMode.current;
+    previousAppMode.current = appMode;
+    if (prev !== 'EDITING' && appMode === 'EDITING') {
+      sim.reset();
+      setInputString('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appMode]);
 
   // ─── Menu state transitions ───
 
