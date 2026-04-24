@@ -370,6 +370,95 @@ body {
   scrollbar-gutter: stable;
 }
 
+/* ─── Transition Table ─── */
+
+/* The table itself adapts to its content size; the wrapper caps it at a
+ * viewport-relative max-height and adds horizontal scroll for wide alphabets. */
+.transition-table-wrap {
+  max-height: 40vh;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.transition-table {
+  border-collapse: separate;
+  border-spacing: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.transition-table th,
+.transition-table td {
+  padding: 0;
+}
+
+.transition-table-symbol {
+  text-align: center;
+  font-weight: var(--weight-bold);
+  color: var(--blue-700);
+  min-width: var(--space-7);
+}
+
+.transition-table-source {
+  text-align: right;
+  font-weight: var(--weight-bold);
+  color: var(--text-heading);
+  padding-right: var(--space-2);
+  white-space: nowrap;
+}
+
+.transition-table-cell {
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s ease;
+}
+
+.transition-table-cell:hover {
+  border-color: var(--blue-300);
+}
+
+.transition-table-cell-missing {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.transition-table-cell-missing:hover {
+  opacity: 1;
+  border-color: var(--blue-400);
+  border-style: solid;
+}
+
+.transition-table-select {
+  /* Reset native styling, fill the cell. */
+  width: 100%;
+  padding: var(--space-1);
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: var(--text-heading);
+  text-align: center;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.transition-table-cell-missing .transition-table-select {
+  color: var(--text-secondary);
+}
+
+.transition-table-select:focus {
+  outline: none;
+}
+
+.transition-table-cell:focus-within {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
 .editor-row {
   display: flex;
   align-items: center;

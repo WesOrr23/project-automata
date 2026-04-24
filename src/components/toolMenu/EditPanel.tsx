@@ -27,8 +27,7 @@ type EditPanelProp = {
   onRemoveState: (stateId: number) => void;
   onSetStartState: (stateId: number) => void;
   onToggleAcceptState: (stateId: number) => void;
-  onAddTransition: (from: number, to: number, symbol: string) => void;
-  onRemoveTransition: (from: number, to: number, symbol: string | null) => void;
+  onSetTransition: (from: number, symbol: string, to: number | null) => void;
 };
 
 export function EditPanel({
@@ -43,8 +42,7 @@ export function EditPanel({
   onRemoveState,
   onSetStartState,
   onToggleAcceptState,
-  onAddTransition,
-  onRemoveTransition,
+  onSetTransition,
 }: EditPanelProp) {
   return (
     <>
@@ -75,8 +73,7 @@ export function EditPanel({
         automaton={automaton}
         displayLabels={displayLabels}
         highlightedTransition={highlightedTransition}
-        onAddTransition={onAddTransition}
-        onRemoveTransition={onRemoveTransition}
+        onSetTransition={onSetTransition}
       />
     </>
   );

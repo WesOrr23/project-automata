@@ -1,182 +1,136 @@
 /**
  * TransitionEditor Component
  *
- * Form-based controls for managing transitions:
- * - Add transition form (from, to, symbol dropdowns)
- * - Inline error banner (right next to the form, not buried below the list)
- * - List of existing transitions with delete buttons
+ * Renders the automaton's transition function as a table:
+ *   - rows: source states
+ *   - columns: alphabet symbols
+ *   - cells: destination state (or empty for missing transition)
+ *
+ * Each cell is a dropdown over the available destination states. The empty
+ * option ('—') means "no transition" and removing a transition is just
+ * picking '—' for that cell. Adding/replacing a transition is picking any
+ * other destination.
+ *
+ * Empty cells therefore *are* the missing transitions — no separate
+ * "ghost transitions" UI needed.
  */
 
-import { useState, useEffect } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
 import { Automaton } from '../../engine/types';
 
 type TransitionEditorProp = {
   automaton: Automaton;
   displayLabels: Map<number, string>;
   highlightedTransition: { from: number; to: number; symbol: string | null } | null;
-  onAddTransition: (from: number, to: number, symbol: string) => void;
-  onRemoveTransition: (from: number, to: number, symbol: string | null) => void;
+  onSetTransition: (from: number, symbol: string, to: number | null) => void;
 };
+
+const EMPTY_VALUE = '__none__';
 
 export function TransitionEditor({
   automaton,
   displayLabels,
   highlightedTransition,
-  onAddTransition,
-  onRemoveTransition,
+  onSetTransition,
 }: TransitionEditorProp) {
   const sortedStates = Array.from(automaton.states).sort((a, b) => a - b);
   const sortedAlphabet = Array.from(automaton.alphabet).sort();
-
-  const [fromState, setFromState] = useState<number>(sortedStates[0] ?? 0);
-  const [toState, setToState] = useState<number>(sortedStates[0] ?? 0);
-  const [symbol, setSymbol] = useState<string>(sortedAlphabet[0] ?? '');
-
-  // Snap form selections back to valid values when the underlying data changes
-  // (e.g. the alphabet was edited, or a selected state was deleted). Prevents
-  // the form from holding a stale value that no longer matches any option.
-  useEffect(() => {
-    if (!automaton.states.has(fromState)) {
-      setFromState(sortedStates[0] ?? 0);
-    }
-    if (!automaton.states.has(toState)) {
-      setToState(sortedStates[0] ?? 0);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [automaton.states]);
-
-  useEffect(() => {
-    if (symbol !== '' && !automaton.alphabet.has(symbol)) {
-      setSymbol(sortedAlphabet[0] ?? '');
-    } else if (symbol === '' && sortedAlphabet.length > 0) {
-      setSymbol(sortedAlphabet[0] ?? '');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [automaton.alphabet]);
 
   function labelFor(stateId: number): string {
     return displayLabels.get(stateId) ?? `q${stateId}`;
   }
 
-  function handleAdd() {
-    if (sortedAlphabet.length === 0) return;
-    onAddTransition(fromState, toState, symbol);
+  /** Find the destination of the (from, symbol) transition, or null. */
+  function destinationOf(from: number, symbol: string): number | null {
+    const t = automaton.transitions.find(
+      (transition) => transition.from === from && transition.symbol === symbol
+    );
+    if (!t) return null;
+    const first = Array.from(t.to)[0];
+    return first ?? null;
   }
 
-  // Sort transitions for stable display: by source state, then by symbol
-  const sortedTransitions = [...automaton.transitions].sort((a, b) => {
-    if (a.from !== b.from) return a.from - b.from;
-    const symA = a.symbol ?? '';
-    const symB = b.symbol ?? '';
-    return symA.localeCompare(symB);
-  });
+  function handleCellChange(from: number, symbol: string, newValue: string) {
+    if (newValue === EMPTY_VALUE) {
+      onSetTransition(from, symbol, null);
+    } else {
+      onSetTransition(from, symbol, Number(newValue));
+    }
+  }
+
+  // Empty alphabet → table has no columns; render a hint instead.
+  if (sortedAlphabet.length === 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        <span className="label">Transitions</span>
+        <p className="caption">Add symbols to the alphabet above first.</p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
       <span className="label">Transitions</span>
 
-      {sortedAlphabet.length === 0 ? (
-        <p className="caption">Add symbols to the alphabet above first.</p>
-      ) : (
-        <>
-          <div style={{ display: 'flex', gap: 'var(--space-1)', alignItems: 'center' }}>
-            <select
-              className="editor-select"
-              value={fromState}
-              onChange={(event) => setFromState(Number(event.target.value))}
-              aria-label="From state"
-              style={{ flex: 1 }}
-            >
-              {sortedStates.map((id) => (
-                <option key={id} value={id}>
-                  {labelFor(id)}
-                </option>
+      <div className="transition-table-wrap">
+        <table className="transition-table">
+          <thead>
+            <tr>
+              <th aria-label="Source state column header" />
+              {sortedAlphabet.map((symbol) => (
+                <th key={symbol} className="transition-table-symbol">
+                  {symbol}
+                </th>
               ))}
-            </select>
-
-            <span className="caption" aria-hidden="true">→</span>
-
-            <select
-              className="editor-select"
-              value={toState}
-              onChange={(event) => setToState(Number(event.target.value))}
-              aria-label="To state"
-              style={{ flex: 1 }}
-            >
-              {sortedStates.map((id) => (
-                <option key={id} value={id}>
-                  {labelFor(id)}
-                </option>
-              ))}
-            </select>
-
-            <select
-              className="editor-select"
-              value={symbol}
-              onChange={(event) => setSymbol(event.target.value)}
-              aria-label="Symbol"
-              style={{ width: '56px' }}
-            >
-              {sortedAlphabet.map((character) => (
-                <option key={character} value={character}>
-                  {character}
-                </option>
-              ))}
-            </select>
-
-            <button
-              className="btn"
-              onClick={handleAdd}
-              style={{ padding: 'var(--space-1) var(--space-2)' }}
-              aria-label="Add transition"
-              title="Add transition"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
-        </>
-      )}
-
-      <div className="editor-list editor-list-scroll">
-        {sortedTransitions.map((transition, index) => {
-          const destinations = Array.from(transition.to).sort((a, b) => a - b);
-          const symbolDisplay = transition.symbol === null ? 'ε' : transition.symbol;
-          const destinationLabel = destinations.map(labelFor).join(', ');
-          const firstDestination = destinations[0];
-          const isHighlighted =
-            highlightedTransition !== null &&
-            highlightedTransition.from === transition.from &&
-            firstDestination === highlightedTransition.to &&
-            highlightedTransition.symbol === transition.symbol;
-          return (
-            <div
-              key={`${transition.from}-${symbolDisplay}-${index}`}
-              className={`editor-row show-actions-on-hover ${isHighlighted ? 'pulse-error' : ''}`}
-            >
-              <span className="editor-row-label" style={{ fontSize: 'var(--text-sm)' }}>
-                {labelFor(transition.from)} →{' '}
-                <span style={{ color: 'var(--blue-600)' }}>{symbolDisplay}</span> →{' '}
-                {destinationLabel}
-              </span>
-              <button
-                className="editor-row-action danger hide-unless-hover"
-                onClick={() => {
-                  if (firstDestination !== undefined) {
-                    onRemoveTransition(transition.from, firstDestination, transition.symbol);
-                  }
-                }}
-                aria-label="Delete transition"
-                title="Delete transition"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          );
-        })}
-        {sortedTransitions.length === 0 && (
-          <p className="caption">No transitions yet.</p>
-        )}
+            </tr>
+          </thead>
+          <tbody>
+            {sortedStates.map((from) => (
+              <tr key={from}>
+                <th scope="row" className="transition-table-source">
+                  {labelFor(from)}
+                </th>
+                {sortedAlphabet.map((symbol) => {
+                  const destination = destinationOf(from, symbol);
+                  const value = destination === null ? EMPTY_VALUE : String(destination);
+                  const isHighlighted =
+                    highlightedTransition !== null &&
+                    highlightedTransition.from === from &&
+                    highlightedTransition.symbol === symbol &&
+                    (destination === highlightedTransition.to);
+                  const isMissing = destination === null;
+                  return (
+                    <td
+                      key={symbol}
+                      className={[
+                        'transition-table-cell',
+                        isMissing ? 'transition-table-cell-missing' : '',
+                        isHighlighted ? 'pulse-error' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    >
+                      <select
+                        className="transition-table-select"
+                        value={value}
+                        onChange={(event) =>
+                          handleCellChange(from, symbol, event.target.value)
+                        }
+                        aria-label={`Transition from ${labelFor(from)} on '${symbol}'`}
+                      >
+                        <option value={EMPTY_VALUE}>—</option>
+                        {sortedStates.map((target) => (
+                          <option key={target} value={target}>
+                            {labelFor(target)}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

@@ -4,7 +4,6 @@ import {
   addState,
   removeState,
   addTransition,
-  removeTransition,
   setStartState,
   addAcceptState,
   removeAcceptState,
@@ -261,31 +260,31 @@ function App() {
     );
   }
 
-  function handleAddTransition(from: number, to: number, symbol: string) {
-    // addTransition throws on duplicates and invalid args. The duplicate case
-    // is the most useful one to highlight — point the user at the existing
-    // conflicting transition (same from + symbol).
-    const existing = automaton.transitions.find(
-      (transition) => transition.from === from && transition.symbol === symbol
-    );
-    const target: NotificationTarget | undefined = existing
-      ? {
-          kind: 'transition',
-          from: existing.from,
-          to: Array.from(existing.to)[0] ?? to,
-          symbol: existing.symbol,
-        }
-      : undefined;
-    const title = existing ? 'Duplicate transition' : 'Could not add transition';
-    applyEdit(
-      (prev) => addTransition(prev, from, new Set([to]), symbol),
-      target,
-      title
-    );
-  }
-
-  function handleRemoveTransition(from: number, to: number, symbol: string | null) {
-    applyEdit((prev) => removeTransition(prev, from, new Set([to]), symbol));
+  /**
+   * Set the destination of (from, symbol). Replaces any existing transition
+   * for that pair. If `to` is null, removes the transition (no-op if none
+   * existed). One atomic state update — avoids the stale-closure pitfall of
+   * doing remove-then-add through two separate handler calls.
+   *
+   * Note: this is the only transition handler the table-based UI needs.
+   * The engine's addTransition/removeTransition are still available; we just
+   * bypass them for cell edits because the cell semantics are
+   * "set (from, symbol) to this destination" which doesn't fit "add" or
+   * "remove" cleanly.
+   */
+  function handleSetTransition(from: number, symbol: string, to: number | null) {
+    setAutomaton((previous) => {
+      const filtered = previous.transitions.filter(
+        (transition) => !(transition.from === from && transition.symbol === symbol)
+      );
+      if (to === null) {
+        return { ...previous, transitions: filtered };
+      }
+      return {
+        ...previous,
+        transitions: [...filtered, { from, to: new Set([to]), symbol }],
+      };
+    });
   }
 
   // ─── Simulation handlers ───
@@ -353,8 +352,7 @@ function App() {
       onRemoveState={handleRemoveState}
       onSetStartState={handleSetStartState}
       onToggleAcceptState={handleToggleAcceptState}
-      onAddTransition={handleAddTransition}
-      onRemoveTransition={handleRemoveTransition}
+      onSetTransition={handleSetTransition}
     />
   );
 
