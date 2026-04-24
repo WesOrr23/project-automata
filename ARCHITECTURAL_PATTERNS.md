@@ -332,6 +332,90 @@ const newAutomaton = addState(automaton).automaton;
 
 ---
 
+## 17. Lifted reducer for cross-component coordination (iter 7)
+
+**The rule.** When a state machine's transitions can be triggered from *multiple* sibling components, lift the reducer up to their common parent. Pass `state` + `dispatch` down as props. Children become controlled.
+
+**Why.**
+- A state machine has a single source of truth. If one child owns it locally, siblings can't dispatch into it cleanly.
+- `useReducer` keeps logic centralized and testable as a pure function.
+- Effects that depend on the state can live in the parent, where they can observe transitions and react (e.g., toggling another component's mode).
+
+**Where.**
+- `App.tsx` → `creationReducer`. Owns the transition-creator's state machine. Hands it down to `TransitionCreator` as props.
+- The canvas (`AutomatonCanvas`) dispatches `sourcePicked` / `destinationPicked` when the user clicks state nodes during a picking phase. The canvas doesn't know about `TransitionCreator` — it just calls `onPickState(stateId)`, which App routes to `creationDispatch`.
+- App also uses the lifted state to derive `canvasPickMode` (canvas affordance) and `overwriteTarget` (warning highlight).
+
+**Mistakes to avoid.**
+- Keeping the reducer local when other components need to peek at or dispatch into it. You'll end up with imperative refs / event buses or duplicated state.
+- Forgetting to expose dispatch to siblings — they'll try to encode the same business logic via callback chains.
+
+---
+
+## 18. Generalized component click API for multi-mode interactions (iter 7)
+
+**The rule.** When a UI element supports multiple click behaviors depending on app state, give it ONE generalized click prop and let the parent decide what to do. Don't proliferate per-mode handlers (`onPick`, `onSelect`, `onEdit`, …) on the element itself.
+
+**Why.**
+- The element shouldn't know what mode the app is in.
+- The parent has the context to wire the right behavior.
+- Simpler component API, easier to add new modes later.
+
+**Where.**
+- `StateNode` originally had `onPick` (used during transition picking). When state-actions clicks were added, instead of adding `onSelect`, `onPick`, `onEdit` etc., the API became:
+  ```typescript
+  isInteractive: boolean;
+  interactionStyle: 'pick' | 'select';   // visual affordance only
+  onClick: (anchorEl: SVGGElement) => void;
+  ```
+- `AutomatonCanvas` decides what to wire based on app state: pick-mode click → `onPickState`; otherwise → `onStateClick`. StateNode doesn't need to know which.
+
+**Mistakes to avoid.**
+- Adding a new click-purpose prop for every new behavior. Signal of accumulating coupling.
+- Letting the leaf component check app state to decide what to do. That's the parent's job.
+
+---
+
+## 19. Floating popovers anchored against the menu, not the trigger (iter 7)
+
+**The rule.** When a popover is conceptually "associated with the sidebar," anchor it to the right of the sidebar (a stable reference) rather than purely below its trigger element. This avoids the popover overlapping unrelated sidebar content.
+
+**Why.**
+- A popover below a trigger can cover other interactive elements in the sidebar.
+- Anchoring to the menu's right edge places the popover in dead space (the canvas area is wide).
+- All popovers consistently appear in the same region, which feels less surprising.
+
+**Where.**
+- `StatePickerPopover` and `StateActionsPopover` both compute `left = .tool-menu-open.getBoundingClientRect().right + 8`. Top is aligned vertically with the trigger.
+- Popover uses `position: fixed` so it can escape the sidebar's overflow context.
+
+**Mistakes to avoid.**
+- Anchoring purely below/inside the trigger when the trigger is in a constrained scrollable container — popover gets clipped by overflow.
+- Using `position: absolute` inside a sidebar with `overflow: auto`. The popover gets clipped and scrolls with the content.
+
+---
+
+## 20. Canvas as the editor, sidebar as the assist (iter 7)
+
+**The rule.** When a feature has natural visual representation, prefer to make the visual representation directly editable (canvas-first), with the sidebar serving as a parallel input path / preview / orientation tool.
+
+**Why.**
+- Canvas-first matches how users think about visual structures (DFAs, diagrams, flowcharts).
+- Removes the impedance mismatch of describing visual things in tables.
+- The mini SVG in `TransitionCreator` is an example of *bidirectional* coupling: the form previews on a small SVG, and the canvas IS the form's input field for state picks and edge selection.
+
+**Where.**
+- `TransitionCreator` mini SVG previews the in-progress transition.
+- Clicking a state node on the canvas picks it for the form (during pick mode) OR opens its action popover (otherwise).
+- Clicking an edge on the canvas loads it into the form for edit/delete.
+- The sidebar still has all the controls — but the canvas is the primary surface for editing operations whose "object" is something on screen.
+
+**Mistakes to avoid.**
+- Trying to fit large structured data (transition tables) into a narrow sidebar. The width constraints will fight every layout decision.
+- Hiding interactive affordances in the sidebar when the user's mental model is "I want to act on THIS thing on the canvas."
+
+---
+
 ## Patterns we *haven't* needed yet (watch for them)
 
 These aren't in the codebase but are likely to appear in future iterations:
