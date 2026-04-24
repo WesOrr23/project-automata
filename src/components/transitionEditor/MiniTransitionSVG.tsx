@@ -2,8 +2,11 @@
  * MiniTransitionSVG
  *
  * Tiny preview of "the transition you're building": two circles + a curved
- * arrow, OR (when source === destination) one circle with a self-loop.
- * Each circle is clickable — clicking opens the picker for that slot.
+ * arrow. Each circle is clickable — clicking opens the picker for that slot.
+ *
+ * (Self-loop visualization deferred — always renders the pair graphic,
+ * even when source === destination. The transition still works correctly;
+ * it just looks the same as a regular transition in the preview.)
  *
  * Three jobs:
  *   1. Show the transition being constructed.
@@ -27,8 +30,6 @@ type MiniTransitionSVGProp = {
   destinationLabel: string | null;
   /** Symbol to display above the arrow (or empty). */
   symbol: string;
-  /** Whether to render as a self-loop (source === destination, both filled). */
-  isSelfLoop: boolean;
   /** Which slot is currently being picked (drives pulsing ring). */
   activeSlot: SlotKind | null;
   onSlotClick: (slot: SlotKind, anchor: HTMLElement) => void;
@@ -36,14 +37,7 @@ type MiniTransitionSVGProp = {
 
 export const MiniTransitionSVG = forwardRef<SVGSVGElement, MiniTransitionSVGProp>(
   function MiniTransitionSVG(
-    {
-      sourceLabel,
-      destinationLabel,
-      symbol,
-      isSelfLoop,
-      activeSlot,
-      onSlotClick,
-    },
+    { sourceLabel, destinationLabel, symbol, activeSlot, onSlotClick },
     ref
   ) {
     return (
@@ -56,27 +50,18 @@ export const MiniTransitionSVG = forwardRef<SVGSVGElement, MiniTransitionSVGProp
         role="img"
         aria-label="Transition preview"
       >
-        {isSelfLoop ? (
-          <SelfLoopGraphic
-            label={sourceLabel}
-            symbol={symbol}
-            onClick={(event) => onSlotClick('source', event.currentTarget as unknown as HTMLElement)}
-            isActive={activeSlot !== null}
-          />
-        ) : (
-          <PairGraphic
-            sourceLabel={sourceLabel}
-            destinationLabel={destinationLabel}
-            symbol={symbol}
-            activeSlot={activeSlot}
-            onSourceClick={(event) =>
-              onSlotClick('source', event.currentTarget as unknown as HTMLElement)
-            }
-            onDestinationClick={(event) =>
-              onSlotClick('destination', event.currentTarget as unknown as HTMLElement)
-            }
-          />
-        )}
+        <PairGraphic
+          sourceLabel={sourceLabel}
+          destinationLabel={destinationLabel}
+          symbol={symbol}
+          activeSlot={activeSlot}
+          onSourceClick={(event) =>
+            onSlotClick('source', event.currentTarget as unknown as HTMLElement)
+          }
+          onDestinationClick={(event) =>
+            onSlotClick('destination', event.currentTarget as unknown as HTMLElement)
+          }
+        />
       </svg>
     );
   }
@@ -139,52 +124,6 @@ function PairGraphic({
         isActive={activeSlot === 'destination'}
         onClick={onDestinationClick}
         ariaLabel="Destination state"
-      />
-    </>
-  );
-}
-
-function SelfLoopGraphic({
-  label,
-  symbol,
-  onClick,
-  isActive,
-}: {
-  label: string | null;
-  symbol: string;
-  onClick: (event: React.MouseEvent<SVGGElement>) => void;
-  isActive: boolean;
-}) {
-  const cx = VIEW_W / 2;
-  const cy = NODE_Y;
-  // Loop arc above the circle
-  const loopRadius = 12;
-  const loopStartX = cx - 8;
-  const loopEndX = cx + 8;
-  const loopApexY = cy - NODE_R - loopRadius;
-  const loopPath = `M ${loopStartX} ${cy - NODE_R} Q ${cx} ${loopApexY - 6} ${loopEndX} ${cy - NODE_R}`;
-
-  return (
-    <>
-      <path d={loopPath} className="mini-transition-arrow" fill="none" />
-      <Arrowhead x={loopEndX} y={cy - NODE_R} angleDeg={70} />
-      {symbol !== '' && (
-        <text
-          x={cx}
-          y={loopApexY - 8}
-          textAnchor="middle"
-          className="mini-transition-symbol"
-        >
-          {symbol}
-        </text>
-      )}
-      <SlotCircle
-        cx={cx}
-        cy={cy}
-        label={label}
-        isActive={isActive}
-        onClick={onClick}
-        ariaLabel="State (self-loop)"
       />
     </>
   );
