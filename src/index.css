@@ -169,15 +169,17 @@ body {
   width: 140px;
 }
 
-/* State 3: Open — tabs + active content, top-anchored */
-/* overflow-y:auto + explicit max-height at every nested level so transition
- * lists and deep editor content scroll rather than overflow off-screen. */
+/* State 3: Open — tabs + active content, top-anchored.
+ * Flex column so the active card can take available space (and have its
+ * own internal scroll) while the compact tabs above/below stay visible. */
 .tool-menu-open {
   top: var(--space-4);
   bottom: var(--space-4);
   width: 260px;
   max-height: calc(100vh - var(--space-4) * 2);
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ─── Collapsed mode buttons (icon only) ─── */
@@ -279,6 +281,12 @@ body {
   background: var(--bg-sidebar);
   border-color: var(--blue-300);
   box-shadow: var(--shadow-sm);
+  /* Take all space the menu has left over after compact cards.
+   * Internal scroll on .tool-menu-card-content. */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .tool-menu-card-header {
@@ -302,6 +310,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  /* The single vertical scroll surface for everything inside the active
+   * tab. Children grow naturally; this is what scrolls. */
+  overflow-y: auto;
+  min-height: 0;
 }
 
 /* ─── Alphabet badges (Config tab) ─── */
@@ -390,21 +402,18 @@ body {
  * by the React component to the right column count). Same for header strips.
  */
 
+/* The shell is just an anchor for absolutely-positioned fade overlays.
+ * It doesn't constrain height — vertical scroll lives at the active card
+ * level (.tool-menu-card-content). The grid grows naturally tall to fit
+ * all rows; horizontal scroll is the only scroll the grid itself owns. */
 .transition-grid-shell {
   position: relative;
-  /* Layout cap — the data area scrolls within this. */
-  max-height: 40vh;
-  display: flex;
-  flex-direction: column;
 }
 
 .transition-grid {
   display: grid;
   grid-template-columns: auto 1fr;
-  grid-template-rows: auto 1fr;
-  /* Sit inside the shell's max-height (the shell controls overall sizing). */
-  min-height: 0;
-  flex: 1 1 auto;
+  grid-template-rows: auto auto;
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   background: var(--bg-sidebar);
@@ -434,11 +443,12 @@ body {
   min-width: var(--space-7);
 }
 
-/* Left header strip — scrolls vertically to track the data area. */
+/* Left header strip — no scroll. Lives in the same vertical flow as the
+ * data area; both grow tall together and the parent (.tool-menu-card-content)
+ * scrolls if needed. */
 .transition-grid-row-headers {
   grid-column: 1;
   grid-row: 2;
-  overflow: hidden;
   background: var(--bg-sidebar);
 }
 
@@ -453,12 +463,13 @@ body {
   justify-content: flex-end;
 }
 
-/* Data area — the real scroll container. Both axes. */
+/* Data area — horizontal scroll only. Grows tall naturally; the active
+ * card scrolls vertically if total content exceeds viewport. */
 .transition-grid-data {
   grid-column: 2;
   grid-row: 2;
-  overflow: auto;
-  scrollbar-gutter: stable;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 /* ─── Cells ─── */
@@ -540,22 +551,36 @@ body {
   z-index: 4; /* above sticky headers (z=2,3) so the gradient covers them at the join */
 }
 
-/* Vertical strip just to the right of the sticky row header */
+/* Vertical strip just to the right of the row-header column. As cells
+ * scroll horizontally toward the row header, they fade into white before
+ * disappearing under it. */
 .transition-grid-fade-right-of-row {
   top: var(--transition-grid-header-h, 28px);
   left: var(--transition-grid-row-header-w, 36px);
-  width: 16px;
+  width: 20px;
   bottom: 0;
-  background: linear-gradient(to right, var(--bg-sidebar), transparent);
+  background: linear-gradient(
+    to right,
+    var(--bg-sidebar) 0%,
+    var(--bg-sidebar) 30%,
+    rgba(255, 255, 255, 0) 100%
+  );
 }
 
-/* Horizontal strip just below the sticky top header */
+/* Horizontal strip just below the col-header row. As cells scroll
+ * vertically toward the top header, they fade into white before
+ * disappearing under it. */
 .transition-grid-fade-below-col {
   top: var(--transition-grid-header-h, 28px);
   left: var(--transition-grid-row-header-w, 36px);
   right: 0;
-  height: 16px;
-  background: linear-gradient(to bottom, var(--bg-sidebar), transparent);
+  height: 20px;
+  background: linear-gradient(
+    to bottom,
+    var(--bg-sidebar) 0%,
+    var(--bg-sidebar) 30%,
+    rgba(255, 255, 255, 0) 100%
+  );
 }
 
 /* ─── Custom transition cell popover ─── */

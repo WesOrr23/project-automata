@@ -89,14 +89,13 @@ export function TransitionGrid({
     if (rowW && rowW > 0) setRowHeaderW(rowW);
   }, [rowIds.length, columnSymbols.length]);
 
-  // Mirror data scroll into the two header strips.
+  // Mirror data's horizontal scroll into the top header strip. The row
+  // headers don't scroll independently — the data area only scrolls
+  // horizontally; vertical content height is governed by the parent
+  // (.tool-menu-card-content) scrolling.
   function handleDataScroll(event: React.UIEvent<HTMLDivElement>) {
-    const target = event.currentTarget;
     if (colHeadersRef.current) {
-      colHeadersRef.current.scrollLeft = target.scrollLeft;
-    }
-    if (rowHeadersRef.current) {
-      rowHeadersRef.current.scrollTop = target.scrollTop;
+      colHeadersRef.current.scrollLeft = event.currentTarget.scrollLeft;
     }
   }
 
