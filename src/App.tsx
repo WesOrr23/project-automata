@@ -19,6 +19,7 @@ import { ToolMenu } from './components/toolMenu/ToolMenu';
 import { ConfigPanel } from './components/toolMenu/ConfigPanel';
 import { EditPanel } from './components/toolMenu/EditPanel';
 import { ToolMenuState, ToolTabID } from './components/toolMenu/types';
+import { NotificationStack } from './notifications/NotificationStack';
 import { computeLayout } from './ui-state/utils';
 import { useSimulation } from './hooks/useSimulation';
 
@@ -358,6 +359,8 @@ function App() {
         editContent={editContent}
         simulateContent={simulateContent}
       />
+
+      <NotificationStack />
 
       <main className="canvas-area">
         {automatonUI === null ? (
