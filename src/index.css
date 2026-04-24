@@ -184,14 +184,17 @@ body {
 /* Fixed dimensions (not aspect-ratio + width:100%) so the button size doesn't
  * jump to match the expanded container width during the 0.2s width transition
  * on mouseleave — prevents the visible "grow then shrink" glitch.
+ *
+ * In collapsed mode these are "naked" icons — no border or background — so
+ * there's no visible box whose spacing to the sidebar edge could feel off.
  */
 .tool-menu-icon {
   width: var(--space-6);
   height: var(--space-6);
   align-self: center;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-button);
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--text-body);
   cursor: pointer;
   display: flex;
@@ -641,15 +644,19 @@ body {
 
 /* ─── Hover-only row actions ─── */
 /* Actions are invisible until the row is hovered or one of its descendants
- * has focus (so keyboard users can still reach them). */
+ * has focus (so keyboard users can still reach them). `visibility: hidden`
+ * (instead of just opacity) so hidden buttons are non-interactive and can't
+ * capture hover accidentally when the cursor moves fast between rows.
+ */
 .show-actions-on-hover .hide-unless-hover {
+  visibility: hidden;
   opacity: 0;
-  transition: opacity 0.15s ease;
 }
 
 .show-actions-on-hover:hover .hide-unless-hover,
 .show-actions-on-hover:focus-within .hide-unless-hover,
 .show-actions-on-hover .hide-unless-hover:focus-visible {
+  visibility: visible;
   opacity: 1;
 }
 
@@ -659,4 +666,21 @@ body {
   font-size: inherit;
   text-align: left;
   width: 100%;
+}
+
+/* Catch-all cursor rules. Explicit rules above still apply for special
+ * cases like disabled or info-only elements; this just guarantees that no
+ * clickable button is ever left with a default text/arrow cursor. */
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* SVG children of buttons shouldn't steal hover or cursor target from
+ * the parent button. */
+button svg {
+  pointer-events: none;
 }
