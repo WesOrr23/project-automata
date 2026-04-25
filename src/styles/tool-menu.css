@@ -310,6 +310,15 @@
   border-color: var(--blue-300);
 }
 
+/* The active row is a non-interactive header — clicks don't fire any
+ * action. Override the inherited press-scale so it doesn't read as a
+ * pressable button when the user mouses down on it. The collapse
+ * button inside is still its own real button with its own press
+ * animation. Visually the row is unchanged at rest. */
+.tool-menu-row.active:active {
+  transform: none;
+}
+
 /* Inline collapse button on the right edge of the active row. */
 .tool-menu-row-collapse {
   flex: 0 0 auto;
