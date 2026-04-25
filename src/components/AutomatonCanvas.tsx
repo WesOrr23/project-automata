@@ -53,9 +53,15 @@ type AutomatonCanvasProp = {
 
   /**
    * Called when the user clicks an existing transition edge on the canvas.
-   * Loads it into the creator form for editing/deletion.
+   * Loads it into the creator form for editing/deletion. For consolidated
+   * edges (multiple symbols sharing the same from→to), the entire group
+   * is loaded — `symbols` carries every symbol on the rendered edge.
    */
-  onEdgeClick?: (transition: { from: number; to: number; symbol: string | null }) => void;
+  onEdgeClick?: (transition: {
+    from: number;
+    to: number;
+    symbols: ReadonlyArray<string | null>;
+  }) => void;
 
   /**
    * Per-edge highlights for the in-progress transition edit. Each entry
@@ -111,34 +117,38 @@ export function AutomatonCanvas({
     >
       {/* Layer 1: Transition edges (background) */}
       {automatonUI.transitions.map((transition, index) => {
+        // A consolidated edge matches the simulation's "next transition"
+        // if any of its underlying symbols is the one about to fire.
         const isNextTransition = nextTransition !== null
           && nextTransition !== undefined
           && transition.fromStateId === nextTransition.fromStateId
           && transition.toStateId === nextTransition.toStateId
-          && transition.symbol === nextTransition.symbol;
+          && transition.symbols.some((s) => s === nextTransition.symbol);
 
         const isHighlighted =
           highlightedTransition !== null
           && highlightedTransition !== undefined
           && transition.fromStateId === highlightedTransition.from
           && transition.toStateId === highlightedTransition.to
-          && transition.symbol === highlightedTransition.symbol;
+          && transition.symbols.some((s) => s === highlightedTransition.symbol);
 
-        // Match this rendered edge against the active edge previews. There
-        // can be at most one match per edge (preview entries are unique by
-        // from/to/symbol).
+        // Match against active edge previews. With consolidation, a
+        // preview entry can match an edge that contains its symbol
+        // among many. If multiple previews match (e.g. consolidated
+        // edge with two symbols both being modified), pick the first;
+        // they should agree on kind in practice.
         const matchingPreview = edgePreviews?.find(
           (preview) =>
             preview.from === transition.fromStateId &&
             preview.to === transition.toStateId &&
-            preview.symbol === transition.symbol
+            transition.symbols.some((s) => s === preview.symbol)
         ) ?? null;
 
         return (
           <TransitionEdge
             key={`transition-${index}`}
             pathData={transition.pathData}
-            symbol={transition.symbol}
+            symbols={transition.symbols}
             arrowheadPosition={transition.arrowheadPosition}
             arrowheadAngle={transition.arrowheadAngle}
             labelPosition={transition.labelPosition}
@@ -152,7 +162,7 @@ export function AutomatonCanvas({
                     onEdgeClick({
                       from: transition.fromStateId,
                       to: transition.toStateId,
-                      symbol: transition.symbol,
+                      symbols: transition.symbols,
                     })
                 : undefined
             }

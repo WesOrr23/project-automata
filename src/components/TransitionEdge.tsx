@@ -12,8 +12,12 @@ type TransitionEdgeProp = {
   /** SVG path d attribute (cubic bezier spline from GraphViz) */
   pathData: string;
 
-  /** Transition symbol (null represents ε-transition) */
-  symbol: string | null;
+  /**
+   * Symbols on this edge. Multiple entries means the edge is a
+   * consolidated rendering of N transitions sharing the same
+   * `(from, to)` — render as `a, b, ε`. `null` is ε.
+   */
+  symbols: ReadonlyArray<string | null>;
 
   /** Position of the arrowhead tip */
   arrowheadPosition: { x: number; y: number };
@@ -65,7 +69,7 @@ const PREVIEW_COLOR = {
 export function TransitionEdge(props: TransitionEdgeProp) {
   const {
     pathData,
-    symbol,
+    symbols,
     arrowheadPosition,
     arrowheadAngle,
     labelPosition,
@@ -75,6 +79,19 @@ export function TransitionEdge(props: TransitionEdgeProp) {
     previewOldSymbol,
     onEdgeClick,
   } = props;
+
+  // Render the (possibly multi-symbol) label as `a, b, ε` — same
+  // convention as the DOT label generator. Single symbol is just
+  // itself (no comma).
+  const displayLabel = symbols
+    .map((symbol) => (symbol === null ? 'ε' : symbol))
+    .sort((a, b) => {
+      // ε always last; otherwise alphabetical.
+      if (a === 'ε') return 1;
+      if (b === 'ε') return -1;
+      return a.localeCompare(b);
+    })
+    .join(', ');
 
   // Color priority: notification highlight (red) > active preview > simulation next > default.
   // The notification system can only highlight one edge at a time and is
@@ -105,16 +122,17 @@ export function TransitionEdge(props: TransitionEdgeProp) {
   const arrowheadPoint2X = arrowheadPosition.x + ARROWHEAD_SIZE * Math.cos(arrowheadAngle2);
   const arrowheadPoint2Y = arrowheadPosition.y + ARROWHEAD_SIZE * Math.sin(arrowheadAngle2);
 
-  const displaySymbol = symbol === null ? 'ε' : symbol;
-
   const groupClass = onEdgeClick ? 'transition-edge-clickable' : undefined;
 
-  // For modify previews where the symbol itself changed, render the label
-  // as two tspans: the original symbol struck-through in red, then the new
-  // symbol in blue. The container <text> still anchors at the GraphViz-
-  // computed midpoint; SVG centers the combined run on textAnchor=middle.
+  // For symbol-only modify previews (single underlying symbol changing
+  // its name), render the label as old struck-red + new blue tspans.
+  // Doesn't apply to consolidated edges with multiple symbols — those
+  // use the plain joined label instead.
   const showSymbolDiff =
-    previewKind === 'modify' && previewOldSymbol !== undefined && symbol !== null;
+    previewKind === 'modify' &&
+    previewOldSymbol !== undefined &&
+    symbols.length === 1 &&
+    symbols[0] !== null;
 
   return (
     <g
@@ -167,11 +185,11 @@ export function TransitionEdge(props: TransitionEdgeProp) {
               {previewOldSymbol}
             </tspan>
             <tspan dx="4" fill={PREVIEW_COLOR.add}>
-              {displaySymbol}
+              {displayLabel}
             </tspan>
           </>
         ) : (
-          <tspan fill={edgeColor}>{displaySymbol}</tspan>
+          <tspan fill={edgeColor}>{displayLabel}</tspan>
         )}
       </text>
     </g>

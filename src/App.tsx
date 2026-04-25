@@ -135,24 +135,24 @@ function App() {
    * so that simulation clicks (currently nothing, but future-proof) and
    * idle hover don't trigger it.
    *
-   * The mini SVG only knows DFA transitions (single destination). For
-   * an NFA transition with multiple destinations, we load the matching
-   * single (from, to, symbol) tuple — the edge the user clicked.
+   * Phase 3 of iter 8 added edge consolidation — a clicked edge may
+   * carry multiple symbols. For now we load the first non-ε symbol,
+   * which preserves the iter-7 behavior. Phase 4 will load the full
+   * comma-joined list into the form.
    */
   function handleCanvasEdgeClick(transition: {
     from: number;
     to: number;
-    symbol: string | null;
+    symbols: ReadonlyArray<string | null>;
   }) {
-    // ε-transitions can't be edited via the form (it requires a symbol);
-    // skip them gracefully.
-    if (transition.symbol === null) return;
+    const firstNonEpsilon = transition.symbols.find((s) => s !== null);
+    if (firstNonEpsilon === undefined) return;
     creationDispatch({
       type: 'loadExisting',
       transition: {
         from: transition.from,
         to: transition.to,
-        symbol: transition.symbol,
+        symbol: firstNonEpsilon,
       },
     });
   }

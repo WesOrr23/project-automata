@@ -37,6 +37,34 @@ const NODE_SIZE_INCHES = (STATE_RADIUS * 2) / 72;
  *  and is easy to recognize when filtering layout output. */
 const START_PHANTOM_NAME = '_start';
 
+/**
+ * Inverse of joinSymbols: split GraphViz's edge label back into the
+ * underlying symbol list. 'ε' round-trips to null; commas separate
+ * multiple symbols. An empty/missing label produces [null] (treated
+ * as a single ε-transition — defensive fallback that should never
+ * trigger in practice).
+ */
+function parseEdgeLabel(rawLabel: string | undefined): Array<string | null> {
+  if (rawLabel === undefined || rawLabel === '') return [null];
+  return rawLabel
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .map((part) => (part === 'ε' ? null : part));
+}
+
+/**
+ * Render a list of symbols as a comma-joined edge label. ε goes last
+ * (visually separated from the alphabet symbols) and the rest are
+ * sorted alphabetically for stability.
+ */
+function joinSymbols(symbols: ReadonlyArray<string | null>): string {
+  const named = symbols.filter((s): s is string => s !== null).sort();
+  const hasEpsilon = symbols.some((s) => s === null);
+  if (hasEpsilon) named.push('ε');
+  return named.join(', ');
+}
+
 function automatonToDot(automaton: Automaton): string {
   const lines: string[] = [];
   lines.push('digraph {');
@@ -49,13 +77,36 @@ function automatonToDot(automaton: Automaton): string {
     lines.push(`  ${stateId} [label="${label}"];`);
   });
 
-  // Add edges with transition symbols
+  // Edge consolidation: group every engine transition by its
+  // (from, to) endpoint pair and emit ONE DOT edge per group with a
+  // comma-joined label. This is what makes "q0 -a-> q1" and "q0 -b-> q1"
+  // render as a single arrow labeled "a, b" instead of two parallel
+  // arrows GraphViz has to space apart.
+  //
+  // Multi-destination NFA transitions (one record with `to` size > 1)
+  // expand into multiple groups — different `to` values are different
+  // visual edges.
+  const groups = new Map<string, ReadonlyArray<string | null>>();
+  function addToGroup(from: number, to: number, symbol: string | null) {
+    const key = `${from}->${to}`;
+    const existing = groups.get(key);
+    if (existing === undefined) {
+      groups.set(key, [symbol]);
+    } else {
+      groups.set(key, [...existing, symbol]);
+    }
+  }
   automaton.transitions.forEach((transition) => {
     transition.to.forEach((destinationStateId) => {
-      const displaySymbol = transition.symbol === null ? 'ε' : transition.symbol;
-      lines.push(`  ${transition.from} -> ${destinationStateId} [label="${displaySymbol}"];`);
+      addToGroup(transition.from, destinationStateId, transition.symbol);
     });
   });
+
+  for (const [key, symbols] of groups) {
+    const [fromStr, toStr] = key.split('->');
+    const label = joinSymbols(symbols);
+    lines.push(`  ${fromStr} -> ${toStr} [label="${label}"];`);
+  }
 
   // Reserve horizontal layout space for the separately-rendered start
   // arrow. Without this, GraphViz happily places the start state in the
@@ -311,8 +362,11 @@ function parseGraphvizJson(
     const fromStateId = parseInt(tailNode.name);
     const toStateId = parseInt(headNode.name);
 
-    // Convert display label back to symbol (ε → null)
-    const symbol = edge.label === 'ε' ? null : (edge.label ?? null);
+    // Parse the (possibly comma-joined) consolidated label back into a
+    // symbol array. ε round-trips to null. An edge with no label
+    // somehow makes it through with a single null symbol — better than
+    // dropping it silently.
+    const symbols = parseEdgeLabel(edge.label);
 
     // Parse edge spline
     const parsedPos = parseEdgePos(edge.pos);
@@ -358,7 +412,7 @@ function parseGraphvizJson(
     transitions.push({
       fromStateId,
       toStateId,
-      symbol,
+      symbols,
       pathData,
       arrowheadPosition,
       arrowheadAngle,

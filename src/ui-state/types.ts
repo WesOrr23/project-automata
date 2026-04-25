@@ -34,11 +34,17 @@ export type StateUI = {
 };
 
 /**
- * UI metadata for a single transition
+ * UI metadata for a single rendered transition edge.
  *
- * Contains pre-computed SVG rendering data from GraphViz layout.
- * GraphViz computes the edge spline, arrowhead position/angle,
- * and label position - TransitionEdge just renders these values.
+ * One TransitionUI may represent multiple engine transitions when they
+ * share the same `(from, to)` pair — edge consolidation collapses
+ * "q0 → q1 on 'a' AND q0 → q1 on 'b'" into one arrow labeled "a, b".
+ * The `symbols` array holds every underlying symbol (with `null` for
+ * ε-transitions); the rendered label is comma-joined.
+ *
+ * Contains pre-computed SVG rendering data from GraphViz layout —
+ * GraphViz computes the spline, arrowhead position/angle, and label
+ * position; TransitionEdge just renders the values.
  */
 export type TransitionUI = {
   /** Source state ID */
@@ -47,8 +53,12 @@ export type TransitionUI = {
   /** Destination state ID */
   toStateId: number;
 
-  /** Transition symbol (null = ε-transition) */
-  symbol: string | null;
+  /**
+   * Every engine-transition symbol consolidated into this edge. `null`
+   * represents an ε-transition. Sorted with non-null symbols first
+   * (alphabetical), ε last — same convention as the rendered label.
+   */
+  symbols: ReadonlyArray<string | null>;
 
   /** SVG path d attribute (cubic bezier spline from GraphViz) */
   pathData: string;
