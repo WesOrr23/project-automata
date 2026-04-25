@@ -6,6 +6,11 @@
  * branch died), 1, or many (parallel exploration). The step function
  * advances the active set by the input symbol and re-applies ε-closure.
  *
+ * Error handling: `createSimulation` and `step` are fallible — they
+ * return `Result<Simulation>` rather than throwing. `runSimulation`,
+ * `accepts`, and `getFinalStates` propagate the Result for callers that
+ * want to handle structural failures gracefully.
+ *
  * Key functions:
  * - createSimulation(): Create a new simulation from automaton and input
  * - step(): Execute one transition (returns new Simulation)
@@ -17,6 +22,7 @@
 import type { Automaton, Simulation, SimulationStep } from './types';
 import { isComplete, hasStartState } from './validator';
 import { epsilonClosureWithTrace } from './utils';
+import { type Result, ok, err } from './result';
 
 /**
  * Create a new simulation for the given automaton and input.
@@ -30,20 +36,23 @@ import { epsilonClosureWithTrace } from './utils';
  * The initial active set is the ε-closure of `{startState}` so any
  * states reachable "for free" via ε-transitions are live from step 0.
  *
- * @throws Error if the automaton is missing structural prerequisites.
+ * @returns ok(simulation) on success; on failure, one of:
+ *   - 'automaton-not-runnable-empty-alphabet'
+ *   - 'automaton-not-runnable-no-start-state'
+ *   - 'automaton-not-runnable-incomplete-dfa'
  */
 export function createSimulation(
   automaton: Automaton,
   input: string
-): Simulation {
+): Result<Simulation> {
   if (automaton.alphabet.size === 0) {
-    throw new Error('Automaton is not runnable (empty alphabet)');
+    return err('automaton-not-runnable-empty-alphabet');
   }
   if (!hasStartState(automaton)) {
-    throw new Error('Automaton is not runnable (no start state)');
+    return err('automaton-not-runnable-no-start-state');
   }
   if (automaton.type === 'DFA' && !isComplete(automaton)) {
-    throw new Error('Automaton is not runnable (DFA is incomplete)');
+    return err('automaton-not-runnable-incomplete-dfa');
   }
 
   // Initial active set is the ε-closure of {startState}. The traced
@@ -64,13 +73,13 @@ export function createSimulation(
     remainingInput: input,
   };
 
-  return {
+  return ok({
     automaton,
     currentStates: initialStates,
     remainingInput: input,
     steps: [initialStep],
     input,
-  };
+  });
 }
 
 /**
@@ -81,15 +90,17 @@ export function createSimulation(
  * produce the new active set. For DFAs this collapses to "look up the
  * one transition and replace the active state."
  *
- * @throws Error if the simulation is finished or the symbol isn't in the alphabet.
- *         Also throws on a DFA dead-end (no transition for the current state's
- *         symbol) — DFA mode treats that as a structural error since
- *         createSimulation already gates on completeness. NFA mode lets the
- *         active set go empty instead.
+ * @returns ok(simulation) on success; on failure, one of:
+ *   - 'simulation-already-finished' if remainingInput is empty
+ *   - 'symbol-not-in-alphabet' if the next symbol isn't in the alphabet
+ *   - 'dfa-dead-end' if a complete DFA has no transition for the symbol
+ *     from any active state. NFA mode lets the active set go empty
+ *     instead — that's a normal outcome (every branch died) and not an
+ *     error.
  */
-export function step(simulation: Simulation): Simulation {
+export function step(simulation: Simulation): Result<Simulation> {
   if (isFinished(simulation)) {
-    throw new Error('Simulation is already finished (no remaining input)');
+    return err('simulation-already-finished');
   }
 
   const { automaton, currentStates, remainingInput } = simulation;
@@ -97,7 +108,7 @@ export function step(simulation: Simulation): Simulation {
   const newRemainingInput = remainingInput.slice(1);
 
   if (!automaton.alphabet.has(symbol)) {
-    throw new Error(`Symbol '${symbol}' is not in the alphabet`);
+    return err('symbol-not-in-alphabet');
   }
 
   // Collect every state reachable from the current set on this symbol,
@@ -122,12 +133,10 @@ export function step(simulation: Simulation): Simulation {
 
   // DFA invariant: a complete DFA always has a transition. If we got
   // nothing, something's wrong with the automaton or the simulation
-  // input — surface it loudly rather than silently rejecting.
+  // input — surface it as a typed error so the caller can decide
+  // whether to halt the simulation, show a notification, etc.
   if (automaton.type === 'DFA' && intermediate.size === 0) {
-    const fromState = Array.from(currentStates)[0];
-    throw new Error(
-      `No transition from state ${fromState ?? '(none active)'} on symbol '${symbol}'`
-    );
+    return err('dfa-dead-end');
   }
 
   // ε-closure expands the new active set with every state reachable
@@ -157,12 +166,12 @@ export function step(simulation: Simulation): Simulation {
     remainingInput: newRemainingInput,
   };
 
-  return {
+  return ok({
     ...simulation,
     currentStates: nextStates,
     remainingInput: newRemainingInput,
     steps: [...simulation.steps, newStep],
-  };
+  });
 }
 
 /**
@@ -196,30 +205,42 @@ export function isAccepted(simulation: Simulation): boolean {
 }
 
 /**
- * Run the entire simulation to completion.
+ * Run the entire simulation to completion. Propagates any error from
+ * `createSimulation` or `step` (e.g. an invalid symbol mid-input).
  */
 export function runSimulation(
   automaton: Automaton,
   input: string
-): Simulation {
-  let simulation = createSimulation(automaton, input);
+): Result<Simulation> {
+  const initial = createSimulation(automaton, input);
+  if (!initial.ok) return initial;
+  let simulation = initial.value;
 
   while (!isFinished(simulation)) {
-    simulation = step(simulation);
+    const stepResult = step(simulation);
+    if (!stepResult.ok) return stepResult;
+    simulation = stepResult.value;
   }
 
-  return simulation;
+  return ok(simulation);
 }
 
 /**
  * Check if the automaton accepts an input string.
+ *
+ * @returns ok(boolean) when the simulation completed; err(...) if the
+ *          automaton or input is structurally invalid (empty alphabet,
+ *          unknown symbol, etc.). Treating the error case as
+ *          "not-accepted" would silently swallow real bugs — make the
+ *          caller acknowledge the failure mode.
  */
 export function accepts(
   automaton: Automaton,
   input: string
-): boolean {
+): Result<boolean> {
   const simulation = runSimulation(automaton, input);
-  return isAccepted(simulation);
+  if (!simulation.ok) return simulation;
+  return ok(isAccepted(simulation.value));
 }
 
 /**
@@ -231,9 +252,10 @@ export function accepts(
 export function getFinalStates(
   automaton: Automaton,
   input: string
-): Set<number> {
+): Result<Set<number>> {
   const simulation = runSimulation(automaton, input);
-  return simulation.currentStates;
+  if (!simulation.ok) return simulation;
+  return ok(simulation.value.currentStates);
 }
 
 /**

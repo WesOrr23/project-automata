@@ -19,13 +19,22 @@ import {
   getOrphanedStates,
   getValidationReport,
 } from './validator';
+import type { Result } from './result';
+
+// Validator tests don't exercise the engine's failure paths, so a small
+// unwrapper keeps the calls readable now that addTransition / setStartState /
+// addAcceptState all return Result<Automaton>.
+function expectOk<T>(result: Result<T>): T {
+  if (!result.ok) throw new Error(`expected ok, got err: ${result.error}`);
+  return result.value;
+}
 
 describe('isDFA', () => {
   it('returns true for valid DFA', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
     // dfa has state 0
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
-    const dfa2 = addTransition(dfa1, 0, new Set([id1]), '0');
+    const dfa2 = expectOk(addTransition(dfa1, 0, new Set([id1]), '0'));
 
     expect(isDFA(dfa2)).toBe(true);
   });
@@ -77,10 +86,10 @@ describe('isComplete', () => {
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
 
     // Every state has transition for every symbol
-    let result = addTransition(dfa1, 0, new Set([0]), '0');
-    result = addTransition(result, 0, new Set([id1]), '1');
-    result = addTransition(result, id1, new Set([0]), '0');
-    result = addTransition(result, id1, new Set([id1]), '1');
+    let result = expectOk(addTransition(dfa1, 0, new Set([0]), '0'));
+    result = expectOk(addTransition(result, 0, new Set([id1]), '1'));
+    result = expectOk(addTransition(result, id1, new Set([0]), '0'));
+    result = expectOk(addTransition(result, id1, new Set([id1]), '1'));
 
     expect(isComplete(result)).toBe(true);
   });
@@ -91,7 +100,7 @@ describe('isComplete', () => {
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
 
     // state 0 only has transition for '0', missing '1'
-    const dfa2 = addTransition(dfa1, 0, new Set([id1]), '0');
+    const dfa2 = expectOk(addTransition(dfa1, 0, new Set([id1]), '0'));
 
     expect(isComplete(dfa2)).toBe(false);
   });
@@ -116,7 +125,7 @@ describe('hasStartState', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
     // dfa has state 0 as start state
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
-    const dfa2 = setStartState(dfa1, id1);
+    const dfa2 = expectOk(setStartState(dfa1, id1));
 
     expect(hasStartState(dfa2)).toBe(true);
   });
@@ -138,7 +147,7 @@ describe('hasAcceptStates', () => {
   it('returns true when accept states exist', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
     // dfa has state 0
-    const dfa2 = addAcceptState(dfa, 0);
+    const dfa2 = expectOk(addAcceptState(dfa, 0));
 
     expect(hasAcceptStates(dfa2)).toBe(true);
   });
@@ -155,8 +164,8 @@ describe('isRunnable', () => {
   it('returns true for complete, valid DFA with start state', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
     // dfa has state 0 as start state
-    let result = addTransition(dfa, 0, new Set([0]), '0');
-    result = addTransition(result, 0, new Set([0]), '1');
+    let result = expectOk(addTransition(dfa, 0, new Set([0]), '0'));
+    result = expectOk(addTransition(result, 0, new Set([0]), '1'));
 
     expect(isRunnable(result)).toBe(true);
   });
@@ -164,8 +173,8 @@ describe('isRunnable', () => {
   it('returns false for DFA with invalid start state reference', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
     // dfa has state 0 as start state
-    let result = addTransition(dfa, 0, new Set([0]), '0');
-    result = addTransition(result, 0, new Set([0]), '1');
+    let result = expectOk(addTransition(dfa, 0, new Set([0]), '0'));
+    result = expectOk(addTransition(result, 0, new Set([0]), '1'));
 
     // Manually corrupt the start state
     const corruptedDfa = {
@@ -179,7 +188,7 @@ describe('isRunnable', () => {
   it('returns false for incomplete DFA', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
     // dfa has state 0 as start state
-    const result = addTransition(dfa, 0, new Set([0]), '0');
+    const result = expectOk(addTransition(dfa, 0, new Set([0]), '0'));
     // Missing transition for '1'
 
     expect(isRunnable(result)).toBe(false);
@@ -200,7 +209,7 @@ describe('getOrphanedStates', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
     // dfa has state 0 as start
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
-    const result = addTransition(dfa1, 0, new Set([id1]), '0');
+    const result = expectOk(addTransition(dfa1, 0, new Set([id1]), '0'));
 
     const orphaned = getOrphanedStates(result);
 
@@ -213,8 +222,8 @@ describe('getOrphanedStates', () => {
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
     const { automaton: dfa2, stateId: id2 } = addState(dfa1);
 
-    let result = addTransition(dfa2, 0, new Set([0]), '0');
-    result = addTransition(result, id2, new Set([id2]), '1'); // id2 can't be reached
+    let result = expectOk(addTransition(dfa2, 0, new Set([0]), '0'));
+    result = expectOk(addTransition(result, id2, new Set([id2]), '1')); // id2 can't be reached
 
     const orphaned = getOrphanedStates(result);
 
@@ -248,8 +257,8 @@ describe('getOrphanedStates', () => {
     const { automaton: dfa2, stateId: id2 } = addState(dfa1);
 
     // Create a cycle: 0 → id1 → 0
-    let result = addTransition(dfa2, 0, new Set([id1]), '0');
-    result = addTransition(result, id1, new Set([0]), '1');
+    let result = expectOk(addTransition(dfa2, 0, new Set([id1]), '0'));
+    result = expectOk(addTransition(result, id1, new Set([0]), '1'));
     // id2 is still unreachable
 
     const orphaned = getOrphanedStates(result);
@@ -263,9 +272,9 @@ describe('getValidationReport', () => {
   it('returns no errors for valid complete DFA', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
     // dfa has state 0 as start state
-    let result = addAcceptState(dfa, 0);
-    result = addTransition(result, 0, new Set([0]), '0');
-    result = addTransition(result, 0, new Set([0]), '1');
+    let result = expectOk(addAcceptState(dfa, 0));
+    result = expectOk(addTransition(result, 0, new Set([0]), '0'));
+    result = expectOk(addTransition(result, 0, new Set([0]), '1'));
 
     const report = getValidationReport(result);
 
@@ -292,7 +301,7 @@ describe('getValidationReport', () => {
   it('reports incomplete DFA', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
     // dfa has state 0 as start state
-    const result = addTransition(dfa, 0, new Set([0]), '0');
+    const result = expectOk(addTransition(dfa, 0, new Set([0]), '0'));
     // Missing transition for '1'
 
     const report = getValidationReport(result);
@@ -304,8 +313,8 @@ describe('getValidationReport', () => {
   it('warns about missing accept states', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
     // dfa has state 0 as start state
-    let result = addTransition(dfa, 0, new Set([0]), '0');
-    result = addTransition(result, 0, new Set([0]), '1');
+    let result = expectOk(addTransition(dfa, 0, new Set([0]), '0'));
+    result = expectOk(addTransition(result, 0, new Set([0]), '1'));
 
     const report = getValidationReport(result);
 
@@ -321,8 +330,8 @@ describe('getValidationReport', () => {
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
     const { automaton: dfa2, stateId: id2 } = addState(dfa1);
 
-    let result = addTransition(dfa2, 0, new Set([0]), '0');
-    result = addTransition(result, 0, new Set([0]), '1');
+    let result = expectOk(addTransition(dfa2, 0, new Set([0]), '0'));
+    result = expectOk(addTransition(result, 0, new Set([0]), '1'));
 
     const report = getValidationReport(result);
 
@@ -352,8 +361,8 @@ describe('NFA validation', () => {
     let nfa = createAutomaton('NFA', new Set(['a']));
     const { automaton: n1, stateId: q1 } = addState(nfa);
     // ε-transition + multi-destination, both forbidden in DFA mode.
-    nfa = addTransition(n1, 0, new Set([q1]), null);
-    nfa = addTransition(nfa, q1, new Set([0, q1]), 'a');
+    nfa = expectOk(addTransition(n1, 0, new Set([q1]), null));
+    nfa = expectOk(addTransition(nfa, q1, new Set([0, q1]), 'a'));
 
     const report = getValidationReport(nfa);
     expect(report.errors.some((e) => e.includes('Not a valid DFA'))).toBe(false);
@@ -363,7 +372,7 @@ describe('NFA validation', () => {
   it('flipping a non-DFA-shaped automaton to DFA mode surfaces the errors', () => {
     let aut = createAutomaton('NFA', new Set(['a']));
     const { automaton: n1, stateId: q1 } = addState(aut);
-    aut = addTransition(n1, 0, new Set([q1]), null); // ε
+    aut = expectOk(addTransition(n1, 0, new Set([q1]), null)); // ε
 
     const reportNFA = getValidationReport(aut);
     expect(reportNFA.errors.some((e) => e.includes('Not a valid DFA'))).toBe(false);
