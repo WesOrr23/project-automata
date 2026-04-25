@@ -428,11 +428,14 @@ function App() {
       // setAutomaton. The runtime is sound — the updater ran once and
       // the assignment happened-before this read.
       const errorVariant: import('./engine/result').EngineError = capturedError;
+      // Conditional spreads keep `detail` / `target` omit-only so the
+      // notification store never sees an explicit `undefined` (would
+      // undermine exactOptionalPropertyTypes).
       notify({
         severity: 'error',
         title: titleOnError ?? errorMessage(errorVariant),
-        detail: titleOnError ? errorMessage(errorVariant) : undefined,
-        target: targetOnError,
+        ...(titleOnError !== undefined && { detail: errorMessage(errorVariant) }),
+        ...(targetOnError !== undefined && { target: targetOnError }),
         // Edits that fail are non-blocking — the user can keep working.
         // Auto-dismiss so the stack doesn't fill with stale errors.
         autoDismissMs: 6_000,

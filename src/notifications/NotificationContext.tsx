@@ -98,12 +98,16 @@ export function NotificationProvider({ children }: NotificationProviderProp) {
           ? input.autoDismissMs
           : DEFAULT_AUTO_DISMISS_MS[input.severity];
 
+      // Conditional spread keeps `detail` / `target` omit-only so
+      // exactOptionalPropertyTypes isn't undermined: a missing key on the
+      // input becomes a missing key on the stored Notification, never the
+      // explicit `undefined` value the flag is meant to police.
       const notification: Notification = {
         id,
         severity: input.severity,
         title: input.title,
-        detail: input.detail,
-        target: input.target,
+        ...(input.detail !== undefined && { detail: input.detail }),
+        ...(input.target !== undefined && { target: input.target }),
         createdAt: Date.now(),
         autoDismissMs,
       };
