@@ -1,17 +1,17 @@
 # Next Session Handoff
 
-Everything you need to pick up where iteration 7 left off, written for whoever opens the next chat.
+Everything you need to pick up where iteration 8 left off, written for whoever opens the next chat.
 
 ---
 
 ## Where things stand right now
 
-- **Branch**: `iteration-7` (committed and ready; not merged to main)
-- **Tests**: 169 passing, typecheck clean
-- **Last commit**: `Modify color, state-click popover, overwrite warning` (5609f44)
+- **Branch**: `iteration-8` (committed and ready; not merged to main)
+- **Tests**: 211 passing, typecheck clean
 - **Auto mode**: ON
 - **Notification system**: in place (iter 6) — `useNotifications().notify({...})` available everywhere
-- **Iteration 7 plan**: see `ITERATION7_PLAN.md` (already documented as complete in `ITERATION7_COMPLETE.md`)
+- **Iteration 8 plan + close-out**: see `ITERATION8_PLAN.md` and `ITERATION8_COMPLETE.md`
+- **NFA mode is live**: ε-transitions (configurable reserved char), multi-state simulation with ε-closure, edge consolidation in both DFA and NFA modes, branch-death pulse
 
 ---
 
@@ -47,16 +47,17 @@ This is the most important section. The user is a CS student building skills as 
 
 ---
 
-## Iteration 8: Undo / Redo (next priority)
+## Iteration 9: Undo / Redo (now the next priority)
 
-The user explicitly asked for this. Plan elements (start with these in `ITERATION8_PLAN.md`):
+Originally planned for iter 8 but the user pivoted to NFA support. Plan elements (start with these in `ITERATION9_PLAN.md`):
 
 ### What needs to be reversible
 - Add / remove state
 - Set start state, toggle accept state
-- Add / remove / replace transition (use the existing `handleSetTransition` / `handleReplaceTransition` as the primitive operations)
+- Add / remove / replace transition (use the new `handleApplyTransitionEdit(removes, adds)` as the primitive)
 - Alphabet add / remove
 - Type change (DFA / NFA)
+- Reserved ε-symbol change (UI state but worth tracking)
 - Probably NOT: simulation control (that has its own history via the simulation reducer)
 
 ### Architecture options to consider
@@ -64,7 +65,7 @@ The user explicitly asked for this. Plan elements (start with these in `ITERATIO
 - **Inverse-action stack**: every edit records its inverse (e.g. "addState 3" → "removeState 3"). Smaller per entry, more complex to define inverses for cascade ops (e.g. removeState removes transitions too).
 - **Immer-like diff**: structural sharing means snapshots are cheap. May not be worth a new dependency.
 
-Recommendation: **snapshot stack** for simplicity. The Automaton is a small object even with many states. Cap at ~50 entries.
+Recommendation: **snapshot stack** for simplicity. The Automaton is a small object even with many states. Cap at ~50 entries. Iter 8's `handleApplyTransitionEdit` makes this easier — one batch update per user action means one snapshot.
 
 ### UI placement
 - Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z keyboard shortcuts.
@@ -73,6 +74,7 @@ Recommendation: **snapshot stack** for simplicity. The Automaton is a small obje
 ### Edge cases
 - Reset history when the automaton is wholesale replaced (e.g. JSON import — when that lands).
 - Don't push history for no-op edits (e.g. setStartState to current start).
+- The simulation hook owns its own history — undo/redo shouldn't touch it.
 
 ---
 
@@ -94,9 +96,14 @@ These are documented in iteration plans / audits but are still open:
 - State rename in the actions popover
 - Maybe: hover preview of the to-be-deleted edge before clicking Delete
 
+### From iter 8 audit (deferred / nice-to-have)
+- Per-branch NFA simulation UI: tabs or trees showing each branch independently. Right now all active states render in the same layer of blue.
+- More NFA/ε visual tweaks: maybe a subtler dashed style on ε-edge labels (user explicitly said *no* dashed line for ε in iter 8 — keep solid — but the label could still flag it).
+- Reserved-`e` rule on JSON load (auto-handle when import lands).
+
 ### From CLAUDE.md backlog
-- Iteration 9: Animations & Polish
-- Iteration 10: NFA → DFA conversion, minimization, equivalence
+- Iteration 9: Undo/Redo (now scheduled — see above)
+- Iteration 10: NFA → DFA conversion (subset construction), minimization, equivalence testing
 - Iteration 11: Edge routing & overlap prevention
 
 ### "Code" / terminal panel for programmatic automaton authoring
@@ -157,10 +164,11 @@ src/
 ├── App.tsx                                ← orchestrator, owns most state
 ├── main.tsx                               ← React root, wraps in providers
 ├── engine/                                ← pure TypeScript, no React
-│   ├── automaton.ts                       ← CRUD primitives
-│   ├── simulator.ts                       ← step-by-step DFA execution
-│   ├── validator.ts                       ← isRunnable, getValidationReport, etc
-│   └── types.ts                           ← Automaton, Transition
+│   ├── automaton.ts                       ← CRUD primitives + addTransitionDestination (NFA)
+│   ├── simulator.ts                       ← multi-state step (DFA + NFA) with ε-closure
+│   ├── validator.ts                       ← isRunnable, getValidationReport, etc (branches on type)
+│   ├── utils.ts                           ← epsilonClosure (NFA simulation helper)
+│   └── types.ts                           ← Automaton, Transition, SimulationStep (with dyingStateIds)
 ├── hooks/
 │   └── useSimulation.ts                   ← reducer-based simulation hook
 ├── ui-state/
