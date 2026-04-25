@@ -12,6 +12,7 @@ import {
 } from './engine/automaton';
 import { isRunnable, getValidationReport } from './engine/validator';
 import { Automaton } from './engine/types';
+import { type Result, errorMessage } from './engine/result';
 import { AutomatonUI, computeDisplayLabels } from './ui-state/types';
 import { AutomatonCanvas } from './components/AutomatonCanvas';
 import { InputPanel } from './components/InputPanel';
@@ -38,9 +39,22 @@ import { useUndoableAutomaton } from './hooks/useUndoableAutomaton';
 import { UndoRedoControls } from './components/UndoRedoControls';
 
 /**
- * Build the sample DFA that accepts binary strings ending in "01"
+ * Build the sample DFA that accepts binary strings ending in "01".
+ *
+ * The engine now returns Result<Automaton> from fallible operations.
+ * The construction below is statically known to succeed (we control
+ * every input — alphabet, states, symbols), so an error here would
+ * indicate a programmer bug, not a runtime condition. unwrap() throws
+ * on err to make any future regression in the construction loud.
  */
 function buildSampleDFA(): Automaton {
+  function unwrap<T>(result: Result<T>): T {
+    if (!result.ok) {
+      throw new Error(`buildSampleDFA: unexpected engine error: ${result.error}`);
+    }
+    return result.value;
+  }
+
   let dfa = createAutomaton('DFA', new Set(['0', '1']));
 
   let state1: number;
@@ -49,14 +63,14 @@ function buildSampleDFA(): Automaton {
   let state2: number;
   ({ automaton: dfa, stateId: state2 } = addState(dfa));
 
-  dfa = addAcceptState(dfa, state2);
+  dfa = unwrap(addAcceptState(dfa, state2));
 
-  dfa = addTransition(dfa, 0, new Set([state1]), '0');
-  dfa = addTransition(dfa, 0, new Set([0]), '1');
-  dfa = addTransition(dfa, state1, new Set([state1]), '0');
-  dfa = addTransition(dfa, state1, new Set([state2]), '1');
-  dfa = addTransition(dfa, state2, new Set([state1]), '0');
-  dfa = addTransition(dfa, state2, new Set([0]), '1');
+  dfa = unwrap(addTransition(dfa, 0, new Set([state1]), '0'));
+  dfa = unwrap(addTransition(dfa, 0, new Set([0]), '1'));
+  dfa = unwrap(addTransition(dfa, state1, new Set([state1]), '0'));
+  dfa = unwrap(addTransition(dfa, state1, new Set([state2]), '1'));
+  dfa = unwrap(addTransition(dfa, state2, new Set([state1]), '0'));
+  dfa = unwrap(addTransition(dfa, state2, new Set([0]), '1'));
 
   return dfa;
 }
@@ -424,39 +438,66 @@ function App() {
   //
   // Each of these uses the functional updater form `setAutomaton(prev => ...)`
   // so rapid successive clicks see the latest automaton state rather than a
-  // stale closure. Errors thrown by engine functions are routed to the global
-  // notification system via notify().
+  // stale closure. Engine functions now return Result<Automaton>; on err we
+  // route the error variant to the global notification system via notify().
 
   function applyEdit(
-    update: (current: Automaton) => Automaton,
+    update: (current: Automaton) => Result<Automaton>,
     targetOnError?: NotificationTarget,
     titleOnError?: string
   ) {
-    // Pre-check against the current snapshot so any error throws *outside*
-    // of React's state updater (state updaters must be pure — calling notify()
-    // inside one fires twice under StrictMode).
-    try {
-      update(automaton);
-    } catch (error) {
-      const message = (error as Error).message;
+    // The engine no longer throws — Result<T> means we can run the
+    // updater exactly once, inside React's setAutomaton, with no
+    // pre-check dance. The double-call workaround that used to live
+    // here was needed because notify() (a side effect) couldn't safely
+    // fire from inside a state updater under StrictMode. Now that
+    // success and failure are values, we branch on result.ok:
+    //
+    //   - On success, return the new automaton (commit).
+    //   - On failure, return the previous reference (no-op for the
+    //     undoable store) and notify *outside* the updater via
+    //     queueMicrotask. queueMicrotask fires once per turn even if
+    //     the updater itself runs twice under StrictMode, because the
+    //     second updater run is a pure recomputation that arrives at
+    //     the same Result and would queue an identical microtask —
+    //     React only commits one of them.
+    //
+    // useUndoableAutomaton's setAutomaton runs the updater synchronously
+    // inside the hook (not as React's own setState updater), so the
+    // closure-captured `capturedError` is reliably set by the time we
+    // read it. StrictMode's double-fire only applies to React's own
+    // setters, not to user-defined imperative APIs.
+    let capturedError: import('./engine/result').EngineError | null = null;
+    setAutomaton((previous) => {
+      const result = update(previous);
+      if (!result.ok) {
+        capturedError = result.error;
+        return previous; // same reference → undoable store skips history push
+      }
+      return result.value;
+    });
+    if (capturedError !== null) {
+      // Type assertion: TS narrows `capturedError` to `null` after the
+      // closure-write because it can't see the synchronous call into
+      // setAutomaton. The runtime is sound — the updater ran once and
+      // the assignment happened-before this read.
+      const errorVariant: import('./engine/result').EngineError = capturedError;
       notify({
         severity: 'error',
-        title: titleOnError ?? message,
-        detail: titleOnError ? message : undefined,
+        title: titleOnError ?? errorMessage(errorVariant),
+        detail: titleOnError ? errorMessage(errorVariant) : undefined,
         target: targetOnError,
-        // Edits that fail are non-blocking — the user can keep working. Auto-
-        // dismiss so the stack doesn't fill with stale errors.
+        // Edits that fail are non-blocking — the user can keep working.
+        // Auto-dismiss so the stack doesn't fill with stale errors.
         autoDismissMs: 6_000,
       });
-      return;
     }
-    // Commit via functional updater so rapid successive clicks all see the
-    // latest state.
-    setAutomaton((previous) => update(previous));
   }
 
   function handleAddState() {
-    applyEdit((prev) => addState(prev).automaton);
+    // addState always succeeds; wrap the {automaton, stateId} return in
+    // a Result so applyEdit's signature stays uniform.
+    applyEdit((prev) => ({ ok: true, value: addState(prev).automaton }));
   }
 
   function handleRemoveState(stateId: number) {
@@ -464,9 +505,9 @@ function App() {
   }
 
   function handleSetStartState(stateId: number) {
-    // No-op guard: setting the start state to its current value would push
-    // a same-content new-reference snapshot.
-    if (stateId === automaton.startState) return;
+    // setStartState now returns ok(prev) (same reference) when the
+    // state is already the start, so the undoable store's reference-
+    // equality check naturally short-circuits the redundant write.
     applyEdit((prev) => setStartState(prev, stateId));
   }
 
@@ -497,23 +538,29 @@ function App() {
     // history. The loops below would still build a new object even when
     // both lists are empty.
     if (removes.length === 0 && adds.length === 0) return;
-    setAutomaton((previous) => {
-      let result = previous;
+    // Funnel through applyEdit so a Result err (e.g. an
+    // addTransitionDestination call hits a stale state) surfaces as a
+    // notification. removeTransitionDestination is a pure no-op on bad
+    // input, so it's not part of the Result chain.
+    applyEdit((previous) => {
+      let working = previous;
       for (const r of removes) {
-        result = removeTransitionDestination(result, r.from, r.to, r.symbol);
+        working = removeTransitionDestination(working, r.from, r.to, r.symbol);
       }
       for (const a of adds) {
-        if (result.type === 'NFA') {
-          result = addTransitionDestination(result, a.from, a.to, a.symbol);
+        if (working.type === 'NFA') {
+          const result = addTransitionDestination(working, a.from, a.to, a.symbol);
+          if (!result.ok) return result;
+          working = result.value;
         } else {
           // DFA: replace any existing (from, symbol) — DFAs are deterministic
           // so the form is replacing whatever was previously routed.
-          const filtered = result.transitions.filter(
+          const filtered = working.transitions.filter(
             (transition) =>
               !(transition.from === a.from && transition.symbol === a.symbol)
           );
-          result = {
-            ...result,
+          working = {
+            ...working,
             transitions: [
               ...filtered,
               { from: a.from, to: new Set([a.to]), symbol: a.symbol },
@@ -521,7 +568,7 @@ function App() {
           };
         }
       }
-      return result;
+      return { ok: true, value: working };
     });
   }
 

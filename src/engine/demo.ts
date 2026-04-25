@@ -14,7 +14,16 @@ import {
   runSimulation,
   isAccepted,
   getValidationReport,
+  type Result,
 } from './index';
+
+// Demo script: every operation here is statically known to succeed
+// (we control all inputs), so a Result err would indicate a regression.
+// unwrap() throws to make any such regression loud.
+function unwrap<T>(result: Result<T>): T {
+  if (!result.ok) throw new Error(`demo: unexpected engine error: ${result.error}`);
+  return result.value;
+}
 
 console.log('=== DFA: Strings that begin OR end (or both) with "01" ===\n');
 
@@ -36,36 +45,36 @@ console.log(`✓ Added states: A=${A}, B=${B}, C=${C}, D=${D}, E=${E}, F=${F}`);
 console.log('  State A is automatically the start state\n');
 
 // Set accept states: D and F
-dfa = addAcceptState(dfa5, D);
-dfa = addAcceptState(dfa, F);
+dfa = unwrap(addAcceptState(dfa5, D));
+dfa = unwrap(addAcceptState(dfa, F));
 console.log(`✓ Set accept states: D=${D}, F=${F}\n`);
 
 // Add all transitions
 console.log('Adding transitions...');
 
 // From A
-dfa = addTransition(dfa, A, new Set([B]), '0');
-dfa = addTransition(dfa, A, new Set([C]), '1');
+dfa = unwrap(addTransition(dfa, A, new Set([B]), '0'));
+dfa = unwrap(addTransition(dfa, A, new Set([C]), '1'));
 
 // From B
-dfa = addTransition(dfa, B, new Set([E]), '0');
-dfa = addTransition(dfa, B, new Set([D]), '1');
+dfa = unwrap(addTransition(dfa, B, new Set([E]), '0'));
+dfa = unwrap(addTransition(dfa, B, new Set([D]), '1'));
 
 // From C
-dfa = addTransition(dfa, C, new Set([E]), '0');
-dfa = addTransition(dfa, C, new Set([C]), '1');
+dfa = unwrap(addTransition(dfa, C, new Set([E]), '0'));
+dfa = unwrap(addTransition(dfa, C, new Set([C]), '1'));
 
 // From D (trap accept state - once here, always accept)
-dfa = addTransition(dfa, D, new Set([D]), '0');
-dfa = addTransition(dfa, D, new Set([D]), '1');
+dfa = unwrap(addTransition(dfa, D, new Set([D]), '0'));
+dfa = unwrap(addTransition(dfa, D, new Set([D]), '1'));
 
 // From E
-dfa = addTransition(dfa, E, new Set([E]), '0');
-dfa = addTransition(dfa, E, new Set([F]), '1');
+dfa = unwrap(addTransition(dfa, E, new Set([E]), '0'));
+dfa = unwrap(addTransition(dfa, E, new Set([F]), '1'));
 
 // From F
-dfa = addTransition(dfa, F, new Set([E]), '0');
-dfa = addTransition(dfa, F, new Set([C]), '1');
+dfa = unwrap(addTransition(dfa, F, new Set([E]), '0'));
+dfa = unwrap(addTransition(dfa, F, new Set([C]), '1'));
 
 console.log('✓ Added 12 transitions');
 console.log('  A --0--> B   A --1--> C');
@@ -100,7 +109,7 @@ const quickTests = [
 ];
 
 for (const { input, expected, reason } of quickTests) {
-  const result = isAccepted(runSimulation(dfa, input));
+  const result = isAccepted(unwrap(runSimulation(dfa, input)));
   const symbol = result === expected ? '✓' : '✗';
   const status = result ? 'ACCEPT' : 'REJECT';
   console.log(
@@ -119,7 +128,7 @@ const detailedTests = [
 ];
 
 for (const { input, reason } of detailedTests) {
-  const sim = runSimulation(dfa, input);
+  const sim = unwrap(runSimulation(dfa, input));
   const accepted = isAccepted(sim);
 
   console.log(`Input: "${input}" (${reason})`);
