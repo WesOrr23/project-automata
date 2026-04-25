@@ -17,7 +17,9 @@ export {
   addState,
   removeState,
   addTransition,
+  addTransitionDestination,
   removeTransition,
+  removeTransitionDestination,
   setStartState,
   addAcceptState,
   removeAcceptState,
@@ -44,6 +46,9 @@ export {
   isAccepted,
   runSimulation,
   accepts,
-  getFinalState,
+  getFinalStates,
   getExecutionTrace,
 } from './simulator';
+
+// Engine utilities
+export { epsilonClosure } from './utils';

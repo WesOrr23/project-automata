@@ -34,6 +34,46 @@ export type StateUI = {
 };
 
 /**
+ * UI metadata for a single rendered transition edge.
+ *
+ * One TransitionUI may represent multiple engine transitions when they
+ * share the same `(from, to)` pair — edge consolidation collapses
+ * "q0 → q1 on 'a' AND q0 → q1 on 'b'" into one arrow labeled "a, b".
+ * The `symbols` array holds every underlying symbol (with `null` for
+ * ε-transitions); the rendered label is comma-joined.
+ *
+ * Contains pre-computed SVG rendering data from GraphViz layout —
+ * GraphViz computes the spline, arrowhead position/angle, and label
+ * position; TransitionEdge just renders the values.
+ */
+export type TransitionUI = {
+  /** Source state ID */
+  fromStateId: number;
+
+  /** Destination state ID */
+  toStateId: number;
+
+  /**
+   * Every engine-transition symbol consolidated into this edge. `null`
+   * represents an ε-transition. Sorted with non-null symbols first
+   * (alphabetical), ε last — same convention as the rendered label.
+   */
+  symbols: ReadonlyArray<string | null>;
+
+  /** SVG path d attribute (cubic bezier spline from GraphViz) */
+  pathData: string;
+
+  /** Position of the arrowhead tip */
+  arrowheadPosition: { x: number; y: number };
+
+  /** Arrowhead angle in radians (direction the arrow points) */
+  arrowheadAngle: number;
+
+  /** GraphViz-computed label position */
+  labelPosition: { x: number; y: number };
+};
+
+/**
  * UI metadata for the entire automaton
  *
  * This type mirrors the Automaton type from the engine layer, but contains
@@ -43,6 +83,12 @@ export type StateUI = {
 export type AutomatonUI = {
   /** Map of state ID to UI metadata */
   states: Map<number, StateUI>;
+
+  /** Pre-computed transition rendering data from GraphViz */
+  transitions: TransitionUI[];
+
+  /** Bounding box of the entire graph (for canvas sizing) */
+  boundingBox: { width: number; height: number };
 };
 
 /**
@@ -51,13 +97,37 @@ export type AutomatonUI = {
  * Creates a label in the format "q{id}" where id is the numeric state ID.
  * This follows the standard convention in automata theory.
  *
+ * Note: prefer `computeDisplayLabels` when you have access to the full state
+ * set — it produces contiguous sequential labels (q0, q1, q2, ...) regardless
+ * of deletions, which is better UX than using raw engine IDs.
+ *
  * @param stateId - The numeric ID of the state
  * @returns A label string (e.g., "q0", "q1", "q2")
- *
- * @example
- * createDefaultLabel(0) // Returns "q0"
- * createDefaultLabel(5) // Returns "q5"
  */
 export function createDefaultLabel(stateId: number): string {
   return `q${stateId}`;
+}
+
+/**
+ * Compute sequential display labels for a set of state IDs.
+ *
+ * Engine IDs are stable but may have gaps after deletions (e.g. 0, 3, 7).
+ * The UI prefers to show users contiguous labels (q0, q1, q2) sorted by ID.
+ * This function detaches display from identity: internal IDs stay stable,
+ * but the labels the user sees are always clean.
+ *
+ * @param states - The Set of engine state IDs
+ * @returns Map from engine state ID → display label (e.g. 7 → "q2")
+ *
+ * @example
+ * computeDisplayLabels(new Set([0, 3, 7]))
+ *   // Returns Map(0→"q0", 3→"q1", 7→"q2")
+ */
+export function computeDisplayLabels(states: Set<number>): Map<number, string> {
+  const sorted = Array.from(states).sort((a, b) => a - b);
+  const labels = new Map<number, string>();
+  sorted.forEach((stateId, index) => {
+    labels.set(stateId, `q${index}`);
+  });
+  return labels;
 }

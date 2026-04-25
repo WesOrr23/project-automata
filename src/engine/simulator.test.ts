@@ -16,9 +16,10 @@ import {
   isAccepted,
   runSimulation,
   accepts,
-  getFinalState,
+  getFinalStates,
   getExecutionTrace,
 } from './simulator';
+import { epsilonClosure } from './utils';
 
 // Helper: Create a simple DFA that accepts strings ending in "01"
 function createEndsWith01DFA() {
@@ -59,25 +60,19 @@ describe('createSimulation', () => {
     expect(sim.input).toBe('101');
     expect(sim.steps.length).toBe(1);
     expect(sim.steps[0]).toEqual({
-      currentState: q0,
+      currentStates: new Set([q0]),
+      dyingStateIds: new Set(),
+      firedTransitions: [],
       symbolProcessed: null,
       remainingInput: '101',
     });
   });
 
-  it('throws error for non-runnable automaton', () => {
+  it('throws error for incomplete DFA', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
     // dfa has state 0 but is incomplete (no transitions)
 
     expect(() => createSimulation(dfa, '01')).toThrow('Automaton is not runnable');
-  });
-
-  it('throws error for NFA', () => {
-    const nfa = createAutomaton('NFA', new Set(['0', '1']));
-
-    expect(() => createSimulation(nfa, '01')).toThrow(
-      'NFA simulation not yet supported'
-    );
   });
 });
 
@@ -100,7 +95,9 @@ describe('step', () => {
 
     expect(sim.steps.length).toBe(2);
     expect(sim.steps[1]).toEqual({
-      currentState: q1,
+      currentStates: new Set([q1]),
+      dyingStateIds: new Set(),
+      firedTransitions: [{ from: 0, to: q1, symbol: '0' }],
       symbolProcessed: '0',
       remainingInput: '1',
     });
@@ -234,21 +231,27 @@ describe('runSimulation', () => {
 
     // Step 0: Initial state
     expect(sim.steps[0]).toEqual({
-      currentState: q0,
+      currentStates: new Set([q0]),
+      dyingStateIds: new Set(),
+      firedTransitions: [],
       symbolProcessed: null,
       remainingInput: '01',
     });
 
     // Step 1: After processing '0'
     expect(sim.steps[1]).toEqual({
-      currentState: q1,
+      currentStates: new Set([q1]),
+      dyingStateIds: new Set(),
+      firedTransitions: [{ from: q0, to: q1, symbol: '0' }],
       symbolProcessed: '0',
       remainingInput: '1',
     });
 
     // Step 2: After processing '1'
     expect(sim.steps[2]).toEqual({
-      currentState: q2,
+      currentStates: new Set([q2]),
+      dyingStateIds: new Set(),
+      firedTransitions: [{ from: q1, to: q2, symbol: '1' }],
       symbolProcessed: '1',
       remainingInput: '',
     });
@@ -306,19 +309,19 @@ describe('accepts', () => {
   });
 });
 
-describe('getFinalState', () => {
-  it('returns the final state after processing input', () => {
+describe('getFinalStates', () => {
+  it('returns the final state set after processing input', () => {
     const { dfa, q1, q2, q0 } = createEndsWith01DFA();
 
-    expect(getFinalState(dfa, '0')).toBe(q1);
-    expect(getFinalState(dfa, '01')).toBe(q2);
-    expect(getFinalState(dfa, '1')).toBe(q0);
+    expect(getFinalStates(dfa, '0')).toEqual(new Set([q1]));
+    expect(getFinalStates(dfa, '01')).toEqual(new Set([q2]));
+    expect(getFinalStates(dfa, '1')).toEqual(new Set([q0]));
   });
 
   it('returns start state for empty input', () => {
     const { dfa, q0 } = createEndsWith01DFA();
 
-    expect(getFinalState(dfa, '')).toBe(q0);
+    expect(getFinalStates(dfa, '')).toEqual(new Set([q0]));
   });
 });
 
@@ -430,5 +433,174 @@ describe('Complex DFA: divisible by 3 in binary', () => {
 
     // 101 (decimal 5) → not divisible
     expect(accepts(dfa, '101')).toBe(false);
+  });
+});
+
+describe('epsilonClosure', () => {
+  it('returns the input set when there are no ε-transitions', () => {
+    const closure = epsilonClosure(new Set([0, 1]), [
+      { from: 0, to: new Set([1]), symbol: 'a' },
+    ]);
+    expect(closure).toEqual(new Set([0, 1]));
+  });
+
+  it('follows a single ε-transition', () => {
+    const closure = epsilonClosure(new Set([0]), [
+      { from: 0, to: new Set([1]), symbol: null },
+    ]);
+    expect(closure).toEqual(new Set([0, 1]));
+  });
+
+  it('follows chained ε-transitions transitively', () => {
+    // 0 -ε-> 1 -ε-> 2
+    const closure = epsilonClosure(new Set([0]), [
+      { from: 0, to: new Set([1]), symbol: null },
+      { from: 1, to: new Set([2]), symbol: null },
+    ]);
+    expect(closure).toEqual(new Set([0, 1, 2]));
+  });
+
+  it('handles ε-cycles without infinite-looping', () => {
+    // 0 -ε-> 1 -ε-> 0
+    const closure = epsilonClosure(new Set([0]), [
+      { from: 0, to: new Set([1]), symbol: null },
+      { from: 1, to: new Set([0]), symbol: null },
+    ]);
+    expect(closure).toEqual(new Set([0, 1]));
+  });
+
+  it('unions the closures of every seed state', () => {
+    // 0 -ε-> 2, 1 -ε-> 3
+    const closure = epsilonClosure(new Set([0, 1]), [
+      { from: 0, to: new Set([2]), symbol: null },
+      { from: 1, to: new Set([3]), symbol: null },
+    ]);
+    expect(closure).toEqual(new Set([0, 1, 2, 3]));
+  });
+
+  it('does not follow non-ε transitions', () => {
+    const closure = epsilonClosure(new Set([0]), [
+      { from: 0, to: new Set([1]), symbol: 'a' },
+    ]);
+    expect(closure).toEqual(new Set([0]));
+  });
+});
+
+describe('NFA simulation', () => {
+  // Build an NFA that accepts strings ending in "01".
+  // q0 self-loops on 0/1, plus has an extra 0-edge to q1 (so on '0',
+  // q0 has two destinations: itself and q1 — the source of the
+  // non-determinism). q1 transitions to q2 (accept) on '1'.
+  // Multi-destination is encoded in the transition's `to` Set.
+  function createEndsWith01NFA() {
+    let nfa = createAutomaton('NFA', new Set(['0', '1']));
+    const { automaton: nfa1, stateId: q1 } = addState(nfa);
+    const { automaton: nfa2, stateId: q2 } = addState(nfa1);
+    nfa = addAcceptState(nfa2, q2);
+
+    nfa = addTransition(nfa, 0, new Set([0, q1]), '0'); // q0 -0-> {q0, q1}
+    nfa = addTransition(nfa, 0, new Set([0]), '1');     // q0 -1-> q0
+    nfa = addTransition(nfa, q1, new Set([q2]), '1');   // q1 -1-> q2
+    return { nfa, q0: 0, q1, q2 };
+  }
+
+  it('starts with the ε-closure of {start}', () => {
+    let nfa = createAutomaton('NFA', new Set(['a']));
+    const { automaton: n1, stateId: q1 } = addState(nfa);
+    nfa = addTransition(n1, 0, new Set([q1]), null); // ε from q0 to q1
+
+    const sim = createSimulation(nfa, '');
+    expect(sim.currentStates).toEqual(new Set([0, q1]));
+  });
+
+  it('follows multiple destinations in parallel', () => {
+    const { nfa, q0, q1 } = createEndsWith01NFA();
+    let sim = createSimulation(nfa, '0');
+    sim = step(sim);
+    // After reading '0' from q0, both q0 (self-loop) and q1 are active.
+    expect(sim.currentStates).toEqual(new Set([q0, q1]));
+  });
+
+  it('accepts when any branch reaches an accept state', () => {
+    const { nfa } = createEndsWith01NFA();
+    expect(accepts(nfa, '01')).toBe(true);
+    expect(accepts(nfa, '0001')).toBe(true);
+    expect(accepts(nfa, '1101')).toBe(true);
+  });
+
+  it('rejects when no branch reaches an accept state', () => {
+    const { nfa } = createEndsWith01NFA();
+    expect(accepts(nfa, '')).toBe(false);
+    expect(accepts(nfa, '0')).toBe(false);
+    expect(accepts(nfa, '10')).toBe(false);
+    expect(accepts(nfa, '100')).toBe(false);
+  });
+
+  it('lets dying branches drop out of the active set', () => {
+    const { nfa, q0 } = createEndsWith01NFA();
+    let sim = createSimulation(nfa, '01');
+    sim = step(sim); // read '0' → {q0, q1}
+    sim = step(sim); // read '1' → q0 self-loops, q1 → q2 (accept). q1 dies.
+    expect(sim.currentStates.has(q0)).toBe(true);
+    expect(sim.currentStates.has(2)).toBe(true);
+    expect(sim.currentStates.has(1)).toBe(false);
+  });
+
+  it('does not mark a state as dying if another branch routes back into it', () => {
+    // q0 -a-> {q0, q1}. On 'a', q1 has no outgoing transition (would
+    // die) but q0's self-loop still keeps q0 alive AND another q0
+    // transition reaches q1. So q1 is reborn; it shouldn't be dying.
+    let nfa = createAutomaton('NFA', new Set(['a']));
+    const { automaton: n1, stateId: q1 } = addState(nfa);
+    nfa = addTransition(n1, 0, new Set([0, q1]), 'a');
+
+    let sim = createSimulation(nfa, 'aa');
+    sim = step(sim); // {q0, q1}
+    sim = step(sim);
+    expect(sim.currentStates).toEqual(new Set([0, q1]));
+    expect(sim.steps[2]!.dyingStateIds).toEqual(new Set());
+  });
+
+  it('records dying state IDs on the step where a branch died', () => {
+    // Construct a tiny NFA where one branch unambiguously dies on the
+    // next step. q0 → 'a' → {q1, q2}. q1 has no outgoing transition on
+    // 'b' — it dies. q2 → 'b' → q2 — survives.
+    let nfa = createAutomaton('NFA', new Set(['a', 'b']));
+    const { automaton: n1, stateId: q1 } = addState(nfa);
+    const { automaton: n2, stateId: q2 } = addState(n1);
+    nfa = addTransition(n2, 0, new Set([q1, q2]), 'a');
+    nfa = addTransition(nfa, q2, new Set([q2]), 'b');
+
+    let sim = createSimulation(nfa, 'ab');
+    sim = step(sim); // read 'a' → {q1, q2}, no dying yet
+    expect(sim.steps[1]!.dyingStateIds).toEqual(new Set());
+    sim = step(sim); // read 'b' → q1 dies, q2 self-loops
+    expect(sim.steps[2]!.dyingStateIds).toEqual(new Set([q1]));
+    expect(sim.currentStates).toEqual(new Set([q2]));
+  });
+
+  it('applies ε-closure after a symbol step', () => {
+    // q0 -a-> q1 -ε-> q2
+    let nfa = createAutomaton('NFA', new Set(['a']));
+    const { automaton: n1, stateId: q1 } = addState(nfa);
+    const { automaton: n2, stateId: q2 } = addState(n1);
+    nfa = addAcceptState(n2, q2);
+    nfa = addTransition(nfa, 0, new Set([q1]), 'a');
+    nfa = addTransition(nfa, q1, new Set([q2]), null); // ε
+
+    let sim = createSimulation(nfa, 'a');
+    sim = step(sim);
+    expect(sim.currentStates).toEqual(new Set([q1, q2]));
+    expect(isAccepted(sim)).toBe(true);
+  });
+
+  it('produces a multi-state trace via getExecutionTrace', () => {
+    const { nfa } = createEndsWith01NFA();
+    const sim = runSimulation(nfa, '01');
+    const trace = getExecutionTrace(sim);
+    // After reading '0' the active set is {q0, q1}; format matches the
+    // helper's `{a, b}` rendering.
+    expect(trace.some((line) => line.includes('{q0, q1}'))).toBe(true);
+    expect(trace[trace.length - 1]).toBe('Result: ACCEPTED');
   });
 });

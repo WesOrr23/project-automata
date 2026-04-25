@@ -125,28 +125,34 @@ for (const { input, reason } of detailedTests) {
   console.log(`Input: "${input}" (${reason})`);
   console.log('Trace:');
 
-  // Custom trace with state names
+  // Custom trace with state names. Active set rendered as the single
+  // state when DFA, or `{a, b}` when there are multiple branches.
+  function renderStates(states: Set<number>): string {
+    if (states.size === 1) return stateName(states.values().next().value!);
+    return `{${Array.from(states).sort((a, b) => a - b).map(stateName).join(', ')}}`;
+  }
+
   for (let i = 0; i < sim.steps.length; i++) {
     const step = sim.steps[i]!;
     if (step.symbolProcessed === null) {
       console.log(
-        `  Start: ${stateName(step.currentState)} | Remaining: "${
+        `  Start: ${renderStates(step.currentStates)} | Remaining: "${
           step.remainingInput
         }"`
       );
     } else {
-      const prev = sim.steps[i - 1]!.currentState;
+      const prev = sim.steps[i - 1]!.currentStates;
       console.log(
-        `  Read '${step.symbolProcessed}': ${stateName(prev)} → ${stateName(
-          step.currentState
+        `  Read '${step.symbolProcessed}': ${renderStates(prev)} → ${renderStates(
+          step.currentStates
         )} | Remaining: "${step.remainingInput}"`
       );
     }
   }
 
-  const finalState = sim.steps[sim.steps.length - 1]!.currentState;
+  const finalStates = sim.steps[sim.steps.length - 1]!.currentStates;
   console.log(
-    `  Final state: ${stateName(finalState)} → ${
+    `  Final state: ${renderStates(finalStates)} → ${
       accepted ? 'ACCEPTED' : 'REJECTED'
     }`
   );

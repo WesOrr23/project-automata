@@ -4,7 +4,7 @@
 
 An interactive web-based simulator for deterministic and non-deterministic finite automata (DFA/NFA). This is a learning project built with pair programming approach - no "vibe-coding," everything is intentional and well-structured.
 
-**Current Status**: Iteration 2 complete - basic visualization working (static DFA rendering with SVG)
+**Current Status**: Iterations 9 + 10 merged — Undo/Redo (snapshot stack capped at 50, floating top-center controls, ⌘/Ctrl+Z shortcuts) and aliveness (eased tool-menu tab swap, idle start-arrow + accept-ring breathing, hover/press/toast polish with a single motion vocabulary). See `ITERATION9_COMPLETE.md` and `ITERATION10_COMPLETE.md`.
 **Development Approach**: Agile iterations with clear deliverables
 **Primary Developer Experience**: Familiar with vanilla HTML/CSS/JS, minimal JavaScript experience, learning React and TypeScript
 
@@ -75,7 +75,7 @@ type Automaton = {
   states: Set<number>;              // State IDs (auto-incremented integers)
   alphabet: Set<string>;            // Input alphabet
   transitions: Transition[];        // All transitions
-  startState: number | null;        // ID of start state (null = not set)
+  startState: number;               // ID of start state (always set: createAutomaton seeds state 0)
   acceptStates: Set<number>;        // IDs of accept states
   nextStateId: number;              // Auto-increment counter for new states
 };
@@ -290,6 +290,13 @@ type UIState = {
 - Minimization
 - Equivalence testing
 - Complement/union/intersection operations
+
+**Iteration 11**: Edge Routing & Overlap Prevention
+- Geometric intersection detection between primitives (circles, lines, quadratic curves)
+- Constraint-based edge routing to prevent edge-edge and edge-label overlaps
+- Iterative solver: adjust curves first, reposition nodes if needed
+- Inspired by GraphViz's spline routing phase (which dagre lacks)
+- Potential approaches: visibility graphs, exclusion zones around nodes, polynomial intersection math
 
 ---
 

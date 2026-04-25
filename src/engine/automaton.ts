@@ -110,13 +110,13 @@ export function removeState(
     (t) => t.from !== stateId && !t.to.has(stateId)
   );
 
-  // Auto-assign start state if we're removing current start state
+  // Auto-assign start state if we're removing current start state.
+  // The size === 1 guard above makes newStates non-empty here, which
+  // is why the [0]! assertion is sound — not a bare guess.
   let newStartState = automaton.startState;
   if (automaton.startState === stateId) {
-    // Since we already checked that this isn't the last state,
-    // there must be at least one remaining state
     const remaining = Array.from(newStates).sort((a, b) => a - b);
-    newStartState = remaining[0]!; // First remaining state (always exists)
+    newStartState = remaining[0]!;
   }
 
   return {
@@ -198,6 +198,107 @@ export function addTransition(
     ...automaton,
     transitions: [...automaton.transitions, newTransition],
   };
+}
+
+/**
+ * Add a destination to a (from, symbol) pair without replacing existing
+ * destinations — this is the NFA-friendly counterpart to addTransition.
+ *
+ * If a transition record for (from, symbol) already exists, the new
+ * destination is unioned into its `to` set. If not, a fresh transition
+ * record with a single-element destination set is created.
+ *
+ * Used by the editor when in NFA mode: typing a symbol that already has
+ * a transition from the same source adds a parallel branch instead of
+ * triggering an "overwrite" warning.
+ *
+ * @throws Error in DFA mode (DFAs can't have multiple destinations).
+ * @throws Error if source/destination states or symbol don't exist.
+ */
+export function addTransitionDestination(
+  automaton: Automaton,
+  from: number,
+  destination: number,
+  symbol: string | null
+): Automaton {
+  if (automaton.type === 'DFA') {
+    throw new Error(
+      'addTransitionDestination is NFA-only — use addTransition for DFAs'
+    );
+  }
+  if (!automaton.states.has(from)) {
+    throw new Error(`Source state ${from} does not exist`);
+  }
+  if (!automaton.states.has(destination)) {
+    throw new Error(`Destination state ${destination} does not exist`);
+  }
+  if (symbol !== null && !automaton.alphabet.has(symbol)) {
+    throw new Error(`Symbol '${symbol}' is not in the alphabet`);
+  }
+
+  const existingIndex = automaton.transitions.findIndex(
+    (transition) => transition.from === from && transition.symbol === symbol
+  );
+
+  if (existingIndex === -1) {
+    return {
+      ...automaton,
+      transitions: [
+        ...automaton.transitions,
+        { from, to: new Set([destination]), symbol },
+      ],
+    };
+  }
+
+  // Union into existing record. Skip the rebuild when the destination is
+  // already present so callers don't get a new automaton reference for a
+  // no-op edit.
+  const existing = automaton.transitions[existingIndex]!;
+  if (existing.to.has(destination)) {
+    return automaton;
+  }
+  const newTo = new Set(existing.to);
+  newTo.add(destination);
+  const newTransitions = [...automaton.transitions];
+  newTransitions[existingIndex] = { from, to: newTo, symbol };
+  return { ...automaton, transitions: newTransitions };
+}
+
+/**
+ * Remove a single destination from a (from, symbol) transition. If the
+ * transition's `to` set becomes empty, the entire transition record is
+ * dropped — there's no meaningful "transition with no destinations."
+ *
+ * Inverse of addTransitionDestination. No-op if the (from, symbol)
+ * transition doesn't exist or doesn't include the given destination.
+ */
+export function removeTransitionDestination(
+  automaton: Automaton,
+  from: number,
+  destination: number,
+  symbol: string | null
+): Automaton {
+  const existingIndex = automaton.transitions.findIndex(
+    (transition) => transition.from === from && transition.symbol === symbol
+  );
+  if (existingIndex === -1) return automaton;
+
+  const existing = automaton.transitions[existingIndex]!;
+  if (!existing.to.has(destination)) return automaton;
+
+  const newTo = new Set(existing.to);
+  newTo.delete(destination);
+
+  if (newTo.size === 0) {
+    return {
+      ...automaton,
+      transitions: automaton.transitions.filter((_, i) => i !== existingIndex),
+    };
+  }
+
+  const newTransitions = [...automaton.transitions];
+  newTransitions[existingIndex] = { from, to: newTo, symbol };
+  return { ...automaton, transitions: newTransitions };
 }
 
 /**

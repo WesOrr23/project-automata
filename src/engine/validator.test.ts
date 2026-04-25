@@ -185,10 +185,13 @@ describe('isRunnable', () => {
     expect(isRunnable(result)).toBe(false);
   });
 
-  it('returns false for NFA type', () => {
+  it('returns true for NFA with alphabet + start state', () => {
+    // NFA mode tolerates incomplete and non-deterministic transition
+    // tables (branches dying is part of the model). The runnable bar is
+    // just the structural prerequisites for stepping at all.
     const nfa = createAutomaton('NFA', new Set(['0', '1']));
 
-    expect(isRunnable(nfa)).toBe(false);
+    expect(isRunnable(nfa)).toBe(true);
   });
 });
 
@@ -295,9 +298,7 @@ describe('getValidationReport', () => {
     const report = getValidationReport(result);
 
     expect(report.valid).toBe(false);
-    expect(report.errors).toContain(
-      'DFA is incomplete (missing transitions for some symbols)'
-    );
+    expect(report.errors).toContain("Missing transition: q0 on '1'");
   });
 
   it('warns about missing accept states', () => {
@@ -310,7 +311,7 @@ describe('getValidationReport', () => {
 
     expect(report.valid).toBe(true); // Still valid, just warning
     expect(report.warnings).toContain(
-      'No accept states defined (will reject all inputs)'
+      'No accept states defined — every input will be rejected'
     );
   });
 
@@ -330,5 +331,45 @@ describe('getValidationReport', () => {
     );
     expect(report.warnings.some((w) => w.includes(`${id1}`))).toBe(true);
     expect(report.warnings.some((w) => w.includes(`${id2}`))).toBe(true);
+  });
+});
+
+describe('NFA validation', () => {
+  it('isRunnable() accepts an NFA with start + alphabet', () => {
+    const nfa = createAutomaton('NFA', new Set(['a']));
+    expect(isRunnable(nfa)).toBe(true);
+  });
+
+  it('isRunnable() rejects an NFA with no alphabet', () => {
+    // createAutomaton enforces non-empty alphabet at construction; we
+    // simulate the "user removed the last symbol" mid-edit case by
+    // mutating the alphabet directly.
+    const nfa = { ...createAutomaton('NFA', new Set(['a'])), alphabet: new Set<string>() };
+    expect(isRunnable(nfa)).toBe(false);
+  });
+
+  it('getValidationReport() does not flag ε-transitions or non-determinism in NFA mode', () => {
+    let nfa = createAutomaton('NFA', new Set(['a']));
+    const { automaton: n1, stateId: q1 } = addState(nfa);
+    // ε-transition + multi-destination, both forbidden in DFA mode.
+    nfa = addTransition(n1, 0, new Set([q1]), null);
+    nfa = addTransition(nfa, q1, new Set([0, q1]), 'a');
+
+    const report = getValidationReport(nfa);
+    expect(report.errors.some((e) => e.includes('Not a valid DFA'))).toBe(false);
+    expect(report.errors.some((e) => e.includes('Missing'))).toBe(false);
+  });
+
+  it('flipping a non-DFA-shaped automaton to DFA mode surfaces the errors', () => {
+    let aut = createAutomaton('NFA', new Set(['a']));
+    const { automaton: n1, stateId: q1 } = addState(aut);
+    aut = addTransition(n1, 0, new Set([q1]), null); // ε
+
+    const reportNFA = getValidationReport(aut);
+    expect(reportNFA.errors.some((e) => e.includes('Not a valid DFA'))).toBe(false);
+
+    const flipped = { ...aut, type: 'DFA' as const };
+    const reportDFA = getValidationReport(flipped);
+    expect(reportDFA.errors.some((e) => e.includes('Not a valid DFA'))).toBe(true);
   });
 });

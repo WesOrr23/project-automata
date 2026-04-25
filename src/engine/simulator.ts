@@ -1,59 +1,72 @@
 /**
- * DFA simulation engine
+ * Simulation engine — DFA and NFA.
  *
- * Executes DFA on input strings and tracks execution history
+ * Both are represented uniformly as a set of currently-active states.
+ * For DFAs that set always has size 1; for NFAs it can be 0 (every
+ * branch died), 1, or many (parallel exploration). The step function
+ * advances the active set by the input symbol and re-applies ε-closure.
  *
  * Key functions:
  * - createSimulation(): Create a new simulation from automaton and input
  * - step(): Execute one transition (returns new Simulation)
  * - isFinished(): Check if simulation is complete
- * - isAccepted(): Check if simulation ended in accept state
+ * - isAccepted(): Check if simulation ended in an accept state
  * - runSimulation(): Run entire simulation to completion
  */
 
 import type { Automaton, Simulation, SimulationStep } from './types';
-import { getTransition } from './automaton';
-import { isRunnable } from './validator';
+import { isComplete, hasStartState } from './validator';
+import { epsilonClosureWithTrace } from './utils';
 
 /**
- * Create a new simulation for the given automaton and input
+ * Create a new simulation for the given automaton and input.
  *
- * @param automaton - The DFA to simulate
- * @param input - Input string to process
- * @returns A new Simulation ready to step through
- * @throws Error if automaton is not runnable or is NFA
+ * Validation is intentionally narrow here — just enough to keep `step`
+ * from crashing. DFAs additionally require completeness so a
+ * mid-simulation "no transition" doesn't surprise the caller; NFAs
+ * tolerate missing transitions because branches dying is part of the
+ * model.
  *
- * @example
- * const sim = createSimulation(dfa, '101');
- * while (!isFinished(sim)) {
- *   sim = step(sim);
- * }
- * console.log('Accepted:', isAccepted(sim));
+ * The initial active set is the ε-closure of `{startState}` so any
+ * states reachable "for free" via ε-transitions are live from step 0.
+ *
+ * @throws Error if the automaton is missing structural prerequisites.
  */
 export function createSimulation(
   automaton: Automaton,
   input: string
 ): Simulation {
-  // DFA type guard
-  if (automaton.type === 'NFA') {
-    throw new Error('NFA simulation not yet supported');
+  if (automaton.alphabet.size === 0) {
+    throw new Error('Automaton is not runnable (empty alphabet)');
+  }
+  if (!hasStartState(automaton)) {
+    throw new Error('Automaton is not runnable (no start state)');
+  }
+  if (automaton.type === 'DFA' && !isComplete(automaton)) {
+    throw new Error('Automaton is not runnable (DFA is incomplete)');
   }
 
-  // Validate automaton is runnable
-  if (!isRunnable(automaton)) {
-    throw new Error('Automaton is not runnable (check with isRunnable())');
-  }
+  // Initial active set is the ε-closure of {startState}. The traced
+  // closure also records which ε-edges were followed so the canvas can
+  // pulse them on the initial step (otherwise the user wouldn't know
+  // those edges were taken to reach the starting active set).
+  const { closure: initialStates, fired: initialFired } =
+    epsilonClosureWithTrace(
+      new Set([automaton.startState]),
+      automaton.transitions
+    );
 
-  // Create initial step (before processing any input)
   const initialStep: SimulationStep = {
-    currentState: automaton.startState,
+    currentStates: initialStates,
+    dyingStateIds: new Set(),
+    firedTransitions: initialFired,
     symbolProcessed: null,
     remainingInput: input,
   };
 
   return {
     automaton,
-    currentStates: new Set([automaton.startState]),
+    currentStates: initialStates,
     remainingInput: input,
     steps: [initialStep],
     input,
@@ -61,18 +74,18 @@ export function createSimulation(
 }
 
 /**
- * Execute a single simulation step
+ * Execute a single simulation step.
  *
- * Processes the next symbol from remainingInput and transitions to the next state
+ * For each currently-active state, follows every transition that matches
+ * the next input symbol; the union of destinations is then ε-closed to
+ * produce the new active set. For DFAs this collapses to "look up the
+ * one transition and replace the active state."
  *
- * @param simulation - The current simulation state
- * @returns A new Simulation with the next state
- * @throws Error if simulation is already finished or transition doesn't exist
- *
- * @example
- * let sim = createSimulation(dfa, '01');
- * sim = step(sim); // Process '0'
- * sim = step(sim); // Process '1'
+ * @throws Error if the simulation is finished or the symbol isn't in the alphabet.
+ *         Also throws on a DFA dead-end (no transition for the current state's
+ *         symbol) — DFA mode treats that as a structural error since
+ *         createSimulation already gates on completeness. NFA mode lets the
+ *         active set go empty instead.
  */
 export function step(simulation: Simulation): Simulation {
   if (isFinished(simulation)) {
@@ -83,60 +96,89 @@ export function step(simulation: Simulation): Simulation {
   const symbol = remainingInput[0]!;
   const newRemainingInput = remainingInput.slice(1);
 
-  // DFA: single current state
-  const currentState = Array.from(currentStates)[0]!;
-
-  // Validate symbol is in alphabet
   if (!automaton.alphabet.has(symbol)) {
     throw new Error(`Symbol '${symbol}' is not in the alphabet`);
   }
 
-  // Find the transition for (currentState, symbol)
-  const transitions = getTransition(automaton, currentState, symbol);
+  // Collect every state reachable from the current set on this symbol,
+  // tracking dying branches (no outgoing transition) and recording every
+  // symbol-driven transition that fired (for the canvas's per-step pulse).
+  const intermediate = new Set<number>();
+  const dyingStateIds = new Set<number>();
+  const firedTransitions: Array<{ from: number; to: number; symbol: string | null }> = [];
+  for (const state of currentStates) {
+    let hadAny = false;
+    for (const transition of automaton.transitions) {
+      if (transition.from !== state) continue;
+      if (transition.symbol !== symbol) continue;
+      hadAny = true;
+      for (const dest of transition.to) {
+        intermediate.add(dest);
+        firedTransitions.push({ from: state, to: dest, symbol });
+      }
+    }
+    if (!hadAny) dyingStateIds.add(state);
+  }
 
-  if (transitions.length === 0) {
+  // DFA invariant: a complete DFA always has a transition. If we got
+  // nothing, something's wrong with the automaton or the simulation
+  // input — surface it loudly rather than silently rejecting.
+  if (automaton.type === 'DFA' && intermediate.size === 0) {
+    const fromState = Array.from(currentStates)[0];
     throw new Error(
-      `No transition from state ${currentState} on symbol '${symbol}'`
+      `No transition from state ${fromState ?? '(none active)'} on symbol '${symbol}'`
     );
   }
 
-  // DFA has exactly one destination
-  const transition = transitions[0]!;
-  const nextState = Array.from(transition.to)[0]!;
+  // ε-closure expands the new active set with every state reachable
+  // for free via ε-transitions. For DFAs (no ε edges) this is a no-op.
+  // The traced variant also reports which ε-edges were followed so
+  // they can pulse alongside the symbol-driven edges.
+  const { closure: nextStates, fired: epsilonFired } = epsilonClosureWithTrace(
+    intermediate,
+    automaton.transitions
+  );
+  firedTransitions.push(...epsilonFired);
 
-  // Record this step
+  // A state was provisionally "dying" if it had no outgoing transition
+  // on the symbol — but if some OTHER active state's transition (or an
+  // ε-closure) routes back into it, a fresh instance is alive and the
+  // state isn't dying after all. Subtract the next active set from
+  // dyingStateIds to keep the visual honest.
+  for (const state of nextStates) {
+    dyingStateIds.delete(state);
+  }
+
   const newStep: SimulationStep = {
-    currentState: nextState,
+    currentStates: nextStates,
+    dyingStateIds,
+    firedTransitions,
     symbolProcessed: symbol,
     remainingInput: newRemainingInput,
   };
 
   return {
     ...simulation,
-    currentStates: new Set([nextState]),
+    currentStates: nextStates,
     remainingInput: newRemainingInput,
     steps: [...simulation.steps, newStep],
   };
 }
 
 /**
- * Check if simulation is complete (no more input to process)
- *
- * @param simulation - The simulation to check
- * @returns true if all input has been processed
+ * Check if simulation is complete (no more input to process).
  */
 export function isFinished(simulation: Simulation): boolean {
   return simulation.remainingInput.length === 0;
 }
 
 /**
- * Check if simulation ended in an accept state
+ * Check if simulation ended in an accept state.
  *
- * Only meaningful if simulation is finished - will return false if
- * there's remaining input even if currently in an accept state
- *
- * @param simulation - The simulation to check
- * @returns true if finished AND current state is an accept state
+ * Only meaningful when the simulation is finished. For NFAs this is
+ * "any active state is an accept state" — the standard non-deterministic
+ * acceptance criterion: if any branch lands in an accept state, the
+ * input is accepted.
  */
 export function isAccepted(simulation: Simulation): boolean {
   if (!isFinished(simulation)) {
@@ -144,8 +186,6 @@ export function isAccepted(simulation: Simulation): boolean {
   }
 
   const { automaton, currentStates } = simulation;
-
-  // DFA: check if the single current state is an accept state
   for (const state of currentStates) {
     if (automaton.acceptStates.has(state)) {
       return true;
@@ -156,20 +196,7 @@ export function isAccepted(simulation: Simulation): boolean {
 }
 
 /**
- * Run the entire simulation to completion
- *
- * Convenience function that creates a simulation and steps through
- * all input symbols
- *
- * @param automaton - The DFA to execute
- * @param input - Input string to process
- * @returns Completed Simulation with full execution history
- * @throws Error if automaton is invalid or input contains invalid symbols
- *
- * @example
- * const sim = runSimulation(dfa, '101');
- * console.log('Accepted:', isAccepted(sim));
- * console.log('Steps:', sim.steps);
+ * Run the entire simulation to completion.
  */
 export function runSimulation(
   automaton: Automaton,
@@ -185,18 +212,7 @@ export function runSimulation(
 }
 
 /**
- * Check if the DFA accepts an input string
- * Convenience wrapper around runSimulation() + isAccepted()
- *
- * @param automaton - The DFA to execute
- * @param input - Input string to test
- * @returns true if input is accepted, false otherwise
- * @throws Error if automaton is invalid
- *
- * @example
- * if (accepts(dfa, '101')) {
- *   console.log('Input accepted!');
- * }
+ * Check if the automaton accepts an input string.
  */
 export function accepts(
   automaton: Automaton,
@@ -207,68 +223,59 @@ export function accepts(
 }
 
 /**
- * Get the final state after processing input
- * Useful for testing or debugging
+ * Get the final state(s) after processing input.
  *
- * @param automaton - The DFA to execute
- * @param input - Input string to process
- * @returns Final state ID after processing input
- * @throws Error if automaton is invalid
- *
- * @example
- * const finalState = getFinalState(dfa, '101');
- * console.log('Ended in state:', finalState);
+ * Returns the full active set so NFA callers can inspect every branch.
+ * DFA callers will always see a single-element Set.
  */
-export function getFinalState(
+export function getFinalStates(
   automaton: Automaton,
   input: string
-): number {
+): Set<number> {
   const simulation = runSimulation(automaton, input);
-  // DFA: single current state
-  return Array.from(simulation.currentStates)[0]!;
+  return simulation.currentStates;
 }
 
 /**
- * Get a human-readable trace of the execution
+ * Get a human-readable trace of the execution.
  *
- * @param simulation - Simulation to trace (can be in-progress or finished)
- * @returns Array of strings describing each step
- *
- * @example
- * const sim = runSimulation(dfa, '101');
- * const trace = getExecutionTrace(sim);
- * trace.forEach(line => console.log(line));
- * // Output:
- * // Start: q0 | Remaining: "101"
- * // Read '1': q0 → q1 | Remaining: "01"
- * // Read '0': q1 → q2 | Remaining: "1"
- * // Read '1': q2 → q0 | Remaining: ""
- * // Result: REJECTED
+ * For DFAs, lines look like `Read '0': q0 → q1`. For NFAs (where each
+ * step can have multiple active states) the lines render the active
+ * set as `{q0, q1}` so the reader can see branches splitting and
+ * dying.
  */
 export function getExecutionTrace(simulation: Simulation): string[] {
   const trace: string[] = [];
 
   for (let i = 0; i < simulation.steps.length; i++) {
     const stepData = simulation.steps[i]!;
+    const stateLabel = formatStateSet(stepData.currentStates);
 
     if (stepData.symbolProcessed === null) {
-      // Initial state
       trace.push(
-        `Start: q${stepData.currentState} | Remaining: "${stepData.remainingInput}"`
+        `Start: ${stateLabel} | Remaining: "${stepData.remainingInput}"`
       );
     } else {
-      // Regular step
-      const prevState = simulation.steps[i - 1]!.currentState;
+      const prevLabel = formatStateSet(simulation.steps[i - 1]!.currentStates);
       trace.push(
-        `Read '${stepData.symbolProcessed}': q${prevState} → q${stepData.currentState} | Remaining: "${stepData.remainingInput}"`
+        `Read '${stepData.symbolProcessed}': ${prevLabel} → ${stateLabel} | Remaining: "${stepData.remainingInput}"`
       );
     }
   }
 
-  // Add result if simulation is finished
   if (isFinished(simulation)) {
     trace.push(`Result: ${isAccepted(simulation) ? 'ACCEPTED' : 'REJECTED'}`);
   }
 
   return trace;
+}
+
+/** Render an active state set as `q0` (single) or `{q0, q1}` (multi/empty). */
+function formatStateSet(states: Set<number>): string {
+  if (states.size === 1) {
+    const id = states.values().next().value!;
+    return `q${id}`;
+  }
+  const ids = Array.from(states).sort((a, b) => a - b).map((id) => `q${id}`);
+  return `{${ids.join(', ')}}`;
 }
