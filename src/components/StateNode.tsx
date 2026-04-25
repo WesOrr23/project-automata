@@ -62,6 +62,14 @@ type StateNodeProp = {
    */
   interactionStyle?: 'pick' | 'select';
 
+  /**
+   * Whether a simulation is currently running (any status other than
+   * idle). Suspends idle-only ambient animations — specifically the
+   * accept-ring breathing — so they can't compete with the simulation's
+   * active-blue / accept-green / reject-red coloring. Defaults to false.
+   */
+  isSimulating?: boolean;
+
   /** Called when the state is clicked. The DOM element is passed for
    * popover anchoring purposes (state-action popover). */
   onClick?: (anchorEl: SVGGElement) => void;
@@ -88,6 +96,7 @@ export function StateNode({
   creationKind = null,
   isInteractive = false,
   interactionStyle = 'select',
+  isSimulating = false,
   onClick,
 }: StateNodeProp) {
   // Determine fill and stroke colors based on simulation state
@@ -182,7 +191,13 @@ export function StateNode({
         className={strokeClass}
       />
 
-      {/* Inner circle (only for accept states) */}
+      {/* Inner circle (only for accept states).
+       * At idle, breathes (scale 0.97 ↔ 1.0 over 3s) via the
+       * `accept-ring-breath` class — a subtle goal marker that
+       * tells the eye "this is where you're trying to land."
+       * Suspended during simulation so it doesn't compete with the
+       * active-blue / accepted-green / rejected-red coloring that's
+       * already animating the node's own visual state. */}
       {isAccept && (
         <circle
           cx={x}
@@ -191,6 +206,12 @@ export function StateNode({
           fill="none"
           stroke={strokeColor}
           strokeWidth={STROKE_WIDTH}
+          className={isSimulating ? undefined : 'accept-ring-breath'}
+          // SVG transforms scale from (0,0) by default. Pin the
+          // transform-origin to the circle's own center so the
+          // scale animation breathes in place instead of drifting
+          // toward the canvas origin.
+          style={isSimulating ? undefined : { transformOrigin: `${x}px ${y}px` }}
         />
       )}
 

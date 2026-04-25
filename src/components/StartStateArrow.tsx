@@ -35,7 +35,10 @@ export function StartStateArrow({
   const startY = targetY;
 
   return (
-    <g>
+    // The `start-arrow-breath` class drives a subtle opacity breathing
+    // (0.85 ↔ 1.0 over 2s) at idle — see index.css. Applied to the group
+    // so both the line and arrowhead breathe together as one mark.
+    <g className="start-arrow-breath">
       {/* Arrow line */}
       <line
         x1={startX}

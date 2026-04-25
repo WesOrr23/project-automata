@@ -4,7 +4,7 @@
 
 An interactive web-based simulator for deterministic and non-deterministic finite automata (DFA/NFA). This is a learning project built with pair programming approach - no "vibe-coding," everything is intentional and well-structured.
 
-**Current Status**: Iteration 9 complete — Undo/Redo shipped (snapshot stack capped at 50, floating top-center controls, ⌘/Ctrl+Z shortcuts). See `ITERATION9_COMPLETE.md`.
+**Current Status**: Iterations 9 + 10 merged — Undo/Redo (snapshot stack capped at 50, floating top-center controls, ⌘/Ctrl+Z shortcuts) and aliveness (eased tool-menu tab swap, idle start-arrow + accept-ring breathing, hover/press/toast polish with a single motion vocabulary). See `ITERATION9_COMPLETE.md` and `ITERATION10_COMPLETE.md`.
 **Development Approach**: Agile iterations with clear deliverables
 **Primary Developer Experience**: Familiar with vanilla HTML/CSS/JS, minimal JavaScript experience, learning React and TypeScript
 

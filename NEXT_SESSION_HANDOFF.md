@@ -1,19 +1,19 @@
 # Next Session Handoff
 
-Everything you need to pick up where iteration 9 left off, written for whoever opens the next chat.
+Everything you need to pick up where iterations 9 + 10 left off, written for whoever opens the next chat.
 
 ---
 
 ## Where things stand right now
 
-- **Branch**: `iteration-9` (committed and ready; not merged to main)
+- **Branch**: `iteration-9-and-10` (merge of iter-9 + iter-10, not merged to main)
 - **Tests**: 225 passing, typecheck clean
 - **Auto mode**: ON
 - **Notification system**: in place (iter 6) — `useNotifications().notify({...})` available everywhere
-- **Iteration 8 plan + close-out**: see `ITERATION8_PLAN.md` and `ITERATION8_COMPLETE.md`
-- **Iteration 9 plan + close-out**: see `ITERATION9_PLAN.md` and `ITERATION9_COMPLETE.md`
-- **NFA mode is live**: ε-transitions (configurable reserved char), multi-state simulation with ε-closure, edge consolidation in both DFA and NFA modes, branch-death pulse
-- **Undo/Redo is live**: snapshot stack capped at 50, two floating circular buttons at top-center, `⌘/Ctrl+Z` and `⌘/Ctrl+Shift+Z` shortcuts (suppressed in text fields), Clear canvas wipes both stacks
+- **Iteration plans + close-outs**: see `ITERATION{8,9,10}_PLAN.md` / `_COMPLETE.md`
+- **NFA mode is live** (iter 8): ε-transitions (configurable reserved char), multi-state simulation with ε-closure, edge consolidation in both DFA and NFA modes, branch-death pulse
+- **Undo/Redo is live** (iter 9): snapshot stack capped at 50, two floating circular buttons at top-center, `⌘/Ctrl+Z` and `⌘/Ctrl+Shift+Z` shortcuts (suppressed in text fields), Clear canvas wipes both stacks
+- **Aliveness pass shipped** (iter 10): eased tab-card swap in the tool menu, idle breathing on the start arrow and accept rings, single motion vocabulary (220ms hover / 80ms press / 280ms toast spring) across buttons, tool-menu items, alphabet badges, editor row actions, and notification toasts. Engine / tests untouched.
 
 ---
 
@@ -94,6 +94,11 @@ warning is most useful before settling on placement.
 - Per-branch NFA simulation UI: tabs or trees showing each branch independently. Right now all active states render in the same layer of blue.
 - More NFA/ε visual tweaks: maybe a subtler dashed style on ε-edge labels (user explicitly said *no* dashed line for ε in iter 8 — keep solid — but the label could still flag it).
 - Reserved-`e` rule on JSON load (auto-handle when import lands).
+
+### From iter 10 (deferred follow-ups)
+- `@media (prefers-reduced-motion: reduce)` — suspend the breathing keyframes (start arrow, accept rings) and drop hover transition durations. Non-blocking; accessibility polish.
+- Page-load entry animation for the canvas.
+- State mount / unmount animation when a state is added or removed (structural change visualization).
 
 ### From CLAUDE.md backlog
 - Iteration 9: Undo/Redo — shipped (see `ITERATION9_COMPLETE.md`)

@@ -720,6 +720,7 @@ function App() {
             creationSourceId={appMode === 'EDITING' ? creationState.source : null}
             creationDestinationId={appMode === 'EDITING' ? creationState.destination : null}
             creationStateKind={appMode === 'EDITING' ? creationStateKind(creationState) : null}
+            isSimulating={appMode === 'SIMULATING'}
           />
         )}
       </main>
