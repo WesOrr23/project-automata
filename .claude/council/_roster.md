@@ -2,10 +2,14 @@
 
 Active and archived agents. Updated when agents are added, retired, or change scope.
 
-| Agent | Status | Role | Model | Last active |
-|---|---|---|---|---|
-| architecture-reviewer | active | Conformance check against documented design principles | opus | 2026-04-25 (synthetic verification) |
-| auditor | sketched | Internal critic of council memory | opus | (never) |
+| Agent | Status | Role | Model | Persistent | Last active |
+|---|---|---|---|---|---|
+| architecture-reviewer | active | Conformance check against documented design principles | opus | yes | 2026-04-25 (synthetic verification) |
+| qa-reviewer | active | Test impact analysis; coverage gaps; meaningful-test discipline | opus | yes | 2026-04-25 (synthetic verification) |
+| typescript-reviewer | active | Type-level correctness; cast discipline; generic constraints | opus | yes | 2026-04-25 (synthetic verification) |
+| security-reviewer | active | Attack surface analysis (deliberately small for this codebase) | opus | yes | 2026-04-25 (synthetic verification) |
+| writer | active | Implementation per iteration | opus | **no — ephemeral** | (per iteration) |
+| auditor | sketched | Internal critic of council memory | opus | yes | (never) |
 
 ## Status meanings
 
@@ -13,11 +17,7 @@ Active and archived agents. Updated when agents are added, retired, or change sc
 - **sketched** — identity defined, knowledge minimal; not yet ready for production runs
 - **archived** — retired; memory preserved in `council-archive/`
 
-## Phase 2 (planned)
+## Persistent vs ephemeral
 
-| Agent | Role |
-|---|---|
-| qa-reviewer | Test impact analysis; coverage gaps; flaky-test patterns |
-| typescript-reviewer | Type-level correctness at callsites; unsafe casts; inference gaps |
-| security-reviewer | Attack surface analysis (low-priority for this codebase but reserved) |
-| writer | Implementer; ephemeral — fresh context per iteration, no persistent memory |
+- **Persistent** agents accumulate `knowledge/`, `decisions/`, `open-questions/`, and `journal/` across sessions. The orchestrator loads relevant memory on each spawn.
+- **Ephemeral** agents (currently only `writer`) are spawned fresh per iteration with full context handed in. They have no persistent memory. The codebase itself is their memory between iterations.
