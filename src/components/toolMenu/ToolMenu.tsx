@@ -63,14 +63,23 @@ export function ToolMenu({
     useEffect(() => {
         if (state.mode === 'OPEN') {
             setDisplayedActiveTab(state.activeTab);
+            return;
         }
+        // Outside OPEN: delay clearing displayedActiveTab through the
+        // full staged close (vertical 0.45s + width 0.3s + radius 0.3s
+        // = 1.05s total). Holding the value keeps the
+        // `.tool-menu-closing-from-open` class applied so the
+        // delayed-label-fade CSS rule remains in effect for its
+        // delayed transition window.
+        const timer = setTimeout(() => setDisplayedActiveTab(null), 1100);
+        return () => clearTimeout(timer);
     }, [state.mode, state.mode === 'OPEN' ? state.activeTab : null]);
 
-    const handleExitComplete = () => {
-        if (state.mode !== 'OPEN') {
-            setDisplayedActiveTab(null);
-        }
-    };
+    // onExitComplete kept as a no-op handler — AnimatePresence has the
+    // panel's exit timing built in; the displayedActiveTab clear is
+    // governed by the timer above instead, since it covers the full
+    // close (panel + width + radius), not just the panel exit.
+    const handleExitComplete = () => {};
 
     const isClosingFromOpen = state.mode !== 'OPEN' && displayedActiveTab !== null;
 
@@ -137,29 +146,38 @@ export function ToolMenu({
                                 <motion.div
                                     key={`content-${tab.id}`}
                                     className="tool-menu-active-content"
-                                    initial={{ opacity: 0, maxHeight: 0, paddingTop: 0, paddingBottom: 0 }}
+                                    // height: 'auto' (vs maxHeight: '95vh') means Framer
+                                    // measures the panel's natural content height and
+                                    // animates to exactly that. With maxHeight: 95vh
+                                    // (~756px) and content ~400px, the panel hit its
+                                    // content cap halfway through the maxHeight curve and
+                                    // visually stopped growing — making the visible
+                                    // expansion feel like it happened in a tiny window.
+                                    // Animating height: auto keeps the visible growth
+                                    // distributed across the full duration.
+                                    initial={{ opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0 }}
                                     animate={{
                                         opacity: 1,
-                                        maxHeight: '95vh',
+                                        height: 'auto',
                                         paddingTop: 12,
                                         paddingBottom: 12,
                                         transition: {
-                                            maxHeight:     { duration: 0.3, delay: 0.3, ease: [0.2, 0.8, 0.2, 1] },
-                                            paddingTop:    { duration: 0.3, delay: 0.3, ease: [0.2, 0.8, 0.2, 1] },
-                                            paddingBottom: { duration: 0.3, delay: 0.3, ease: [0.2, 0.8, 0.2, 1] },
-                                            opacity:       { duration: 0.2, delay: 0.3, ease: [0.2, 0.8, 0.2, 1] },
+                                            height:        { duration: 0.45, delay: 0.3, ease: [0.4, 0.0, 0.2, 1] },
+                                            paddingTop:    { duration: 0.45, delay: 0.3, ease: [0.4, 0.0, 0.2, 1] },
+                                            paddingBottom: { duration: 0.45, delay: 0.3, ease: [0.4, 0.0, 0.2, 1] },
+                                            opacity:       { duration: 0.30, delay: 0.45, ease: [0.4, 0.0, 0.2, 1] },
                                         },
                                     }}
                                     exit={{
                                         opacity: 0,
-                                        maxHeight: 0,
+                                        height: 0,
                                         paddingTop: 0,
                                         paddingBottom: 0,
                                         transition: {
-                                            maxHeight:     { duration: 0.3, ease: [0.2, 0.8, 0.2, 1] },
-                                            paddingTop:    { duration: 0.3, ease: [0.2, 0.8, 0.2, 1] },
-                                            paddingBottom: { duration: 0.3, ease: [0.2, 0.8, 0.2, 1] },
-                                            opacity:       { duration: 0.2, ease: [0.2, 0.8, 0.2, 1] },
+                                            height:        { duration: 0.45, ease: [0.4, 0.0, 0.2, 1] },
+                                            paddingTop:    { duration: 0.45, ease: [0.4, 0.0, 0.2, 1] },
+                                            paddingBottom: { duration: 0.45, ease: [0.4, 0.0, 0.2, 1] },
+                                            opacity:       { duration: 0.30, ease: [0.4, 0.0, 0.2, 1] },
                                         },
                                     }}
                                 >

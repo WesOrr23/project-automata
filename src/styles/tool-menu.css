@@ -81,21 +81,31 @@
 
 /* OPEN → COLLAPSED: three-stage close mirroring the three-stage open.
  *
- * Stage 1 (0–0.3s): max-height shrinks (concurrent with the panel's
- *   Framer exit which fades opacity + collapses panel max-height).
- *   Width and border-radius hold.
- * Stage 2 (0.3–0.6s): width shrinks. Radius still holds — corners
- *   stay at the card radius (24) while the box narrows.
- * Stage 3 (0.6–0.9s): border-radius transitions (24 → 24, no visible
- *   change since the value is the same; kept in the rule for
- *   completeness). Width is already at 48 so the rendered radius =
- *   min(24, 24) = 24, a true pill. */
+ * Stage 1 (0–0.45s): max-height shrinks (concurrent with the panel's
+ *   Framer exit: opacity, height, and padding shrink to 0). Width and
+ *   border-radius hold; tab-row labels stay visible.
+ * Stage 2 (0.45–0.75s): width shrinks 280 → 48. Tab-row labels fade
+ *   out (delayed transition rule below). Active row fades to regular
+ *   chrome.
+ * Stage 3 (0.75–1.05s): border-radius transitions 12 → 24 — the
+ *   final "settle into the pill" beat at the COLLAPSED width. */
 .tool-menu-collapsed.tool-menu-closing-from-open {
   transition:
-    height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
-    max-height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
-    width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s,
-    border-radius 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.6s;
+    height 0.45s cubic-bezier(0.4, 0.0, 0.2, 1),
+    max-height 0.45s cubic-bezier(0.4, 0.0, 0.2, 1),
+    width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.45s,
+    border-radius 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.75s;
+}
+
+/* During the staged close, hold the label fade until stage 2 (width
+ * shrink) so the labels stay visible while the menu compresses
+ * vertically, then fade out as the box narrows from EXPANDED-width
+ * down to COLLAPSED. This mirrors how labels appear during the open:
+ * they're visible only when the box is wide enough to fit them. */
+.tool-menu-collapsed.tool-menu-closing-from-open .tool-menu-row-label {
+  transition:
+    opacity 0.30s cubic-bezier(0.4, 0.0, 0.2, 1) 0.45s,
+    transform 0.30s cubic-bezier(0.4, 0.0, 0.2, 1) 0.45s;
 }
 
 /* EXPANDED — same height, wider. Reveals the labels by un-clipping the
@@ -125,12 +135,11 @@
 
 /* OPEN — wider still, height grows to fit content. Width transitions
  * FIRST (no delay), max-height SECOND (delayed) — explicit two-stage
- * "open out, then drop down" gesture the user asked for.
+ * "open out, then drop down" gesture.
  *
- * height: auto on the base + interpolate-size: allow-keywords means
- * subsequent tab swaps re-resize the menu smoothly without needing a
- * separate transition rule. The `height` curve here is shared — it
- * picks up tab-switch resize too. */
+ * The max-height transition is 0.45s (matching the panel's Framer
+ * height-auto animation duration) so the container's cap doesn't
+ * outrun the panel's natural-height growth. */
 .tool-menu-open {
   width: 280px;
   max-height: 95vh;
@@ -138,8 +147,8 @@
   transition:
     width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
     border-radius 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
-    height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
-    max-height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s;
+    height 0.45s cubic-bezier(0.4, 0.0, 0.2, 1) 0.3s,
+    max-height 0.45s cubic-bezier(0.4, 0.0, 0.2, 1) 0.3s;
 }
 
 /* ─── Tab rows ─── */
