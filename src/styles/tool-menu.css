@@ -42,41 +42,35 @@
   /* Hide row content that overflows the current container width — that
    * clipping is what creates the icon-only look in COLLAPSED mode. */
   overflow: hidden;
-  /* Default transition (used when target is COLLAPSED or EXPANDED).
-   *
-   * Order: border-radius FIRST (no delay), then width (delayed by
-   * 0.3s). Why split them: border-radius 999px caps at min-dim/2, so
-   * if both width and border-radius transition together, the rendered
-   * radius LOOKS pill-shaped the entire time (because min(width/2,
-   * transitioning-value) stays at width/2 for narrow widths). Letting
-   * border-radius finish first means the corners are already at their
-   * destination shape (12px or pill) before the width starts moving.
-   *
-   * max-height also has no delay — collapsed and expanded share the
-   * same max-height value so this transition is mostly a no-op for
-   * those, but it kicks in cleanly when leaving OPEN: height drops
-   * first, then width and radius shape back into a pill. */
   /* Auto-height baseline so tab-switch height adjustments transition
    * via interpolate-size. height itself is included in the transition
    * list. */
   height: auto;
+  /* Concurrent fallback. Each destination class (.tool-menu-collapsed,
+   * .tool-menu-expanded, .tool-menu-open) overrides this with its own
+   * direction-specific timing. The fallback only matters for transient
+   * states or class mixes that don't have an override. */
   transition:
     height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
     max-height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
     border-radius 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
-    width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s;
+    width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 /* COLLAPSED — narrow icon strip. Inner row width 32 + 8 padding × 2 = 48.
  *
- * Closing transition (any → COLLAPSED): border-radius and width run
- * concurrently with no delay, so the corners ease back to the pill
- * *during* the width shrink rather than waiting for it to finish. The
- * base rule delays width by 0.3s (which is right for opening — radius
- * lands first, then width grows out from a finished card shape), but
- * on the close that ordering reads as "shrink first, then re-round."
- * Overriding the transition list here keeps the ordering correct in
- * both directions. */
+ * Closing transition (any → COLLAPSED): width, max-height, and
+ * border-radius all run concurrently with no delay. Two reasons:
+ *
+ *  - Border-radius pill caps at min-dim/2, so as width shrinks the
+ *    rendered corners track width/2 and read as "rounding back into
+ *    the pill" *during* the shrink rather than snapping at the end.
+ *
+ *  - From OPEN, max-height (95vh → 120px) shrinks alongside width
+ *    (280 → 48px) so the box contracts as one continuous gesture
+ *    that mirrors the opening grow-out, instead of dropping height
+ *    first (content snap-clipped) and then collapsing width as a
+ *    separate beat. */
 .tool-menu-collapsed {
   width: 48px;
   max-height: 120px;
@@ -88,11 +82,28 @@
 }
 
 /* EXPANDED — same height, wider. Reveals the labels by un-clipping the
- * row content. */
+ * row content.
+ *
+ * Opening transition (COLLAPSED → EXPANDED): border-radius FIRST (no
+ * delay), then width (delayed by 0.3s). Splitting them: border-radius
+ * 999px caps at min-dim/2, so if width and border-radius transition
+ * together while opening, the rendered radius looks pill-shaped the
+ * whole way (min(width/2, transitioning-value) stays at width/2 for
+ * narrow widths). Letting border-radius reshape to --radius-md first
+ * means the corners are already at their destination shape before the
+ * width grows out, which reads as the box "becoming a card" then
+ * "growing wider." This rule lives on EXPANDED specifically so the
+ * staged delay only applies to opening, not to closing back through
+ * EXPANDED on its way to COLLAPSED. */
 .tool-menu-expanded {
   width: 152px;
   max-height: 120px;
   border-radius: var(--radius-md);
+  transition:
+    height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    max-height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-radius 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s;
 }
 
 /* OPEN — wider still, height grows to fit content. Width transitions
