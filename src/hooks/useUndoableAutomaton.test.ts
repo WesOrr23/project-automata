@@ -116,9 +116,13 @@ describe('useUndoableAutomaton', () => {
     expect(result.current.canRedo).toBe(true);
 
     act(() => {
-      result.current.setAutomaton((previous) =>
-        addAcceptState(withOneMoreState(previous), 0)
-      );
+      result.current.setAutomaton((previous) => {
+        // addAcceptState now returns Result; unwrap synchronously since
+        // the test owns every input and an err here would be a regression.
+        const acceptResult = addAcceptState(withOneMoreState(previous), 0);
+        if (!acceptResult.ok) throw new Error(`unexpected err: ${acceptResult.error}`);
+        return acceptResult.value;
+      });
     });
 
     expect(result.current.canRedo).toBe(false);

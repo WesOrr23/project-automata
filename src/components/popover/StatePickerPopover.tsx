@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useKeyboardScope } from '../../hooks/useKeyboardScope';
 
 export type PickerOption = {
   value: string;
@@ -58,14 +59,25 @@ export function StatePickerPopover({
     setPos({ top, left });
   }, [anchorRect, options.length]);
 
-  // Close on Escape and click-outside.
-  useEffect(() => {
-    function handleKey(event: KeyboardEvent) {
+  // Modal scope: while the popover is mounted, it owns Escape so the press
+  // doesn't leak to lower scopes (e.g. transition-creator's own Escape
+  // handler that would cancel the whole creation flow).
+  useKeyboardScope({
+    id: 'state-picker-popover',
+    active: true,
+    capture: true,
+    onKey: (event) => {
       if (event.key === 'Escape') {
         event.stopPropagation();
         onClose();
+        return true;
       }
-    }
+      return false;
+    },
+  });
+
+  // Close on click-outside.
+  useEffect(() => {
     function handleClick(event: MouseEvent) {
       const target = event.target as HTMLElement;
       if (popoverRef.current?.contains(target)) return;
@@ -76,10 +88,8 @@ export function StatePickerPopover({
       if (target.closest?.('.state-node-pickable')) return;
       onClose();
     }
-    document.addEventListener('keydown', handleKey);
     document.addEventListener('mousedown', handleClick);
     return () => {
-      document.removeEventListener('keydown', handleKey);
       document.removeEventListener('mousedown', handleClick);
     };
   }, [onClose]);

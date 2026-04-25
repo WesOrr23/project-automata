@@ -1,6 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { computeLayout } from './utils';
 import { createAutomaton, addState, addTransition } from '../engine/automaton';
+import type { Result } from '../engine/result';
+
+// addTransition now returns Result<Automaton>; the layout tests don't
+// care about the failure paths, so a small unwrapper keeps the rest of
+// the file readable.
+function expectOk<T>(result: Result<T>): T {
+  if (!result.ok) throw new Error(`expected ok, got err: ${result.error}`);
+  return result.value;
+}
 
 describe('computeLayout', () => {
   it('should position all states with valid coordinates', async () => {
@@ -31,7 +40,7 @@ describe('computeLayout', () => {
   it('should handle multiple states with reasonable separation', async () => {
     let automaton = createAutomaton('DFA', new Set(['0', '1']));
     const { automaton: automaton2, stateId: state1 } = addState(automaton);
-    automaton = addTransition(automaton2, 0, new Set([state1]), '0');
+    automaton = expectOk(addTransition(automaton2, 0, new Set([state1]), '0'));
 
     const automatonUI = await computeLayout(automaton);
 
@@ -80,7 +89,7 @@ describe('computeLayout', () => {
 
   it('should handle automaton with self-loops', async () => {
     let automaton = createAutomaton('DFA', new Set(['0', '1']));
-    automaton = addTransition(automaton, 0, new Set([0]), '0');
+    automaton = expectOk(addTransition(automaton, 0, new Set([0]), '0'));
 
     const automatonUI = await computeLayout(automaton);
 
@@ -119,9 +128,9 @@ describe('computeLayout', () => {
     ({ automaton, stateId: state2 } = addState(automaton));
     ({ automaton, stateId: state3 } = addState(automaton));
 
-    automaton = addTransition(automaton, 0, new Set([state1]), 'a');
-    automaton = addTransition(automaton, state1, new Set([state2]), 'a');
-    automaton = addTransition(automaton, state2, new Set([state3]), 'a');
+    automaton = expectOk(addTransition(automaton, 0, new Set([state1]), 'a'));
+    automaton = expectOk(addTransition(automaton, state1, new Set([state2]), 'a'));
+    automaton = expectOk(addTransition(automaton, state2, new Set([state3]), 'a'));
 
     const automatonUI = await computeLayout(automaton);
 
@@ -145,9 +154,9 @@ describe('computeLayout', () => {
     ({ automaton, stateId: state1 } = addState(automaton));
     ({ automaton, stateId: state2 } = addState(automaton));
 
-    automaton = addTransition(automaton, 0, new Set([state1]), 'a');
-    automaton = addTransition(automaton, state1, new Set([state2]), 'a');
-    automaton = addTransition(automaton, state2, new Set([0]), 'a');
+    automaton = expectOk(addTransition(automaton, 0, new Set([state1]), 'a'));
+    automaton = expectOk(addTransition(automaton, state1, new Set([state2]), 'a'));
+    automaton = expectOk(addTransition(automaton, state2, new Set([0]), 'a'));
 
     const automatonUI = await computeLayout(automaton);
 
@@ -166,7 +175,7 @@ describe('computeLayout', () => {
   it('should produce transitions with valid SVG path data', async () => {
     let automaton = createAutomaton('DFA', new Set(['0', '1']));
     const { automaton: automaton2, stateId: state1 } = addState(automaton);
-    automaton = addTransition(automaton2, 0, new Set([state1]), '0');
+    automaton = expectOk(addTransition(automaton2, 0, new Set([state1]), '0'));
 
     const automatonUI = await computeLayout(automaton);
 

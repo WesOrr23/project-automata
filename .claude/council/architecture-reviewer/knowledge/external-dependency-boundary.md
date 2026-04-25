@@ -3,7 +3,7 @@ agent: architecture-reviewer
 type: knowledge
 topic: external-dependency-boundary
 schema-version: 1
-verified-as-of: 2cf5e42
+verified-as-of: 5cba947
 last-updated: 2026-04-25
 confidence: high
 ---
@@ -39,9 +39,10 @@ No other UI module imports `@hpcc-js/wasm-graphviz`; no other module sees DOT or
 
 ## What's fine
 
-- The wrapper itself being long (the present `utils.ts` is ~480 lines). Concentrating the messy adapter code is the point.
+- The wrapper itself being long. Concentrating the messy adapter code is the point. (Specific line counts drift; cite the symbol name and the principle, not the count.)
 - Async leakage when the library forces it (WASM init made `computeLayout` async; that's an unavoidable cost, not a violation).
-- Internal helpers being private module functions — but note this creates a testing gap (qa-reviewer's `known-coverage-gaps.md` lists `parseEdgePos`, `controlPointsToSvgPath`, `flipY` for this reason).
+- Internal helpers being private module functions — but note this creates a testing gap.
+- Exporting boundary-internal *output-format* helpers (string parsing, coordinate math) for testability is fine — they post-process the dependency's opaque output but don't import or invoke the dependency itself. The funnel still has one mouth. (Iteration-11 update: `parseEdgeLabel`, `parseEdgePos`, `controlPointsToSvgPath`, `flipY` were promoted from private to exported for direct unit testing; the boundary invariant is unchanged.)
 
 ## Provenance
 

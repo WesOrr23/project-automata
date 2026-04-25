@@ -6,7 +6,17 @@
  * - They never mutate the input automaton
  * - They enforce structural invariants (valid references, etc.)
  *
- * Error handling: Functions throw errors for invalid operations
+ * Error handling: fallible operations return `Result<Automaton>` rather
+ * than throwing. Callers branch on `result.ok`. The only remaining throw
+ * is `createAutomaton`'s empty-alphabet check — that's a programmer-fault
+ * contract (UI never lets it happen) and surfacing it as a user-facing
+ * error would obscure the real bug.
+ *
+ * No-op semantics: when an operation has no effect on the automaton
+ * (e.g. marking a state that's already an accept state), the function
+ * returns `ok(automaton)` with the SAME reference. The undoable-store
+ * uses reference equality to short-circuit history pushes, so preserving
+ * the reference matters.
  *
  * State IDs: Auto-incremented integers (0, 1, 2, ...)
  * - Engine owns IDs, UI layer owns labels
@@ -14,6 +24,7 @@
  */
 
 import type { Automaton, Transition } from './types';
+import { type Result, ok, err } from './result';
 
 /**
  * Create a new empty automaton
@@ -21,6 +32,12 @@ import type { Automaton, Transition } from './types';
  * @param type - 'DFA' or 'NFA'
  * @param alphabet - Set of input symbols (e.g., new Set(['0', '1']))
  * @returns A new automaton with a singular initial state and no transitions
+ *
+ * @throws Error if the alphabet is empty. This is a programmer-fault
+ *         contract (the UI gates construction so it never happens), not
+ *         a user-recoverable error — keeping it as a throw makes misuse
+ *         loud at the call site rather than burying it behind a Result
+ *         that callers might forget to check.
  *
  * @example
  * const dfa = createAutomaton('DFA', new Set(['0', '1']));
@@ -49,8 +66,9 @@ export function createAutomaton(
  * Add a new state to the automaton
  * State ID is auto-generated (auto-incrementing integer)
  *
- * @param automaton - The automaton to modify
- * @returns Object with new automaton and the generated state ID
+ * Always succeeds — no Result wrapper needed. Returns the new automaton
+ * along with the freshly-generated state ID so the caller knows what to
+ * reference.
  *
  * @example
  * const { automaton: dfa2, stateId } = addState(dfa);
@@ -76,25 +94,21 @@ export function addState(
  * Also removes all transitions involving this state
  * If removing start state, auto-assigns to first remaining state
  *
- * @param automaton - The automaton to modify
- * @param stateId - ID of the state to remove
- * @returns New automaton with the state removed
- * @throws Error if state doesn't exist
- *
- * @example
- * const dfa2 = removeState(dfa, 0);
+ * @returns ok(newAutomaton) on success;
+ *          err('state-not-found') if the state doesn't exist;
+ *          err('cannot-remove-only-state') if removal would leave no states.
  */
 export function removeState(
   automaton: Automaton,
   stateId: number
-): Automaton {
+): Result<Automaton> {
   if (!automaton.states.has(stateId)) {
-    throw new Error(`State ${stateId} does not exist`);
+    return err('state-not-found');
   }
 
   // Prevent deleting the last state (automaton must always have at least one state)
   if (automaton.states.size === 1) {
-    throw new Error('Cannot remove the last state');
+    return err('cannot-remove-only-state');
   }
 
   // Remove state from states set
@@ -119,61 +133,56 @@ export function removeState(
     newStartState = remaining[0]!;
   }
 
-  return {
+  return ok({
     ...automaton,
     states: newStates,
     acceptStates: newAcceptStates,
     transitions: newTransitions,
     startState: newStartState,
-  };
+  });
 }
 
 /**
- * Add a transition to the automaton
+ * Add a transition to the automaton.
  *
- * @param automaton - The automaton to modify
- * @param from - Source state ID
- * @param to - Destination state IDs (Set of numbers)
- *             For DFA: Set with 1 element, e.g., new Set([1])
- *             For NFA: Set with multiple elements, e.g., new Set([1, 2])
- * @param symbol - Input symbol (or null for ε-transition)
- * @returns New automaton with the transition added
- * @throws Error if states don't exist or symbol not in alphabet
- *
- * @example
- * const dfa2 = addTransition(dfa, 0, new Set([1]), '0');
+ * @returns ok(newAutomaton) on success; on failure, one of:
+ *   - 'state-not-found' (source or any destination missing)
+ *   - 'symbol-not-in-alphabet' (and not ε)
+ *   - 'multi-destination-not-allowed-in-dfa' (DFA + |to| ≠ 1)
+ *   - 'epsilon-not-allowed-in-dfa' (DFA + symbol === null)
+ *   - 'transition-already-exists' (duplicate (from, symbol) pair)
  */
 export function addTransition(
   automaton: Automaton,
   from: number,
   to: Set<number>,
   symbol: string | null
-): Automaton {
+): Result<Automaton> {
   // Validate source state exists
   if (!automaton.states.has(from)) {
-    throw new Error(`Source state ${from} does not exist`);
+    return err('state-not-found');
   }
 
   // Validate all destination states exist
   for (const destState of to) {
     if (!automaton.states.has(destState)) {
-      throw new Error(`Destination state ${destState} does not exist`);
+      return err('state-not-found');
     }
   }
 
   // Validate symbol (must be in alphabet or null for ε-transition)
   if (symbol !== null && !automaton.alphabet.has(symbol)) {
-    throw new Error(`Symbol '${symbol}' is not in the alphabet`);
+    return err('symbol-not-in-alphabet');
   }
 
   // For DFA, ensure exactly one destination
   if (automaton.type === 'DFA' && to.size !== 1) {
-    throw new Error('DFA transitions must have exactly one destination state');
+    return err('multi-destination-not-allowed-in-dfa');
   }
 
   // For DFA, ε-transitions are not allowed
   if (automaton.type === 'DFA' && symbol === null) {
-    throw new Error('DFA cannot have ε-transitions (epsilon transitions)');
+    return err('epsilon-not-allowed-in-dfa');
   }
 
   // Check for existing transition with same (from, symbol) - prevents invalid structure.
@@ -181,10 +190,7 @@ export function addTransition(
     (t) => t.from === from && t.symbol === symbol
   );
   if (existingTransition) {
-    const symbolDisplay = symbol === null ? 'ε' : `'${symbol}'`;
-    throw new Error(
-      `Transition from state ${from} on symbol ${symbolDisplay} already exists`
-    );
+    return err('transition-already-exists');
   }
 
   // Create new transition
@@ -194,10 +200,10 @@ export function addTransition(
     symbol,
   };
 
-  return {
+  return ok({
     ...automaton,
     transitions: [...automaton.transitions, newTransition],
-  };
+  });
 }
 
 /**
@@ -212,28 +218,29 @@ export function addTransition(
  * a transition from the same source adds a parallel branch instead of
  * triggering an "overwrite" warning.
  *
- * @throws Error in DFA mode (DFAs can't have multiple destinations).
- * @throws Error if source/destination states or symbol don't exist.
+ * @returns ok(automaton) — same reference — when the destination is
+ *          already present (no-op).
+ *          err('add-destination-not-allowed-in-dfa') in DFA mode.
+ *          err('state-not-found') if source/destination is missing.
+ *          err('symbol-not-in-alphabet') if symbol isn't in alphabet (and not ε).
  */
 export function addTransitionDestination(
   automaton: Automaton,
   from: number,
   destination: number,
   symbol: string | null
-): Automaton {
+): Result<Automaton> {
   if (automaton.type === 'DFA') {
-    throw new Error(
-      'addTransitionDestination is NFA-only — use addTransition for DFAs'
-    );
+    return err('add-destination-not-allowed-in-dfa');
   }
   if (!automaton.states.has(from)) {
-    throw new Error(`Source state ${from} does not exist`);
+    return err('state-not-found');
   }
   if (!automaton.states.has(destination)) {
-    throw new Error(`Destination state ${destination} does not exist`);
+    return err('state-not-found');
   }
   if (symbol !== null && !automaton.alphabet.has(symbol)) {
-    throw new Error(`Symbol '${symbol}' is not in the alphabet`);
+    return err('symbol-not-in-alphabet');
   }
 
   const existingIndex = automaton.transitions.findIndex(
@@ -241,27 +248,28 @@ export function addTransitionDestination(
   );
 
   if (existingIndex === -1) {
-    return {
+    return ok({
       ...automaton,
       transitions: [
         ...automaton.transitions,
         { from, to: new Set([destination]), symbol },
       ],
-    };
+    });
   }
 
   // Union into existing record. Skip the rebuild when the destination is
   // already present so callers don't get a new automaton reference for a
-  // no-op edit.
+  // no-op edit (the undoable-store relies on reference equality to skip
+  // history pushes).
   const existing = automaton.transitions[existingIndex]!;
   if (existing.to.has(destination)) {
-    return automaton;
+    return ok(automaton);
   }
   const newTo = new Set(existing.to);
   newTo.add(destination);
   const newTransitions = [...automaton.transitions];
   newTransitions[existingIndex] = { from, to: newTo, symbol };
-  return { ...automaton, transitions: newTransitions };
+  return ok({ ...automaton, transitions: newTransitions });
 }
 
 /**
@@ -269,8 +277,10 @@ export function addTransitionDestination(
  * transition's `to` set becomes empty, the entire transition record is
  * dropped — there's no meaningful "transition with no destinations."
  *
- * Inverse of addTransitionDestination. No-op if the (from, symbol)
- * transition doesn't exist or doesn't include the given destination.
+ * Inverse of addTransitionDestination. No-op (returns the same
+ * automaton reference) if the (from, symbol) transition doesn't exist
+ * or doesn't include the given destination — pure transformation, no
+ * Result wrapper needed.
  */
 export function removeTransitionDestination(
   automaton: Automaton,
@@ -302,16 +312,9 @@ export function removeTransitionDestination(
 }
 
 /**
- * Remove a specific transition from the automaton
- *
- * @param automaton - The automaton to modify
- * @param from - Source state ID
- * @param to - Destination state IDs (Set)
- * @param symbol - Input symbol
- * @returns New automaton with the transition removed
- *
- * @example
- * const dfa2 = removeTransition(dfa, 0, new Set([1]), '0');
+ * Remove a specific transition from the automaton. Pure no-op if the
+ * matching transition doesn't exist (no Result needed — there's nothing
+ * to fail on).
  */
 export function removeTransition(
   automaton: Automaton,
@@ -341,89 +344,86 @@ export function removeTransition(
 }
 
 /**
- * Set the start state of the automaton
+ * Set the start state of the automaton.
  *
- * @param automaton - The automaton to modify
- * @param stateId - ID of the state to make the start state
- * @returns New automaton with start state updated
- * @throws Error if state doesn't exist
- *
- * @example
- * const dfa2 = setStartState(dfa, 0);
+ * @returns ok(newAutomaton) on success;
+ *          ok(automaton) (same reference) if the state is already the start;
+ *          err('state-not-found') if the state doesn't exist.
  */
 export function setStartState(
   automaton: Automaton,
   stateId: number
-): Automaton {
+): Result<Automaton> {
   if (!automaton.states.has(stateId)) {
-    throw new Error(`State ${stateId} does not exist`);
+    return err('state-not-found');
   }
 
-  return {
+  // No-op short-circuit: same start state, same reference.
+  if (automaton.startState === stateId) {
+    return ok(automaton);
+  }
+
+  return ok({
     ...automaton,
     startState: stateId,
-  };
+  });
 }
 
 /**
- * Mark a state as an accept state
+ * Mark a state as an accept state.
  *
- * @param automaton - The automaton to modify
- * @param stateId - ID of the state to mark as accepting
- * @returns New automaton with accept state added
- * @throws Error if state doesn't exist
- *
- * @example
- * const dfa2 = addAcceptState(dfa, 2);
+ * @returns ok(automaton) (same reference) if the state is already an
+ *          accept state — no-op rather than an error, since "make this
+ *          state accept" is idempotent from the user's perspective.
+ *          err('state-not-found') if the state doesn't exist.
  */
 export function addAcceptState(
   automaton: Automaton,
   stateId: number
-): Automaton {
+): Result<Automaton> {
   if (!automaton.states.has(stateId)) {
-    throw new Error(`State ${stateId} does not exist`);
+    return err('state-not-found');
   }
 
+  // No-op short-circuit: idempotent from the user's perspective, and we
+  // want to preserve reference equality so the undoable store doesn't
+  // push a redundant history entry.
   if (automaton.acceptStates.has(stateId)) {
-    throw new Error(`State ${stateId} is already an accept state`);
+    return ok(automaton);
   }
 
-  return {
+  return ok({
     ...automaton,
     acceptStates: new Set([...automaton.acceptStates, stateId]),
-  };
+  });
 }
 
 /**
- * Unmark a state as an accept state
+ * Unmark a state as an accept state.
  *
- * @param automaton - The automaton to modify
- * @param stateId - ID of the state to unmark
- * @returns New automaton with accept state removed
- * @throws Error if state doesn't exist or isn't an accept state
- *
- * @example
- * const dfa2 = removeAcceptState(dfa, 2);
+ * @returns ok(automaton) (same reference) if the state isn't currently
+ *          an accept state — idempotent removal mirrors idempotent add.
+ *          err('state-not-found') if the state doesn't exist.
  */
 export function removeAcceptState(
   automaton: Automaton,
   stateId: number
-): Automaton {
+): Result<Automaton> {
   if (!automaton.states.has(stateId)) {
-    throw new Error(`State ${stateId} does not exist`);
+    return err('state-not-found');
   }
 
   if (!automaton.acceptStates.has(stateId)) {
-    throw new Error(`State ${stateId} is not an accept state`);
+    return ok(automaton);
   }
 
   const newAcceptStates = new Set(automaton.acceptStates);
   newAcceptStates.delete(stateId);
 
-  return {
+  return ok({
     ...automaton,
     acceptStates: newAcceptStates,
-  };
+  });
 }
 
 /**

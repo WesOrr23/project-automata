@@ -1,5 +1,9 @@
 /**
  * Tests for automaton CRUD operations
+ *
+ * Fallible operations return Result<Automaton>. Tests unwrap successful
+ * results via the small helpers below; failure-case tests assert on the
+ * `error` discriminant variant directly.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -16,6 +20,20 @@ import {
   getTransitionsFrom,
   getTransition,
 } from './automaton';
+import type { Result } from './result';
+import type { Automaton } from './types';
+
+/**
+ * Test helper: assert a Result is ok and return its value. Throws an
+ * AssertionError with the actual error variant on failure so the test
+ * report includes the variant name.
+ */
+function expectOk<T>(result: Result<T>): T {
+  if (!result.ok) {
+    throw new Error(`expected ok, got err: ${result.error}`);
+  }
+  return result.value;
+}
 
 describe('createAutomaton', () => {
   it('creates a DFA with initial state 0 and given alphabet', () => {
@@ -32,6 +50,9 @@ describe('createAutomaton', () => {
   });
 
   it('throws error for empty alphabet', () => {
+    // createAutomaton's empty-alphabet check stayed as a throw — it's a
+    // programmer-fault contract (the UI never lets it happen), not a
+    // user-recoverable error.
     expect(() => createAutomaton('DFA', new Set())).toThrow('Alphabet cannot be empty');
   });
 });
@@ -83,7 +104,7 @@ describe('removeState', () => {
     // dfa has state 0, add state 1
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
 
-    const dfa2 = removeState(dfa1, id1);
+    const dfa2 = expectOk(removeState(dfa1, id1));
 
     expect(dfa2.states.has(0)).toBe(true);
     expect(dfa2.states.has(id1)).toBe(false);
@@ -96,10 +117,10 @@ describe('removeState', () => {
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
     const { automaton: dfa2, stateId: id2 } = addState(dfa1);
 
-    let result = addTransition(dfa2, 0, new Set([id1]), '0');
-    result = addTransition(result, id1, new Set([id2]), '1');
+    let result: Automaton = expectOk(addTransition(dfa2, 0, new Set([id1]), '0'));
+    result = expectOk(addTransition(result, id1, new Set([id2]), '1'));
 
-    const final = removeState(result, id1);
+    const final = expectOk(removeState(result, id1));
 
     // Both transitions involving id1 should be removed
     expect(final.transitions.length).toBe(0);
@@ -111,33 +132,37 @@ describe('removeState', () => {
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
 
     // Remove state 0 (the start state)
-    const final = removeState(dfa1, 0);
+    const final = expectOk(removeState(dfa1, 0));
 
     // Should auto-assign to id1 (first remaining state)
     expect(final.startState).toBe(id1);
   });
 
-  it('throws error if trying to remove the last state', () => {
+  it('returns err(cannot-remove-only-state) when only one state remains', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
     // dfa only has state 0
+    const result = removeState(dfa, 0);
 
-    expect(() => removeState(dfa, 0)).toThrow('Cannot remove the last state');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('cannot-remove-only-state');
   });
 
   it('removes state from accept states if present', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
-    let result = addAcceptState(dfa1, id1);
+    const result = expectOk(addAcceptState(dfa1, id1));
 
-    const final = removeState(result, id1);
+    const final = expectOk(removeState(result, id1));
 
     expect(final.acceptStates.has(id1)).toBe(false);
   });
 
-  it('throws error if state does not exist', () => {
+  it('returns err(state-not-found) if state does not exist', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
+    const result = removeState(dfa, 99);
 
-    expect(() => removeState(dfa, 99)).toThrow('State 99 does not exist');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('state-not-found');
   });
 });
 
@@ -147,7 +172,7 @@ describe('addTransition', () => {
     // dfa has state 0
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
 
-    const dfa2 = addTransition(dfa1, 0, new Set([id1]), '0');
+    const dfa2 = expectOk(addTransition(dfa1, 0, new Set([id1]), '0'));
 
     expect(dfa2.transitions.length).toBe(1);
     expect(dfa2.transitions[0]).toEqual({
@@ -157,156 +182,157 @@ describe('addTransition', () => {
     });
   });
 
-  it('throws error if source state does not exist', () => {
+  it('returns err(state-not-found) if source state does not exist', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
-    // dfa has state 0
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
+    const result = addTransition(dfa1, 99, new Set([id1]), '0');
 
-    expect(() => addTransition(dfa1, 99, new Set([id1]), '0')).toThrow(
-      'Source state 99 does not exist'
-    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('state-not-found');
   });
 
-  it('throws error if destination state does not exist', () => {
+  it('returns err(state-not-found) if destination state does not exist', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
-    // dfa has state 0
+    const result = addTransition(dfa, 0, new Set([99]), '0');
 
-    expect(() => addTransition(dfa, 0, new Set([99]), '0')).toThrow(
-      'Destination state 99 does not exist'
-    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('state-not-found');
   });
 
-  it('throws error if symbol not in alphabet', () => {
+  it('returns err(symbol-not-in-alphabet) if symbol not in alphabet', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
-    // dfa has state 0
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
+    const result = addTransition(dfa1, 0, new Set([id1]), 'a');
 
-    expect(() => addTransition(dfa1, 0, new Set([id1]), 'a')).toThrow(
-      "Symbol 'a' is not in the alphabet"
-    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('symbol-not-in-alphabet');
   });
 
-  it('throws error for DFA with multiple destinations', () => {
+  it('returns err(multi-destination-not-allowed-in-dfa) for DFA with multiple destinations', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
-    // dfa has state 0
+    const { automaton: dfa1, stateId: id1 } = addState(dfa);
+    const { automaton: dfa2, stateId: id2 } = addState(dfa1);
+    const result = addTransition(dfa2, 0, new Set([id1, id2]), '0');
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('multi-destination-not-allowed-in-dfa');
+  });
+
+  it('returns err(epsilon-not-allowed-in-dfa) for DFA with ε-transition', () => {
+    const dfa = createAutomaton('DFA', new Set(['0', '1']));
+    const { automaton: dfa1, stateId: id1 } = addState(dfa);
+    const result = addTransition(dfa1, 0, new Set([id1]), null);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('epsilon-not-allowed-in-dfa');
+  });
+
+  it('returns err(transition-already-exists) for duplicate (from, symbol) transition', () => {
+    const dfa = createAutomaton('DFA', new Set(['0', '1']));
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
     const { automaton: dfa2, stateId: id2 } = addState(dfa1);
 
-    expect(() => addTransition(dfa2, 0, new Set([id1, id2]), '0')).toThrow(
-      'DFA transitions must have exactly one destination state'
-    );
-  });
+    const dfa3 = expectOk(addTransition(dfa2, 0, new Set([id1]), '0'));
+    const result = addTransition(dfa3, 0, new Set([id2]), '0');
 
-  it('throws error for DFA with ε-transition', () => {
-    const dfa = createAutomaton('DFA', new Set(['0', '1']));
-    // dfa has state 0
-    const { automaton: dfa1, stateId: id1 } = addState(dfa);
-
-    expect(() => addTransition(dfa1, 0, new Set([id1]), null)).toThrow(
-      'DFA cannot have ε-transitions'
-    );
-  });
-
-  it('throws error for duplicate (from, symbol) transition', () => {
-    const dfa = createAutomaton('DFA', new Set(['0', '1']));
-    // dfa has state 0
-    const { automaton: dfa1, stateId: id1 } = addState(dfa);
-    const { automaton: dfa2, stateId: id2 } = addState(dfa1);
-
-    // Add first transition from 0 on '0'
-    const dfa3 = addTransition(dfa2, 0, new Set([id1]), '0');
-
-    // Try to add another transition from 0 on '0' (duplicate)
-    expect(() => addTransition(dfa3, 0, new Set([id2]), '0')).toThrow(
-      "Transition from state 0 on symbol '0' already exists"
-    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('transition-already-exists');
   });
 });
 
 describe('setStartState', () => {
   it('sets the start state', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
-    // dfa has state 0 as start, add state 1
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
 
-    const dfa2 = setStartState(dfa1, id1);
+    const dfa2 = expectOk(setStartState(dfa1, id1));
 
     expect(dfa2.startState).toBe(id1);
   });
 
-  it('throws error if state does not exist', () => {
+  it('is a no-op (same reference) when target is already the start state', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
+    const result = setStartState(dfa, 0);
 
-    expect(() => setStartState(dfa, 99)).toThrow('State 99 does not exist');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(dfa); // reference equality
+  });
+
+  it('returns err(state-not-found) if state does not exist', () => {
+    const dfa = createAutomaton('DFA', new Set(['0', '1']));
+    const result = setStartState(dfa, 99);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('state-not-found');
   });
 });
 
 describe('addAcceptState', () => {
   it('marks a state as accepting', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
-    // dfa has state 0
-
-    const dfa2 = addAcceptState(dfa, 0);
+    const dfa2 = expectOk(addAcceptState(dfa, 0));
 
     expect(dfa2.acceptStates.has(0)).toBe(true);
   });
 
-  it('throws error if state does not exist', () => {
+  it('returns err(state-not-found) if state does not exist', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
+    const result = addAcceptState(dfa, 99);
 
-    expect(() => addAcceptState(dfa, 99)).toThrow('State 99 does not exist');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('state-not-found');
   });
 
-  it('throws error if state is already an accept state', () => {
+  it('is a no-op (same reference) when state is already an accept state', () => {
+    // Previously this was an error; new semantics treat it as idempotent
+    // so the toggle pattern in App.tsx becomes simpler and the undoable
+    // store sees the same reference and skips the history push.
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
-    // dfa has state 0
-    const dfa2 = addAcceptState(dfa, 0);
+    const dfa2 = expectOk(addAcceptState(dfa, 0));
+    const result = addAcceptState(dfa2, 0);
 
-    expect(() => addAcceptState(dfa2, 0)).toThrow(
-      'State 0 is already an accept state'
-    );
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(dfa2); // reference equality
   });
 });
 
 describe('removeAcceptState', () => {
   it('unmarks a state as accepting', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
-    // dfa has state 0
-    const dfa2 = addAcceptState(dfa, 0);
+    const dfa2 = expectOk(addAcceptState(dfa, 0));
 
-    const dfa3 = removeAcceptState(dfa2, 0);
+    const dfa3 = expectOk(removeAcceptState(dfa2, 0));
 
     expect(dfa3.acceptStates.has(0)).toBe(false);
   });
 
-  it('throws error if state does not exist', () => {
+  it('returns err(state-not-found) if state does not exist', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
+    const result = removeAcceptState(dfa, 99);
 
-    expect(() => removeAcceptState(dfa, 99)).toThrow(
-      'State 99 does not exist'
-    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('state-not-found');
   });
 
-  it('throws error if state is not an accept state', () => {
+  it('is a no-op (same reference) if state is not an accept state', () => {
+    // Mirror of addAcceptState's idempotent semantics.
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
-    // dfa has state 0, which is not an accept state
+    const result = removeAcceptState(dfa, 0);
 
-    expect(() => removeAcceptState(dfa, 0)).toThrow(
-      'State 0 is not an accept state'
-    );
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(dfa);
   });
 });
 
 describe('getTransitionsFrom', () => {
   it('returns all transitions from a state', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
-    // dfa has state 0
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
     const { automaton: dfa2, stateId: id2 } = addState(dfa1);
 
-    let result = addTransition(dfa2, 0, new Set([id1]), '0');
-    result = addTransition(result, 0, new Set([id2]), '1');
-    result = addTransition(result, id1, new Set([id2]), '0');
+    let result: Automaton = expectOk(addTransition(dfa2, 0, new Set([id1]), '0'));
+    result = expectOk(addTransition(result, 0, new Set([id2]), '1'));
+    result = expectOk(addTransition(result, id1, new Set([id2]), '0'));
 
     const transitions = getTransitionsFrom(result, 0);
 
@@ -316,7 +342,6 @@ describe('getTransitionsFrom', () => {
 
   it('returns empty array if no transitions', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
-    // dfa has state 0 but no transitions
 
     const transitions = getTransitionsFrom(dfa, 0);
 
@@ -327,9 +352,8 @@ describe('getTransitionsFrom', () => {
 describe('getTransition', () => {
   it('returns transition for specific state and symbol', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
-    // dfa has state 0
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
-    const dfa2 = addTransition(dfa1, 0, new Set([id1]), '0');
+    const dfa2 = expectOk(addTransition(dfa1, 0, new Set([id1]), '0'));
 
     const transitions = getTransition(dfa2, 0, '0');
 
@@ -343,9 +367,8 @@ describe('getTransition', () => {
 
   it('returns empty array if no matching transition', () => {
     const dfa = createAutomaton('DFA', new Set(['0', '1']));
-    // dfa has state 0
     const { automaton: dfa1, stateId: id1 } = addState(dfa);
-    const dfa2 = addTransition(dfa1, 0, new Set([id1]), '0');
+    const dfa2 = expectOk(addTransition(dfa1, 0, new Set([id1]), '0'));
 
     const transitions = getTransition(dfa2, 0, '1');
 
@@ -357,7 +380,7 @@ describe('addTransitionDestination', () => {
   it('creates a new transition record when none exists', () => {
     let nfa = createAutomaton('NFA', new Set(['a']));
     const { automaton: n1, stateId: q1 } = addState(nfa);
-    nfa = addTransitionDestination(n1, 0, q1, 'a');
+    nfa = expectOk(addTransitionDestination(n1, 0, q1, 'a'));
 
     expect(nfa.transitions).toHaveLength(1);
     expect(nfa.transitions[0]!.from).toBe(0);
@@ -369,42 +392,44 @@ describe('addTransitionDestination', () => {
     let nfa = createAutomaton('NFA', new Set(['a']));
     const { automaton: n1, stateId: q1 } = addState(nfa);
     const { automaton: n2, stateId: q2 } = addState(n1);
-    nfa = addTransitionDestination(n2, 0, q1, 'a');
-    nfa = addTransitionDestination(nfa, 0, q2, 'a');
+    nfa = expectOk(addTransitionDestination(n2, 0, q1, 'a'));
+    nfa = expectOk(addTransitionDestination(nfa, 0, q2, 'a'));
 
     expect(nfa.transitions).toHaveLength(1);
     expect(nfa.transitions[0]!.to).toEqual(new Set([q1, q2]));
   });
 
-  it('is a no-op when the destination is already present', () => {
+  it('is a no-op (same reference) when the destination is already present', () => {
     let nfa = createAutomaton('NFA', new Set(['a']));
     const { automaton: n1, stateId: q1 } = addState(nfa);
-    nfa = addTransitionDestination(n1, 0, q1, 'a');
+    nfa = expectOk(addTransitionDestination(n1, 0, q1, 'a'));
     const before = nfa;
-    nfa = addTransitionDestination(nfa, 0, q1, 'a');
+    nfa = expectOk(addTransitionDestination(nfa, 0, q1, 'a'));
     expect(nfa).toBe(before);
   });
 
   it('supports ε-transitions in NFA mode', () => {
     let nfa = createAutomaton('NFA', new Set(['a']));
     const { automaton: n1, stateId: q1 } = addState(nfa);
-    nfa = addTransitionDestination(n1, 0, q1, null);
+    nfa = expectOk(addTransitionDestination(n1, 0, q1, null));
     expect(nfa.transitions[0]!.symbol).toBe(null);
   });
 
-  it('throws in DFA mode', () => {
-    let dfa = createAutomaton('DFA', new Set(['a']));
+  it('returns err(add-destination-not-allowed-in-dfa) in DFA mode', () => {
+    const dfa = createAutomaton('DFA', new Set(['a']));
     const { automaton: d1, stateId: q1 } = addState(dfa);
-    expect(() => addTransitionDestination(d1, 0, q1, 'a')).toThrow(
-      'NFA-only'
-    );
+    const result = addTransitionDestination(d1, 0, q1, 'a');
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('add-destination-not-allowed-in-dfa');
   });
 
-  it('throws when source state does not exist', () => {
+  it('returns err(state-not-found) when source state does not exist', () => {
     const nfa = createAutomaton('NFA', new Set(['a']));
-    expect(() => addTransitionDestination(nfa, 99, 0, 'a')).toThrow(
-      'Source state 99'
-    );
+    const result = addTransitionDestination(nfa, 99, 0, 'a');
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('state-not-found');
   });
 });
 
@@ -413,8 +438,8 @@ describe('removeTransitionDestination', () => {
     let nfa = createAutomaton('NFA', new Set(['a']));
     const { automaton: n1, stateId: q1 } = addState(nfa);
     const { automaton: n2, stateId: q2 } = addState(n1);
-    nfa = addTransitionDestination(n2, 0, q1, 'a');
-    nfa = addTransitionDestination(nfa, 0, q2, 'a');
+    nfa = expectOk(addTransitionDestination(n2, 0, q1, 'a'));
+    nfa = expectOk(addTransitionDestination(nfa, 0, q2, 'a'));
 
     nfa = removeTransitionDestination(nfa, 0, q1, 'a');
     expect(nfa.transitions).toHaveLength(1);
@@ -424,7 +449,7 @@ describe('removeTransitionDestination', () => {
   it('drops the entire transition when the last destination is removed', () => {
     let nfa = createAutomaton('NFA', new Set(['a']));
     const { automaton: n1, stateId: q1 } = addState(nfa);
-    nfa = addTransitionDestination(n1, 0, q1, 'a');
+    nfa = expectOk(addTransitionDestination(n1, 0, q1, 'a'));
 
     nfa = removeTransitionDestination(nfa, 0, q1, 'a');
     expect(nfa.transitions).toHaveLength(0);
@@ -440,7 +465,7 @@ describe('removeTransitionDestination', () => {
     let nfa = createAutomaton('NFA', new Set(['a']));
     const { automaton: n1, stateId: q1 } = addState(nfa);
     const { automaton: n2, stateId: q2 } = addState(n1);
-    nfa = addTransitionDestination(n2, 0, q1, 'a');
+    nfa = expectOk(addTransitionDestination(n2, 0, q1, 'a'));
     const before = nfa;
     nfa = removeTransitionDestination(nfa, 0, q2, 'a');
     expect(nfa).toBe(before);

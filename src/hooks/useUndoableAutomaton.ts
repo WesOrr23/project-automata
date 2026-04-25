@@ -9,8 +9,21 @@
  * - One useState holds the current snapshot. Changes to it drive re-renders.
  * - Two useRefs hold the undo / redo stacks. They aren't rendered directly,
  *   so keeping them in refs avoids forcing a full Snapshot copy into state.
- * - canUndo / canRedo are derived from stack lengths on every render; cheap
- *   (length lookup), and always correct after any mutation.
+ * - canUndo / canRedo are real useState booleans, kept in lockstep with the
+ *   ref'd stacks. Every operation that mutates a stack ALSO calls the
+ *   matching flag setter — that's the hook's invariant.
+ *
+ * Hook contract (invariant):
+ * - Any code that mutates `undoStackRef.current` MUST call `setCanUndo` with
+ *   the new "is non-empty?" value (or rely on a helper that does).
+ * - Any code that mutates `redoStackRef.current` MUST call `setCanRedo` the
+ *   same way.
+ * - Without this, the flags drift out of sync with the stacks. The previous
+ *   incarnation of this hook derived the flags from `stack.length` on every
+ *   render and relied on `setCurrent` to trigger a render after every stack
+ *   mutation — that worked but was implicit and forced `clearHistory` to
+ *   push a same-content snapshot just to provoke a re-render. Explicit flag
+ *   state makes the dependency obvious and removes the hack.
  *
  * No-op semantics:
  * - `setAutomaton(updater)` computes `next = updater(current.automaton)`.
@@ -58,6 +71,8 @@ export function useUndoableAutomaton(
   const [current, setCurrent] = useState<Snapshot>(initial);
   const undoStackRef = useRef<Snapshot[]>([]);
   const redoStackRef = useRef<Snapshot[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
 
   // Keep a ref to the current snapshot so the imperative setters can read
   // it synchronously. React state alone would show the stale value inside
@@ -71,6 +86,13 @@ export function useUndoableAutomaton(
     // FIFO eviction: drop the oldest entry. shift() is O(n) but n <= 50,
     // so the cost is negligible and the code stays obvious.
     if (stack.length > HISTORY_CAP) stack.shift();
+    setCanUndo(true);
+  }, []);
+
+  const clearRedoStack = useCallback(() => {
+    if (redoStackRef.current.length === 0) return;
+    redoStackRef.current = [];
+    setCanRedo(false);
   }, []);
 
   const setAutomaton = useCallback(
@@ -79,13 +101,13 @@ export function useUndoableAutomaton(
       const nextAutomaton = updater(previousSnapshot.automaton);
       if (nextAutomaton === previousSnapshot.automaton) return;
       pushCurrentOntoUndo();
-      redoStackRef.current = [];
+      clearRedoStack();
       setCurrent({
         automaton: nextAutomaton,
         epsilonSymbol: previousSnapshot.epsilonSymbol,
       });
     },
-    [pushCurrentOntoUndo]
+    [pushCurrentOntoUndo, clearRedoStack]
   );
 
   const setEpsilonSymbol = useCallback(
@@ -93,13 +115,13 @@ export function useUndoableAutomaton(
       const previousSnapshot = currentRef.current;
       if (next === previousSnapshot.epsilonSymbol) return;
       pushCurrentOntoUndo();
-      redoStackRef.current = [];
+      clearRedoStack();
       setCurrent({
         automaton: previousSnapshot.automaton,
         epsilonSymbol: next,
       });
     },
-    [pushCurrentOntoUndo]
+    [pushCurrentOntoUndo, clearRedoStack]
   );
 
   const undo = useCallback(() => {
@@ -107,6 +129,8 @@ export function useUndoableAutomaton(
     if (undoStack.length === 0) return;
     const previous = undoStack.pop()!;
     redoStackRef.current.push(currentRef.current);
+    setCanUndo(undoStack.length > 0);
+    setCanRedo(true);
     setCurrent(previous);
   }, []);
 
@@ -115,24 +139,19 @@ export function useUndoableAutomaton(
     if (redoStack.length === 0) return;
     const next = redoStack.pop()!;
     undoStackRef.current.push(currentRef.current);
+    setCanRedo(redoStack.length > 0);
+    setCanUndo(true);
     setCurrent(next);
   }, []);
 
   const clearHistory = useCallback(() => {
     undoStackRef.current = [];
     redoStackRef.current = [];
-    // Force re-render so canUndo/canRedo update. The snapshot itself is
-    // unchanged but consumers need to see the new false/false flags.
-    //
-    // CONTRACT (fragile, intentional): canUndo/canRedo are derived from
-    // ref'd stacks (see top-of-file rationale). React doesn't re-read those
-    // unless something else triggers a render. Every stack-mutating method
-    // in this hook ALSO calls setCurrent — that's what keeps the derived
-    // flags honest. clearHistory has nothing semantic to commit, so it
-    // pushes a same-content new-reference snapshot purely to provoke a
-    // render. If you add another stack-mutating method, you must do the
-    // same — or migrate canUndo/canRedo into useState (see Major Changes).
-    setCurrent((snapshot) => ({ ...snapshot }));
+    setCanUndo(false);
+    setCanRedo(false);
+    // No fake re-render needed: the flag setters above already trigger one
+    // when either flag actually changes (and a no-op clear is genuinely a
+    // no-op for consumers).
   }, []);
 
   return {
@@ -142,8 +161,8 @@ export function useUndoableAutomaton(
     setEpsilonSymbol,
     undo,
     redo,
-    canUndo: undoStackRef.current.length > 0,
-    canRedo: redoStackRef.current.length > 0,
+    canUndo,
+    canRedo,
     clearHistory,
   };
 }

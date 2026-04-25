@@ -1,0 +1,175 @@
+/* ===================================
+   Animations — keyframes shared across features, plus the small
+   classes that just instantiate them on canvas/SVG elements (state
+   nodes, edges, start arrow). Feature-specific instantiations of
+   the same keyframes (e.g. .editor-row.pulse-error in tool-menu.css)
+   live with their feature.
+   =================================== */
+
+/* ─── Source highlighting (notification target pulse) ─── */
+
+@keyframes pulse-error {
+  0%   { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.55); }
+  50%  { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+
+@keyframes pulse-warning {
+  0%   { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.55); }
+  50%  { box-shadow: 0 0 0 6px rgba(217, 119, 6, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
+}
+
+/* SVG circle / path pulse for canvas elements. Uses CSS variables so we can
+ * scale the colour per severity. */
+@keyframes pulse-stroke {
+  0%   { stroke-width: 2; }
+  50%  { stroke-width: 5; }
+  100% { stroke-width: 2; }
+}
+
+.pulse-canvas {
+  animation: pulse-stroke 0.7s ease-in-out 2;
+  transition: stroke 0.15s ease;
+}
+
+.pulse-canvas-error {
+  stroke: var(--error-stroke) !important;
+}
+
+@keyframes pulse-canvas-warn {
+  0%, 100% { stroke-opacity: 1; }
+  50%      { stroke-opacity: 0.55; }
+}
+
+.pulse-canvas-warning {
+  stroke: #d97706 !important;
+}
+
+/* Live preview of an in-progress transition edit. The opacity-pulse keeps
+ * the edge legible while signalling "this isn't committed yet" — same
+ * cadence across all three kinds so they read as one visual language. */
+@keyframes pulse-canvas-preview {
+  0%, 100% { stroke-opacity: 1; }
+  50%      { stroke-opacity: 0.5; }
+}
+
+.pulse-canvas-add,
+.pulse-canvas-modify,
+.pulse-canvas-delete {
+  animation: pulse-canvas-preview 1.4s ease-in-out infinite;
+  /* Override the brief stroke-width pulse from .pulse-canvas — preview
+   * highlights are continuous, not a one-shot attention grab. */
+  animation-iteration-count: infinite;
+}
+
+/* The actual color is set inline on the <path stroke="..."> for crisp
+ * coordination with the arrowhead fill, but we re-assert it here in case
+ * the path picks up !important from notification highlights. */
+.pulse-canvas-add    { stroke: #2563eb; }   /* blue-600   */
+.pulse-canvas-modify { stroke: #7c3aed; }   /* violet-600 */
+.pulse-canvas-delete { stroke: #dc2626; }   /* red-600    */
+
+/* State circles share the same pulse classes as edges (pulse-canvas +
+ * pulse-canvas-add/-modify/-error). The pulse-canvas-preview keyframe
+ * pulses stroke-opacity, which works equally well for circle and path
+ * strokes — no separate state-specific CSS needed. */
+
+/* Per-step edge pulse — fires once on every transition that just
+ * fired this simulation step (symbol-driven and ε-closure). Width
+ * grows, opacity flashes, then settles back to default — the eye
+ * sees the arrow being "taken." Single-shot via animation-iteration-
+ * count: 1; the parent re-keys the element on each step so a repeated
+ * fire restarts the animation. */
+@keyframes pulse-edge-fired {
+  0%   { stroke-width: 2; stroke-opacity: 1; }
+  30%  { stroke-width: 6; stroke-opacity: 1; }
+  100% { stroke-width: 3; stroke-opacity: 1; }
+}
+
+.edge-just-fired {
+  animation: pulse-edge-fired 0.5s ease-out 1 forwards;
+}
+
+/* ─── Aliveness (iter 10) ─── */
+/*
+ * Two infinite, low-amplitude breathing cues that make the page feel
+ * awake at idle without ever reading as "busy":
+ *
+ *   1. Start-state arrow: opacity 0.85 ↔ 1.0 over 2s. Marks the entry
+ *      point as "ready." Runs always — the start state is a permanent
+ *      marker, not competing with any simulation visual.
+ *
+ *   2. Accept-state inner ring: scale 0.97 ↔ 1.0 over 3s. Subtle goal
+ *      marker. Suspended during simulation (the class is only applied
+ *      when !isSimulating) so it can't fight with the active/result
+ *      coloring.
+ *
+ * Both use `ease-in-out` so there's no perceptible start/end beat.
+ * Different periods (2s vs 3s) keep them from appearing to pulse in
+ * sync, which would read as a single stronger motion.
+ */
+@keyframes start-arrow-breath {
+  0%, 100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  50% {
+    opacity: 0.55;
+    transform: translateX(-3px);
+  }
+}
+
+/* The arrow nudges left a few pixels and dims while it does — reads as
+ * the entry point "pulsing inward toward the start state." More visible
+ * than pure opacity at 0.85, still not distracting. */
+.start-arrow-breath {
+  animation: start-arrow-breath 2.4s ease-in-out infinite;
+  transform-origin: right center;
+}
+
+/* Branch-death pulse — fires once per dying state when the NFA (or
+ * dead-end DFA) loses a branch on a step. Stroke pulses red briefly,
+ * then fades back; the eye reads "that branch just died." Single-shot
+ * (no infinite loop) so a fast play doesn't strobe. */
+@keyframes pulse-die {
+  0% {
+    stroke-width: 2;
+    stroke-opacity: 1;
+    fill-opacity: 1;
+  }
+  40% {
+    stroke-width: 5;
+    stroke-opacity: 1;
+  }
+  100% {
+    stroke-width: 2;
+    stroke-opacity: 0.45;
+    fill-opacity: 0.5;
+  }
+}
+
+.state-dying {
+  animation: pulse-die 0.7s ease-out 1 forwards;
+}
+
+/* Transition-creator slot pulse (lives in tool-menu.css). Keyframe is
+ * shared with no other consumer right now, but it belongs with the
+ * other animation keyframes. */
+@keyframes mini-transition-pulse {
+  0%, 100% {
+    stroke-opacity: 1;
+    filter: drop-shadow(0 0 0 var(--blue-300));
+  }
+  50% {
+    stroke-opacity: 0.6;
+    filter: drop-shadow(0 0 4px var(--blue-300));
+  }
+}
+
+/* State-node pickable breath (lives in canvas.css). Keyframe shared
+ * here for consistency with the other "alive at idle" animations. */
+@keyframes state-node-pickable-breath {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(59, 130, 246, 0)); }
+  50%      { filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.45)); }
+}

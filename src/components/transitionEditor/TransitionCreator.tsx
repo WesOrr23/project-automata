@@ -35,6 +35,7 @@ import {
 } from './creationReducer';
 import { MiniTransitionSVG } from './MiniTransitionSVG';
 import { StatePickerPopover, type PickerOption } from '../popover/StatePickerPopover';
+import { useKeyboardScope } from '../../hooks/useKeyboardScope';
 
 type TransitionCreatorProp = {
   automaton: Automaton;
@@ -131,16 +132,18 @@ export function TransitionCreator({
   // reliable way to back out of any state, including "I just clicked an
   // edge but actually didn't want to do anything." The reset is cheap;
   // only the picker popover actually loses anything from the early-out.
-  useEffect(() => {
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key !== 'Escape') return;
+  useKeyboardScope({
+    id: 'transition-creator-escape',
+    active: true,
+    capture: false,
+    onKey: (event) => {
+      if (event.key !== 'Escape') return false;
       setPickerSlot(null);
       setPickerAnchor(null);
       dispatch({ type: 'reset' });
-    }
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [dispatch]);
+      return true;
+    },
+  });
 
   // Auto-focus the symbol input when both source + destination are filled
   // (so the user lands directly in the symbol field after the second pick,
@@ -281,31 +284,23 @@ export function TransitionCreator({
 
   // Global Enter — commit the form regardless of focus, so the user can
   // click out of the symbol input (e.g. onto the canvas) and still confirm
-  // by pressing Enter. Skip if focus is in some other input (e.g. the new-
-  // symbol field above) or if the state-actions popover is open. Also
-  // skipped in delete mode (loaded-but-unchanged) — see handleSymbolKeyDown
-  // for the reasoning.
-  useEffect(() => {
-    function onEnter(event: KeyboardEvent) {
-      if (event.key !== 'Enter') return;
-      const target = event.target as HTMLElement | null;
-      if (
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'TEXTAREA' ||
-        target?.isContentEditable
-      ) {
-        // Enter inside the symbol input is handled by handleSymbolKeyDown;
-        // Enter inside other inputs (alphabet field, etc.) shouldn't trigger
-        // a transition commit.
-        return;
-      }
-      if (document.querySelector('.state-actions-popover')) return;
-      if (modeRef.current === 'delete') return;
+  // by pressing Enter. The scope manager handles the text-input filter
+  // (Enter inside the symbol input is processed by handleSymbolKeyDown
+  // directly on the input). Capturing scopes layered above (e.g. an open
+  // state-actions popover) preempt this scope automatically — no explicit
+  // querySelector check needed. Also skipped in delete mode
+  // (loaded-but-unchanged) — see handleSymbolKeyDown for the reasoning.
+  useKeyboardScope({
+    id: 'transition-creator-enter',
+    active: true,
+    capture: false,
+    onKey: (event) => {
+      if (event.key !== 'Enter') return false;
+      if (modeRef.current === 'delete') return false;
       handleActionRef.current();
-    }
-    document.addEventListener('keydown', onEnter);
-    return () => document.removeEventListener('keydown', onEnter);
-  }, []);
+      return true;
+    },
+  });
 
   // (No global Del shortcut for transition deletion — was unreliable in
   // browser testing. The Delete button on the form is the canonical path
@@ -316,19 +311,16 @@ export function TransitionCreator({
   // it as the new symbol and move focus into the input. This lets the
   // user "click an edge, type a new symbol" without an intermediate click,
   // while leaving Del free to delete (no auto-focused input swallowing
-  // characters first).
-  useEffect(() => {
-    function onChar(event: KeyboardEvent) {
-      if (state.editingExisting === null) return;
-      if (event.key.length !== 1) return; // only single-char printable keys
-      if (event.ctrlKey || event.metaKey || event.altKey) return;
-      const target = event.target as HTMLElement | null;
-      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) {
-        return;
-      }
-      if (document.querySelector('.state-actions-popover')) return;
-      if (!automaton.alphabet.has(event.key)) return;
-
+  // characters first). Transparent — passes through if the key isn't a
+  // valid alphabet symbol (e.g. arrow keys, modifiers).
+  useKeyboardScope({
+    id: 'transition-creator-type-to-modify',
+    active: state.editingExisting !== null,
+    capture: false,
+    onKey: (event) => {
+      if (event.key.length !== 1) return false; // only single-char printable keys
+      if (event.ctrlKey || event.metaKey || event.altKey) return false;
+      if (!automaton.alphabet.has(event.key)) return false;
       event.preventDefault();
       event.stopPropagation();
       dispatch({ type: 'symbolChanged', symbol: event.key });
@@ -336,10 +328,9 @@ export function TransitionCreator({
       // to clear, then re-type). The symbolChanged dispatch happens first
       // so React renders the new value before focus lands.
       symbolInputRef.current?.focus();
-    }
-    document.addEventListener('keydown', onChar);
-    return () => document.removeEventListener('keydown', onChar);
-  }, [state.editingExisting, automaton.alphabet, dispatch]);
+      return true;
+    },
+  });
 
   const sourceLabel = state.source !== null ? labelFor(state.source) : null;
   const destinationLabel =

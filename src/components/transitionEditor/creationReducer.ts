@@ -450,7 +450,7 @@ export function computePreview<T extends TransitionLike>(
         to: newDestination,
         symbol: newSymbol,
         kind: 'modify',
-        oldSymbol: oldSymbol === null ? undefined : oldSymbol,
+        ...(oldSymbol !== null && { oldSymbol }),
       },
     ];
     if (conflict !== undefined) {

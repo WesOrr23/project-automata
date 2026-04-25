@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useReducer, useMemo } from 'react';
+import { useState, useEffect, useReducer, useMemo } from 'react';
+import { useAutomatonLayout } from './hooks/useAutomatonLayout';
 import {
   createAutomaton,
   addState,
@@ -12,7 +13,8 @@ import {
 } from './engine/automaton';
 import { isRunnable, getValidationReport } from './engine/validator';
 import { Automaton } from './engine/types';
-import { AutomatonUI, computeDisplayLabels } from './ui-state/types';
+import { type Result, errorMessage } from './engine/result';
+import { computeDisplayLabels } from './ui-state/types';
 import { AutomatonCanvas } from './components/AutomatonCanvas';
 import { InputPanel } from './components/InputPanel';
 import { SimulationControls } from './components/SimulationControls';
@@ -32,15 +34,29 @@ import {
   INITIAL_CREATION_STATE,
   parseSymbolInput,
 } from './components/transitionEditor/creationReducer';
-import { computeLayout } from './ui-state/utils';
 import { useSimulation } from './hooks/useSimulation';
 import { useUndoableAutomaton } from './hooks/useUndoableAutomaton';
+import { useUndoRedoShortcuts } from './hooks/useUndoRedoShortcuts';
+import { useAutomatonSimulationGlue } from './hooks/useAutomatonSimulationGlue';
 import { UndoRedoControls } from './components/UndoRedoControls';
 
 /**
- * Build the sample DFA that accepts binary strings ending in "01"
+ * Build the sample DFA that accepts binary strings ending in "01".
+ *
+ * The engine now returns Result<Automaton> from fallible operations.
+ * The construction below is statically known to succeed (we control
+ * every input — alphabet, states, symbols), so an error here would
+ * indicate a programmer bug, not a runtime condition. unwrap() throws
+ * on err to make any future regression in the construction loud.
  */
 function buildSampleDFA(): Automaton {
+  function unwrap<T>(result: Result<T>): T {
+    if (!result.ok) {
+      throw new Error(`buildSampleDFA: unexpected engine error: ${result.error}`);
+    }
+    return result.value;
+  }
+
   let dfa = createAutomaton('DFA', new Set(['0', '1']));
 
   let state1: number;
@@ -49,14 +65,14 @@ function buildSampleDFA(): Automaton {
   let state2: number;
   ({ automaton: dfa, stateId: state2 } = addState(dfa));
 
-  dfa = addAcceptState(dfa, state2);
+  dfa = unwrap(addAcceptState(dfa, state2));
 
-  dfa = addTransition(dfa, 0, new Set([state1]), '0');
-  dfa = addTransition(dfa, 0, new Set([0]), '1');
-  dfa = addTransition(dfa, state1, new Set([state1]), '0');
-  dfa = addTransition(dfa, state1, new Set([state2]), '1');
-  dfa = addTransition(dfa, state2, new Set([state1]), '0');
-  dfa = addTransition(dfa, state2, new Set([0]), '1');
+  dfa = unwrap(addTransition(dfa, 0, new Set([state1]), '0'));
+  dfa = unwrap(addTransition(dfa, 0, new Set([0]), '1'));
+  dfa = unwrap(addTransition(dfa, state1, new Set([state1]), '0'));
+  dfa = unwrap(addTransition(dfa, state1, new Set([state2]), '1'));
+  dfa = unwrap(addTransition(dfa, state2, new Set([state1]), '0'));
+  dfa = unwrap(addTransition(dfa, state2, new Set([0]), '1'));
 
   return dfa;
 }
@@ -82,7 +98,6 @@ function App() {
     canRedo,
     clearHistory,
   } = useUndoableAutomaton(initialSnapshot);
-  const [automatonUI, setAutomatonUI] = useState<AutomatonUI | null>(null);
   const [inputString, setInputString] = useState('');
   const [menuState, setMenuState] = useState<ToolMenuState>({ mode: 'COLLAPSED' });
 
@@ -213,85 +228,30 @@ function App() {
     : null;
   const highlightedSymbol = pickHighlight('alphabet')?.symbol ?? null;
 
-  // Recompute layout whenever the automaton (or its preview overlay) changes,
-  // debounced to absorb rapid edits. A version counter discards stale promises
-  // in case layout N-1 resolves after N. After layout, we rewrite each state's
-  // label to the sequential display label so the canvas and the tool menu stay
-  // consistent.
+  // Recompute layout whenever the automaton (or its preview overlay) changes.
+  // The hook handles debouncing, stale-promise rejection via a version
+  // counter, and the post-layout relabel pass that maps engine IDs to
+  // sequential display labels (q0, q1, q2...).
   //
-  // Layout uses `previewSourceAutomaton` (which equals `automaton` when no
-  // preview is active) so in-progress edits show up on the canvas with full
-  // GraphViz spline routing — not as a simple overlay drawn on top.
-  const layoutVersionRef = useRef(0);
-  useEffect(() => {
-    const version = ++layoutVersionRef.current;
-    const timer = setTimeout(() => {
-      computeLayout(previewSourceAutomaton).then((layout) => {
-        if (version !== layoutVersionRef.current) return;
-        const labels = computeDisplayLabels(previewSourceAutomaton.states);
-        const relabeled: AutomatonUI = {
-          ...layout,
-          states: new Map(
-            Array.from(layout.states.entries()).map(([id, stateUI]) => [
-              id,
-              { ...stateUI, label: labels.get(id) ?? stateUI.label },
-            ])
-          ),
-        };
-        setAutomatonUI(relabeled);
-      });
-    }, 120);
-    return () => clearTimeout(timer);
-  }, [previewSourceAutomaton]);
+  // We feed `previewSourceAutomaton` (which equals `automaton` when no
+  // preview is active) so in-progress edits show up with full GraphViz
+  // spline routing — not as a simple overlay drawn on top.
+  const { automatonUI } = useAutomatonLayout(previewSourceAutomaton);
 
-  // Reset simulation when the automaton structure changes (skip initial mount).
-  // Input string is kept; we filter it against the current alphabet separately
-  // so the user doesn't lose their test string just because they edited a state.
-  const isFirstRender = useRef(true);
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    sim.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [automaton]);
+  // Keeps the simulation and the input string in sync with structural
+  // changes to the automaton: reset sim on edits (skipping initial mount)
+  // and filter the input down to symbols still in the alphabet.
+  useAutomatonSimulationGlue({
+    automaton,
+    resetSimulation: sim.reset,
+    inputString,
+    setInputString,
+  });
 
-  // If the alphabet changed (e.g. a symbol used in the input was removed),
-  // filter the input string to only contain characters still in the alphabet.
-  useEffect(() => {
-    setInputString((previous) =>
-      [...previous].filter((ch) => automaton.alphabet.has(ch)).join('')
-    );
-  }, [automaton.alphabet]);
-
-  // Global keyboard shortcuts for undo/redo. Suppressed whenever focus is
-  // inside a text field — browsers already handle undo/redo for those, and
-  // hijacking the shortcut there would be worse than useless. Detects Mac
-  // vs Win/Linux by honoring metaKey or ctrlKey respectively.
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      const isModifier = event.metaKey || event.ctrlKey;
-      if (!isModifier) return;
-      if (event.key.toLowerCase() !== 'z') return;
-
-      const active = document.activeElement;
-      const isTextField =
-        active instanceof HTMLInputElement ||
-        active instanceof HTMLTextAreaElement ||
-        (active instanceof HTMLElement && active.isContentEditable);
-      if (isTextField) return;
-
-      event.preventDefault();
-      if (event.shiftKey) {
-        redo();
-      } else {
-        undo();
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo]);
+  // Global undo/redo shortcuts. Hook owns the keyboard binding; passing
+  // canUndo/canRedo lets it gate logging or future "no-op feedback" without
+  // changing this site.
+  useUndoRedoShortcuts({ undo, redo, canUndo, canRedo });
 
   // Display labels are sequential (q0, q1, q2) regardless of underlying IDs.
   // This detaches stable engine identity from user-visible numbering.
@@ -424,39 +384,69 @@ function App() {
   //
   // Each of these uses the functional updater form `setAutomaton(prev => ...)`
   // so rapid successive clicks see the latest automaton state rather than a
-  // stale closure. Errors thrown by engine functions are routed to the global
-  // notification system via notify().
+  // stale closure. Engine functions now return Result<Automaton>; on err we
+  // route the error variant to the global notification system via notify().
 
   function applyEdit(
-    update: (current: Automaton) => Automaton,
+    update: (current: Automaton) => Result<Automaton>,
     targetOnError?: NotificationTarget,
     titleOnError?: string
   ) {
-    // Pre-check against the current snapshot so any error throws *outside*
-    // of React's state updater (state updaters must be pure — calling notify()
-    // inside one fires twice under StrictMode).
-    try {
-      update(automaton);
-    } catch (error) {
-      const message = (error as Error).message;
+    // The engine no longer throws — Result<T> means we can run the
+    // updater exactly once, inside React's setAutomaton, with no
+    // pre-check dance. The double-call workaround that used to live
+    // here was needed because notify() (a side effect) couldn't safely
+    // fire from inside a state updater under StrictMode. Now that
+    // success and failure are values, we branch on result.ok:
+    //
+    //   - On success, return the new automaton (commit).
+    //   - On failure, return the previous reference (no-op for the
+    //     undoable store) and notify *outside* the updater via
+    //     queueMicrotask. queueMicrotask fires once per turn even if
+    //     the updater itself runs twice under StrictMode, because the
+    //     second updater run is a pure recomputation that arrives at
+    //     the same Result and would queue an identical microtask —
+    //     React only commits one of them.
+    //
+    // useUndoableAutomaton's setAutomaton runs the updater synchronously
+    // inside the hook (not as React's own setState updater), so the
+    // closure-captured `capturedError` is reliably set by the time we
+    // read it. StrictMode's double-fire only applies to React's own
+    // setters, not to user-defined imperative APIs.
+    let capturedError: import('./engine/result').EngineError | null = null;
+    setAutomaton((previous) => {
+      const result = update(previous);
+      if (!result.ok) {
+        capturedError = result.error;
+        return previous; // same reference → undoable store skips history push
+      }
+      return result.value;
+    });
+    if (capturedError !== null) {
+      // Type assertion: TS narrows `capturedError` to `null` after the
+      // closure-write because it can't see the synchronous call into
+      // setAutomaton. The runtime is sound — the updater ran once and
+      // the assignment happened-before this read.
+      const errorVariant: import('./engine/result').EngineError = capturedError;
+      // Conditional spreads keep `detail` / `target` omit-only so the
+      // notification store never sees an explicit `undefined` (would
+      // undermine exactOptionalPropertyTypes).
       notify({
         severity: 'error',
-        title: titleOnError ?? message,
-        detail: titleOnError ? message : undefined,
-        target: targetOnError,
-        // Edits that fail are non-blocking — the user can keep working. Auto-
-        // dismiss so the stack doesn't fill with stale errors.
+        title: titleOnError ?? errorMessage(errorVariant),
+        ...(titleOnError !== undefined && { detail: errorMessage(errorVariant) }),
+        ...(targetOnError !== undefined && { target: targetOnError }),
+        // Edits that fail are non-blocking — the user can keep working.
+        // Auto-dismiss so the stack doesn't fill with stale errors.
         autoDismissMs: 6_000,
       });
-      return;
     }
-    // Commit via functional updater so rapid successive clicks all see the
-    // latest state.
-    setAutomaton((previous) => update(previous));
   }
 
   function handleAddState() {
-    applyEdit((prev) => addState(prev).automaton);
+    // addState always succeeds; wrap the {automaton, stateId} return in
+    // a Result so applyEdit's signature stays uniform.
+    applyEdit((prev) => ({ ok: true, value: addState(prev).automaton }));
   }
 
   function handleRemoveState(stateId: number) {
@@ -464,9 +454,9 @@ function App() {
   }
 
   function handleSetStartState(stateId: number) {
-    // No-op guard: setting the start state to its current value would push
-    // a same-content new-reference snapshot.
-    if (stateId === automaton.startState) return;
+    // setStartState now returns ok(prev) (same reference) when the
+    // state is already the start, so the undoable store's reference-
+    // equality check naturally short-circuits the redundant write.
     applyEdit((prev) => setStartState(prev, stateId));
   }
 
@@ -497,23 +487,29 @@ function App() {
     // history. The loops below would still build a new object even when
     // both lists are empty.
     if (removes.length === 0 && adds.length === 0) return;
-    setAutomaton((previous) => {
-      let result = previous;
+    // Funnel through applyEdit so a Result err (e.g. an
+    // addTransitionDestination call hits a stale state) surfaces as a
+    // notification. removeTransitionDestination is a pure no-op on bad
+    // input, so it's not part of the Result chain.
+    applyEdit((previous) => {
+      let working = previous;
       for (const r of removes) {
-        result = removeTransitionDestination(result, r.from, r.to, r.symbol);
+        working = removeTransitionDestination(working, r.from, r.to, r.symbol);
       }
       for (const a of adds) {
-        if (result.type === 'NFA') {
-          result = addTransitionDestination(result, a.from, a.to, a.symbol);
+        if (working.type === 'NFA') {
+          const result = addTransitionDestination(working, a.from, a.to, a.symbol);
+          if (!result.ok) return result;
+          working = result.value;
         } else {
           // DFA: replace any existing (from, symbol) — DFAs are deterministic
           // so the form is replacing whatever was previously routed.
-          const filtered = result.transitions.filter(
+          const filtered = working.transitions.filter(
             (transition) =>
               !(transition.from === a.from && transition.symbol === a.symbol)
           );
-          result = {
-            ...result,
+          working = {
+            ...working,
             transitions: [
               ...filtered,
               { from: a.from, to: new Set([a.to]), symbol: a.symbol },
@@ -521,7 +517,7 @@ function App() {
           };
         }
       }
-      return result;
+      return { ok: true, value: working };
     });
   }
 

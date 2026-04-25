@@ -1,0 +1,886 @@
+/* ===================================
+   Tool Menu — 3-state sidebar (collapsed / expanded / open),
+   tabs and panels, and the editors that live inside the panels:
+   alphabet badges, editor list rows, transition grid, transition
+   creator, in-row pulse highlights.
+   =================================== */
+
+/* ─── Tool Menu (3-state sidebar, single-architecture rewrite) ─── */
+/*
+ * One DOM, three sizes. The menu always renders three rows (one per
+ * tab); the container width controls how much of each row is visible.
+ *
+ * Geometry invariants:
+ *  - Vertical center of the menu is pinned to viewport center via
+ *    translateY(-50%). All size changes are symmetric about that center.
+ *  - COLLAPSED and EXPANDED have identical heights (only width animates).
+ *  - OPEN grows symmetrically up and down from center to fit the active
+ *    tab's content, capped at 95vh to leave breathing room.
+ *
+ * Two-stage open transition is implemented via per-state transition
+ * declarations: when the destination is OPEN, width animates first
+ * with max-height delayed; when leaving OPEN, max-height animates
+ * first with width delayed. Each rule lives on its destination class.
+ */
+.tool-menu {
+  position: fixed;
+  left: var(--space-4);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-subtle);
+  /* Default radius is the pill — matches undo/redo when COLLAPSED.
+   * EXPANDED/OPEN drop to a much smaller radius (--radius-md) so the
+   * wider container doesn't read as a giant circle. */
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-2);
+  /* Hide row content that overflows the current container width — that
+   * clipping is what creates the icon-only look in COLLAPSED mode. */
+  overflow: hidden;
+  /* Default transition (used when target is COLLAPSED or EXPANDED).
+   *
+   * Order: border-radius FIRST (no delay), then width (delayed by
+   * 0.3s). Why split them: border-radius 999px caps at min-dim/2, so
+   * if both width and border-radius transition together, the rendered
+   * radius LOOKS pill-shaped the entire time (because min(width/2,
+   * transitioning-value) stays at width/2 for narrow widths). Letting
+   * border-radius finish first means the corners are already at their
+   * destination shape (12px or pill) before the width starts moving.
+   *
+   * max-height also has no delay — collapsed and expanded share the
+   * same max-height value so this transition is mostly a no-op for
+   * those, but it kicks in cleanly when leaving OPEN: height drops
+   * first, then width and radius shape back into a pill. */
+  /* Auto-height baseline so tab-switch height adjustments transition
+   * via interpolate-size. height itself is included in the transition
+   * list. */
+  height: auto;
+  transition:
+    height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    max-height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-radius 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s;
+}
+
+/* COLLAPSED — narrow icon strip. Inner row width 32 + 8 padding × 2 = 48. */
+.tool-menu-collapsed {
+  width: 48px;
+  max-height: 120px;
+}
+
+/* EXPANDED — same height, wider. Reveals the labels by un-clipping the
+ * row content. */
+.tool-menu-expanded {
+  width: 152px;
+  max-height: 120px;
+  border-radius: var(--radius-md);
+}
+
+/* OPEN — wider still, height grows to fit content. Width transitions
+ * FIRST (no delay), max-height SECOND (delayed) — explicit two-stage
+ * "open out, then drop down" gesture the user asked for.
+ *
+ * height: auto on the base + interpolate-size: allow-keywords means
+ * subsequent tab swaps re-resize the menu smoothly without needing a
+ * separate transition rule. The `height` curve here is shared — it
+ * picks up tab-switch resize too. */
+.tool-menu-open {
+  width: 280px;
+  max-height: 95vh;
+  border-radius: var(--radius-md);
+  transition:
+    width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-radius 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    max-height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s;
+}
+
+/* ─── Tab rows ─── */
+/*
+ * Same DOM in every mode. Width tracks the container's inner width
+ * (rows are flex children with width:100%), so growing the container
+ * grows each row in lockstep. The icon sits at a fixed offset from
+ * the row's left edge — same pixel position in every mode — so it
+ * never shifts during a width transition.
+ *
+ * Border + background fade in alongside the width animation: in
+ * COLLAPSED there's no chrome, so a 32×32 icon-only feel; in
+ * EXPANDED/OPEN the pill outline appears as the labels do. Single
+ * 0.28s curve carries everything.
+ */
+.tool-menu-row {
+  width: 100%;
+  height: 32px;
+  flex: 0 0 32px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-body);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+  text-align: left;
+  /* Children that overflow the row's own (clipped) width should be
+   * hidden — the label is the main one this affects. */
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    background 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.tool-menu-row > svg {
+  flex: 0 0 auto;
+  /* Icons sit just inside the row's left padding. Their position is
+   * the same in every mode — labels appear to the right of them. */
+}
+
+.tool-menu-row-label {
+  flex: 1 1 auto;
+  opacity: 0;
+  /* Slight x-translate alongside the fade reads as the label sliding
+   * in from behind the icon, matching the container's right-ward
+   * widening gesture. */
+  transform: translateX(-4px);
+  transition:
+    opacity 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Pill chrome appears whenever the row has space to display it —
+ * EXPANDED and OPEN both qualify. */
+.tool-menu-expanded .tool-menu-row,
+.tool-menu-open .tool-menu-row {
+  background: var(--bg-button);
+  border-color: var(--border-subtle);
+}
+
+.tool-menu-expanded .tool-menu-row-label,
+.tool-menu-open .tool-menu-row-label {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.tool-menu-row:hover {
+  background: var(--bg-button-hover);
+  color: var(--blue-600);
+  border-color: rgba(59, 130, 246, 0.25);
+}
+
+.tool-menu-collapsed .tool-menu-row:hover {
+  /* In COLLAPSED, the row's chrome is invisible by default — let the
+   * hover reveal it as a subtle confirmation that the click target
+   * is alive without committing to the full pill look. */
+  background: var(--bg-button-hover);
+  border-color: transparent;
+}
+
+.tool-menu-row:active:not(:disabled) {
+  transform: scale(0.97);
+  transition: transform 80ms ease-out;
+}
+
+/* ─── Active row + content panel: visually united ─── */
+/*
+ * DOM-wise these are siblings (the row stays stable across mode
+ * changes, the panel just appears beneath). Visually we glue them
+ * into one rounded card by:
+ *   - active row: full chrome on top, left, right; bottom corners
+ *     squared off; bottom border swapped for the panel-shared color
+ *     so the seam reads as a header divider, not a card edge.
+ *   - active content panel: top corners squared off; left, right,
+ *     bottom borders matching the row's accent color; no top border
+ *     (the row's bottom border supplies it).
+ * Together they look like one card with a header strip.
+ */
+.tool-menu-row.active {
+  color: var(--blue-700);
+  background: var(--blue-50);
+  border-color: var(--blue-300);
+  /* Square the bottom corners so the active row visually merges with
+   * the content panel beneath. */
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  /* Slightly darker bottom border = the "header divider" between the
+   * active row and the content panel. */
+  border-bottom-color: var(--blue-300);
+  cursor: default;
+  /* Keep header height aligned with regular rows so the menu's
+   * vertical rhythm doesn't lurch when a tab activates. */
+}
+
+.tool-menu-row.active:hover {
+  /* No hover chrome change on the active row — it's already where the
+   * user just clicked. */
+  background: var(--blue-50);
+  color: var(--blue-700);
+  border-color: var(--blue-300);
+}
+
+/* Inline collapse button on the right edge of the active row. */
+.tool-menu-row-collapse {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--blue-700);
+  cursor: pointer;
+  transition:
+    background 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.tool-menu-row-collapse:hover {
+  background: rgba(59, 130, 246, 0.18);
+  color: var(--blue-800);
+}
+
+.tool-menu-row-collapse:active:not(:disabled) {
+  transform: scale(0.92);
+  transition: transform 80ms ease-out;
+}
+
+.tool-menu-active-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow-y: auto;
+  background: var(--bg-sidebar);
+  /* Top corners flat — the row above provides the top edge. */
+  border: 1px solid var(--blue-300);
+  border-top: none;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  /* Pull the panel's top edge up so its border continues the active
+   * row's bottom border with no visible gap. The container's `gap`
+   * would otherwise insert space between the two siblings. */
+  margin-top: calc(var(--space-1) * -1);
+  /* Fade + slight upward slide every time a panel mounts — both on
+   * first OPEN and on tab switches (the React key on this element
+   * forces remount per active tab so @starting-style fires every
+   * time, not only once). */
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@starting-style {
+  .tool-menu-active-content {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* ─── Alphabet badges (Config tab) ─── */
+.alphabet-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.alphabet-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-1) 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--blue-50);
+  border: 1px solid var(--blue-200);
+  color: var(--blue-700);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+
+.alphabet-badge-symbol {
+  line-height: 1;
+}
+
+.alphabet-badge-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-4);
+  height: var(--space-4);
+  border-radius: var(--radius-pill);
+  border: none;
+  background: transparent;
+  color: var(--blue-600);
+  cursor: pointer;
+  transition:
+    background 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.alphabet-badge-remove:hover:not(:disabled) {
+  background: var(--blue-200);
+  color: var(--error-text);
+  transform: scale(1.1);
+}
+
+.alphabet-badge-remove:active:not(:disabled) {
+  transform: scale(0.92);
+  transition: transform 80ms ease-out;
+}
+
+.alphabet-badge-remove:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ─── State editor list rows (Edit tab) ─── */
+.editor-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* Scrollable variant — used for the transitions list so a long list doesn't
+ * grow the whole edit pane and crush the Configure / Simulate cards below. */
+.editor-list-scroll {
+  max-height: 280px;
+  overflow-y: auto;
+  /* Scrollbar gutter reserves space so the list doesn't reflow when a
+   * scrollbar appears. */
+  scrollbar-gutter: stable;
+}
+
+/* ─── Transition Grid (CSS Grid layout) ─── */
+/*
+ * Layout (NOT a <table>):
+ *
+ *   .transition-grid-shell           relative anchor for fade overlays
+ *     .transition-grid               2x2 CSS grid (auto auto + auto 1fr)
+ *       .transition-grid-corner      grid (1,1)
+ *       .transition-grid-col-headers grid (1,2) — overflow:hidden, scrolled by JS
+ *       .transition-grid-row-headers grid (2,1) — overflow:hidden, scrolled by JS
+ *       .transition-grid-data        grid (2,2) — overflow:auto (the real scroller)
+ *     .transition-grid-fade-*        absolute fade strips just inside headers
+ *
+ * Each section is its own scroll container. The data area's scroll is
+ * mirrored (via React onScroll) into col-headers and row-headers so they
+ * track horizontally / vertically.
+ *
+ * Cells inside .transition-grid-data are themselves a CSS grid (set inline
+ * by the React component to the right column count). Same for header strips.
+ */
+
+/* The shell is just an anchor for absolutely-positioned fade overlays.
+ * It doesn't constrain height — vertical scroll lives at the active card
+ * level (.tool-menu-card-content). The grid grows naturally tall to fit
+ * all rows; horizontal scroll is the only scroll the grid itself owns. */
+.transition-grid-shell {
+  position: relative;
+}
+
+.transition-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--bg-sidebar);
+}
+
+/* Top-left corner — empty cell that anchors the header / row-header join. */
+.transition-grid-corner {
+  grid-column: 1;
+  grid-row: 1;
+  background: var(--bg-sidebar);
+}
+
+/* Top header strip — scrolls horizontally to track the data area. The
+ * outer wraps; the inner is the actual grid of header cells. */
+.transition-grid-col-headers {
+  grid-column: 2;
+  grid-row: 1;
+  overflow: hidden;
+  background: var(--bg-sidebar);
+}
+
+.transition-grid-col-header {
+  text-align: center;
+  font-weight: var(--weight-bold);
+  color: var(--blue-700);
+  padding: var(--space-1) 0 var(--space-2);
+  min-width: var(--space-7);
+}
+
+/* Left header strip — no scroll. Lives in the same vertical flow as the
+ * data area; both grow tall together and the parent (.tool-menu-card-content)
+ * scrolls if needed. */
+.transition-grid-row-headers {
+  grid-column: 1;
+  grid-row: 2;
+  background: var(--bg-sidebar);
+}
+
+.transition-grid-row-header {
+  text-align: right;
+  font-weight: var(--weight-bold);
+  color: var(--text-heading);
+  padding: 0 var(--space-3) 0 var(--space-1);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* Data area — horizontal scroll only. Grows tall naturally; the active
+ * card scrolls vertically if total content exceeds viewport. */
+.transition-grid-data {
+  grid-column: 2;
+  grid-row: 2;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* ─── Cells ─── */
+
+.transition-grid-cell {
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.transition-grid-cell:hover {
+  background: var(--blue-50);
+}
+
+.transition-grid-cell-missing {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--text-secondary);
+  opacity: 0.5;
+}
+
+.transition-grid-cell-missing:hover {
+  opacity: 1;
+  background: var(--blue-50);
+  box-shadow: inset 0 0 0 1px var(--blue-400);
+}
+
+.transition-grid-cell:focus-within {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+.transition-grid-trigger {
+  /* Reset native button styling; fill the cell. */
+  width: 100%;
+  padding: var(--space-1);
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: var(--text-heading);
+  text-align: center;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.transition-grid-cell-missing .transition-grid-trigger {
+  color: var(--text-secondary);
+}
+
+.transition-grid-trigger:focus {
+  outline: none;
+}
+
+/* ─── Fade overlays ─── */
+/* Pinned just *inside* the sticky headers, fading from white → transparent
+ * as you move away from each header. Effect: as data scrolls toward the
+ * header it's about to be hidden behind, it softly fades to white instead
+ * of cutting off hard.
+ *
+ *   - fade-below-col-header: horizontal strip, sits just below the top
+ *     header. Fades top (white) to bottom (transparent). Data scrolling up
+ *     into the header zone fades out as it approaches.
+ *
+ *   - fade-right-of-row-header: vertical strip, sits just right of the
+ *     left header. Fades left (white) to right (transparent). Data
+ *     scrolling left into the header zone fades out as it approaches.
+ *
+ * Positioned on the shell (outside the scroll wrap) so they don't scroll.
+ * The CSS variables for header dimensions are written by TransitionGrid
+ * after measuring the rendered header. */
+
+.transition-grid-fade {
+  position: absolute;
+  pointer-events: none;
+  z-index: 4; /* above sticky headers (z=2,3) so the gradient covers them at the join */
+}
+
+/* Vertical strip just to the right of the row-header column. As cells
+ * scroll horizontally toward the row header, they fade into white before
+ * disappearing under it. */
+.transition-grid-fade-right-of-row {
+  top: var(--transition-grid-header-h, 28px);
+  left: var(--transition-grid-row-header-w, 36px);
+  width: 20px;
+  bottom: 0;
+  background: linear-gradient(
+    to right,
+    var(--bg-sidebar) 0%,
+    var(--bg-sidebar) 30%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+/* Horizontal strip just below the col-header row. As cells scroll
+ * vertically toward the top header, they fade into white before
+ * disappearing under it. */
+.transition-grid-fade-below-col {
+  top: var(--transition-grid-header-h, 28px);
+  left: var(--transition-grid-row-header-w, 36px);
+  right: 0;
+  height: 20px;
+  background: linear-gradient(
+    to bottom,
+    var(--bg-sidebar) 0%,
+    var(--bg-sidebar) 30%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+/* ─── Custom transition cell popover ─── */
+
+.transition-cell-popover {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-sidebar);
+  box-shadow: var(--shadow-lg);
+  max-height: 240px;
+  overflow-y: auto;
+  outline: none;
+}
+
+.transition-cell-popover-option {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  padding: var(--space-1) var(--space-2);
+  border: none;
+  background: transparent;
+  color: var(--text-heading);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.transition-cell-popover-option.empty {
+  color: var(--text-secondary);
+}
+
+.transition-cell-popover-option.highlighted {
+  background: var(--blue-100);
+  color: var(--blue-700);
+}
+
+.transition-cell-popover-option[aria-selected='true'] {
+  background: var(--blue-500);
+  color: white;
+}
+
+.transition-cell-popover-option[aria-selected='true'].highlighted {
+  background: var(--blue-600);
+}
+
+.editor-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+}
+
+.editor-row-label {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-heading);
+}
+
+.editor-row-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-5);
+  height: var(--space-5);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-button);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.editor-row-action:hover:not(:disabled) {
+  background: var(--bg-button-hover);
+  color: var(--text-body);
+  transform: scale(1.05);
+}
+
+.editor-row-action:active:not(:disabled) {
+  transform: scale(0.95);
+  transition: transform 80ms ease-out;
+}
+
+.editor-row-action:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.editor-row-action.active {
+  background: var(--blue-500);
+  color: white;
+  border-color: var(--blue-600);
+}
+
+.editor-row-action.active:hover:not(:disabled) {
+  background: var(--blue-600);
+}
+
+.editor-row-action.danger:hover:not(:disabled) {
+  background: var(--error-bg);
+  color: var(--error-text);
+  border-color: var(--error-border);
+}
+
+.editor-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.editor-select {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-input);
+  color: var(--text-heading);
+  cursor: pointer;
+}
+
+.editor-validation-banner {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--error-bg);
+  color: var(--error-text);
+  border: 1px solid var(--error-border);
+  font-size: var(--text-sm);
+}
+
+.editor-validation-banner.warning {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+/* ─── Transition Creator (visual transition editor) ─── */
+
+.transition-creator {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+}
+
+.transition-creator-svg-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.mini-transition-svg {
+  user-select: none;
+  display: block;
+}
+
+.mini-transition-slot {
+  cursor: pointer;
+}
+
+.mini-transition-slot circle {
+  fill: var(--bg-sidebar);
+  stroke: var(--text-secondary);
+  stroke-width: 2;
+  transition: stroke 0.15s ease, fill 0.15s ease;
+}
+
+.mini-transition-slot-empty circle {
+  fill: var(--bg-input);
+  stroke-dasharray: 3 3;
+}
+
+.mini-transition-slot-filled circle {
+  fill: var(--blue-50);
+  stroke: var(--blue-500);
+  stroke-dasharray: none;
+}
+
+.mini-transition-slot:hover circle {
+  stroke: var(--blue-600);
+}
+
+.mini-transition-slot-active circle {
+  stroke: var(--blue-500);
+  stroke-width: 3;
+  animation: mini-transition-pulse 1.2s ease-in-out infinite;
+}
+
+.mini-transition-label {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: var(--weight-bold);
+  fill: var(--text-heading);
+  pointer-events: none;
+}
+
+.mini-transition-slot-empty .mini-transition-label {
+  fill: var(--text-secondary);
+}
+
+.mini-transition-arrow {
+  stroke: var(--text-body);
+  stroke-width: 1.5;
+}
+
+.mini-transition-arrowhead {
+  fill: var(--text-body);
+}
+
+.mini-transition-symbol {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: var(--weight-bold);
+  fill: var(--blue-600);
+}
+
+.transition-creator-action-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.transition-creator-symbol-input {
+  flex: 1;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+}
+
+.transition-creator-symbol-input.invalid {
+  border-color: var(--error-stroke);
+  /* Background and text color stay normal — only the border conveys
+   * the validation state, so the user's typed character remains
+   * comfortably readable. */
+}
+
+.transition-creator-symbol-input.invalid:focus,
+.transition-creator-symbol-input.invalid:focus-visible {
+  border-color: var(--error-stroke);
+  /* Override the global blue focus ring (both box-shadow and outline)
+   * so an invalid input doesn't get a blue outer ring + red inner
+   * border at the same time. */
+  outline-color: var(--error-stroke);
+  box-shadow:
+    inset 0 1px 2px rgba(15, 23, 42, 0.03),
+    0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
+.transition-creator-action-row .btn {
+  flex: 0 0 auto;
+  min-width: 64px;
+}
+
+.transition-creator-instruction {
+  font-size: var(--text-sm);
+  color: var(--text-body);
+  text-align: center;
+  margin: 0;
+  padding: var(--space-1) 0;
+}
+
+/* Instruction text stays in the normal body color — color cues belong on the
+ * canvas (blue for add, purple for modify, red for delete), not in the prose. */
+
+/* ─── In-row pulse highlights (notification target attention) ─── */
+/* Editor row pulse (state, transition, alphabet badge). Plays twice across
+ * the highlight duration. Background colour shift makes it visible even when
+ * the row's box-shadow isn't easy to see against the surrounding container.
+ * The pulse-error / pulse-warning keyframes themselves live in animations.css. */
+.editor-row.pulse-error,
+.alphabet-badge.pulse-error,
+.editor-row.pulse-warning,
+.alphabet-badge.pulse-warning {
+  animation-duration: 1s;
+  animation-iteration-count: 2;
+  animation-timing-function: ease-out;
+  position: relative;
+  z-index: 1;
+}
+
+.editor-row.pulse-error,
+.alphabet-badge.pulse-error {
+  animation-name: pulse-error;
+  background: var(--error-bg);
+  border-color: var(--error-border);
+}
+
+.editor-row.pulse-warning,
+.alphabet-badge.pulse-warning {
+  animation-name: pulse-warning;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+/* Tab rows are <button>; reset default browser styling. */
+.tool-menu-row {
+  font-family: inherit;
+  font-size: inherit;
+}

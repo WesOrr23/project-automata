@@ -44,7 +44,7 @@ const START_PHANTOM_NAME = '_start';
  * (the caller treats edges with no symbols as ill-formed and can choose
  * to drop them).
  */
-function parseEdgeLabel(rawLabel: string | undefined): Array<string | null> {
+export function parseEdgeLabel(rawLabel: string | undefined): Array<string | null> {
   if (rawLabel === undefined || rawLabel === '') return [];
   return rawLabel
     .split(',')
@@ -146,7 +146,7 @@ type ParsedEdgePos = {
  * @param posString - Raw pos string from GraphViz json output
  * @returns Parsed arrowhead position and control points
  */
-function parseEdgePos(posString: string): ParsedEdgePos {
+export function parseEdgePos(posString: string): ParsedEdgePos {
   const parts = posString.trim().split(/\s+/);
   let arrowheadPosition: { x: number; y: number } | null = null;
   const controlPoints: { x: number; y: number }[] = [];
@@ -182,7 +182,7 @@ function parseEdgePos(posString: string): ParsedEdgePos {
  * @param points - B-spline control points from GraphViz
  * @returns SVG path d attribute string
  */
-function controlPointsToSvgPath(points: { x: number; y: number }[]): string {
+export function controlPointsToSvgPath(points: { x: number; y: number }[]): string {
   if (points.length === 0) return '';
 
   const startPoint = points[0]!;
@@ -220,7 +220,7 @@ function controlPointsToSvgPath(points: { x: number; y: number }[]): string {
  * @param boundingBoxHeight - Height of the GraphViz bounding box
  * @returns Y coordinate in SVG space (with padding applied)
  */
-function flipY(graphvizY: number, boundingBoxHeight: number): number {
+export function flipY(graphvizY: number, boundingBoxHeight: number): number {
   return boundingBoxHeight - graphvizY + CANVAS_PADDING;
 }
 

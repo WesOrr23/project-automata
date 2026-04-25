@@ -11,6 +11,10 @@
 // Type definitions
 export type { Automaton, Transition, SimulationStep, Simulation } from './types';
 
+// Result types — every fallible engine function returns Result<T>
+export type { Result, EngineError } from './result';
+export { ok, err, errorMessage } from './result';
+
 // Automaton operations (CRUD)
 export {
   createAutomaton,

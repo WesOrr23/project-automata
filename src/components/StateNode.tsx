@@ -24,13 +24,13 @@ type StateNodeProp = {
   isAccept: boolean;
 
   /** Whether this state is active during simulation */
-  isActive?: boolean;
+  isActive?: boolean | undefined;
 
   /** Result status for final state highlighting after simulation completes */
-  resultStatus?: 'accepted' | 'rejected' | null;
+  resultStatus?: 'accepted' | 'rejected' | null | undefined;
 
   /** Whether this state is the active highlight target of a notification */
-  isHighlighted?: boolean;
+  isHighlighted?: boolean | undefined;
 
   /**
    * Whether this state's branch died on the most recent simulation
@@ -38,7 +38,7 @@ type StateNodeProp = {
    * the branch winding down. Independent of isActive (a dying state
    * is no longer in the active set by definition).
    */
-  isDying?: boolean;
+  isDying?: boolean | undefined;
 
   /**
    * If this state is currently selected as the source or destination of
@@ -46,24 +46,24 @@ type StateNodeProp = {
    * pulsing halo color (blue for add, purple for modify). Null/undefined
    * leaves the state alone.
    */
-  creationKind?: 'add' | 'modify' | null;
+  creationKind?: 'add' | 'modify' | null | undefined;
 
   /**
    * Whether the state is currently interactive (clickable). Drives the
    * cursor and hover affordance.
    */
-  isInteractive?: boolean;
+  isInteractive?: boolean | undefined;
 
   /**
    * Visual emphasis variant — 'pick' shows a pulsing ring (used while
    * the canvas is in pick mode for the creator form), 'select' shows
    * a quieter affordance (used for state-action clicks in edit mode).
    */
-  interactionStyle?: 'pick' | 'select';
+  interactionStyle?: 'pick' | 'select' | undefined;
 
   /** Called when the state is clicked. The DOM element is passed for
    * popover anchoring purposes (state-action popover). */
-  onClick?: (anchorEl: SVGGElement) => void;
+  onClick?: ((anchorEl: SVGGElement) => void) | undefined;
 };
 
 /**
