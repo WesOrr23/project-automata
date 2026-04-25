@@ -69,6 +69,8 @@ Index entry format:
 
 Knowledge files include `verified-as-of: <commit-hash>` indicating the codebase commit they were last validated against. The auditor flags knowledge files where `verified-as-of` is older than a threshold relative to recent diffs.
 
+**Use commit hashes** (short SHA, 7+ characters) by default. Iteration markers like `iteration-11` are acceptable only when the work spans many commits and a single hash would be misleading; in that case, name the iteration's terminating commit in the file body. Mixed conventions reduce the auditor's ability to programmatically detect staleness — be consistent.
+
 ## Confidence levels
 
 Knowledge files include `confidence: <high|medium|low>`. Low-confidence claims are subject to extra scrutiny in audits.

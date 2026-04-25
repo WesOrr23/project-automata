@@ -51,9 +51,9 @@ The listener filters out keys when focus is inside `<input>`, `<textarea>`, or `
 - Multiple transparent scopes registered simultaneously — they coexist, walk in stack order.
 - Capturing scopes preempting transparent ones — exactly what they're for (modals owning their key set).
 
-## Known partial migration
+## Migration history
 
-`src/components/popover/StatePickerPopover.tsx` retained a raw `document.addEventListener('keydown', ...)` for Escape after iter-11. Not architecturally fatal (the popover's local Escape doesn't conflict with anything else), but the convention should be uniform. To be cleaned up in a follow-up commit.
+The four global `keydown` listeners that existed pre-iter-11 (App's undo/redo, TransitionCreator's Enter and type-to-modify, StateActionsPopover's Esc/Space/Del, StatePickerPopover's Escape) were all migrated to `useKeyboardScope` during iter-11 — three in commit `e666a06` and the fourth (StatePickerPopover) in cleanup commit `632ac70`. As of HEAD, no raw `document.addEventListener('keydown', ...)` remains in `src/components/`.
 
 ## Provenance
 

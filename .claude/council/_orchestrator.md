@@ -62,6 +62,7 @@ The exception: if one position is **factually wrong** about the code (a claim th
 - For a major change (the eight backlog items, or anything touching engine API surface), invoke the writer first to do the work, then run the council on the cumulative diff at the end.
 - For a contentious decision, spawn the agents whose domains conflict (often architect + ts-reviewer) and let them disagree on disk.
 - For periodic hygiene, run the auditor every few iterations or before merging a major branch to main.
+- **When an iteration touches a domain, spawn the affected reviewer at close-out even if no review is contested.** Test files and coverage gaps = QA. Type-system flags, generics, casts = TS. Data-shape changes = QA + arch. Error contracts = arch + TS. Their knowledge files will silently go stale otherwise (audit-002 P5/P6).
 
 ## Branches and Worktrees
 
@@ -85,12 +86,14 @@ Always check the user's MEMORY index for pending-review items. As of 2026-04-25:
 - **Phase 1** (commit `e45c26b`): council scaffolding, conventions, schema templates, architecture-reviewer end-to-end.
 - **Phase 2** (commit `2bfd164`): full council brought online (qa, ts, security, writer + auditor sketched), each persistent agent verified with synthetic diff.
 - **Phase 3** (commit `a421af9`): historical evolution review (iter 1→2, 2→3, 7→8), inaugural audit.
-- Auditor findings applied (commit pending after this file): qa `startState` correction propagated, ts line-citations converted to symbol-relative, CLAUDE.md drift open question filed, AutomatonLike-pending-user-review open question filed, citation-discipline added to `_conventions.md`.
+- **Phase 4** (commit `bb59cfc`): audit-001 findings applied (qa `startState` correction propagated, ts line-citations converted to symbol-relative, CLAUDE.md drift open question filed, AutomatonLike-pending-user-review open question filed, citation-discipline added to `_conventions.md`, this orchestrator handoff written).
+- **Council merged to main** (commit `64e2efc`).
+- **Iteration 11** (commits `42aaf4f` through `5cba947` on the `iteration-11` branch): seven of eight Major Change Proposals implemented. Architecture-reviewer ran iter-11 close-out (`77de9ca`); audit-002 produced post-iter-11.
 
 ## What's Next (and gated on what)
 
-- **Iteration 11**: implement the seven major backlog changes (excluding `AutomatonLike` which is gated on user review). Writer drives, council reviews at end. New branch `iteration-11` off main.
-- **Auditor on Iteration 11 close**: when iter-11 lands, run the auditor again to catch any new drift.
+- **Spawn TS-reviewer + QA-reviewer for iter-11 sweeps.** Audit-002 (P5) flagged that the architect was the only reviewer invoked at iter-11 close, leaving sibling agents' knowledge silently stale on changes in their domains (e.g., `exactOptionalPropertyTypes` is squarely TS territory; new test files are squarely QA territory). Both should be spawned to update their knowledge files post-iter-11. **Audit-002 finding F8** is the substantive open item: the `exactOptionalPropertyTypes` audit was effectively skipped for component prop types — the writer reflexively widened to `T | undefined` instead of forcing the omit-only-vs-allowing-undefined decision the flag was meant to surface. The TS-reviewer needs to take a position.
+- **Merge `iteration-11` to `main`** when Wes signs off.
 - **AutomatonLike review** with Wes when he raises it.
 
 ## Things That Will Trip You Up
