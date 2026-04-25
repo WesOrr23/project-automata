@@ -13,6 +13,21 @@ type ToolMenuProp = {
     simulateContent: ReactNode;
 };
 
+/**
+ * ToolMenu — single architecture, three sizes.
+ *
+ * The menu always renders the same three tab rows; the container
+ * width controls how much of each row is visible. COLLAPSED clips
+ * everything past the icon; EXPANDED reveals the labels; OPEN reveals
+ * the labels AND grows vertically to host the active tab's content.
+ *
+ * Vertical center of the menu is pinned to the viewport center, so
+ * height changes are symmetric about that axis (no top-anchor jump).
+ *
+ * Two-stage OPEN transition: width animates first, max-height delayed
+ * — see `.tool-menu-open` in index.css for the per-state transition
+ * declarations that drive the effect.
+ */
 export function ToolMenu({
     state,
     onHoverEvent,
@@ -33,80 +48,70 @@ export function ToolMenu({
                 return _exhaustive;
         }
     }
-    if (state.mode === 'COLLAPSED') {
-        return  (
-            <aside className="tool-menu tool-menu-collapsed" onMouseEnter={onHoverEvent}>
-                {toolTabs.map((tab) => {
-                    const Icon = tab.icon;
-                    return (
-                        <button
-                            key={tab.id}
-                            className="tool-menu-icon"
-                            aria-label={tab.label}
-                            onClick={() => onTabClick(tab.id)}
-                        >
-                            <Icon size={20}/>
-                        </button>
-                    );
-                })}
-            </aside>
-        )
-    }
 
-    if (state.mode === "EXPANDED") {
-        return (
-            <aside className="tool-menu tool-menu-expanded" onMouseLeave={onHoverLeave}>
-                {toolTabs.map((tab) => {
-                    const Icon = tab.icon;
-                    return (
-                        <button key={tab.id} className="tool-menu-pill" onClick={() => onTabClick(tab.id)}>
-                            <Icon size={20}/>
-                            <span>{tab.label}</span>
-                        </button>
-                    )
-                })}
-            </aside>
-        );
-    }
+    const modeClass =
+        state.mode === 'COLLAPSED' ? 'tool-menu-collapsed'
+      : state.mode === 'EXPANDED'  ? 'tool-menu-expanded'
+      :                              'tool-menu-open';
 
-    if (state.mode === "OPEN") {
-        return (
-            <aside className="tool-menu tool-menu-open">
-                <button className="tool-menu-back" onClick={onCollapse} aria-label="Collapse Menu">
-                    <ChevronLeft size={16}/>
+    // Hover handlers only meaningful in COLLAPSED → EXPANDED transition.
+    // OPEN mode pins the menu in place; no hover-driven shrink.
+    const onMouseEnter = state.mode === 'COLLAPSED' ? onHoverEvent : undefined;
+    const onMouseLeave = state.mode === 'EXPANDED'  ? onHoverLeave : undefined;
+
+    const activeTab = state.mode === 'OPEN' ? state.activeTab : null;
+
+    return (
+        <aside
+            className={`tool-menu ${modeClass}`}
+            onMouseEnter={onMouseEnter}
+            onMouseLeave={onMouseLeave}
+        >
+            {state.mode === 'OPEN' && (
+                <button
+                    type="button"
+                    className="tool-menu-back"
+                    onClick={onCollapse}
+                    aria-label="Collapse menu"
+                >
+                    <ChevronLeft size={14} />
+                    <span className="tool-menu-row-label">Collapse</span>
                 </button>
-                {toolTabs.map((tab) => {
-                    const Icon = tab.icon;
-                    const isActive = tab.id === state.activeTab;
-                    // Active card is just a container (not interactive).
-                    // Compact cards are buttons so keyboard users can Tab + Enter to switch.
-                    if (isActive) {
-                        return (
-                            <div key={tab.id} className="tool-menu-card active">
-                                <div className="tool-menu-card-header">
-                                    <Icon size={20} />
-                                    <span>{tab.label}</span>
-                                </div>
-                                <div className="tool-menu-card-content">{contentFor(tab.id)}</div>
-                            </div>
-                        );
-                    }
+            )}
+            {toolTabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = tab.id === activeTab;
+
+                // The active row is wrapped in a card containing both the
+                // header (a non-interactive row) and the content panel
+                // beneath. Compact rows (and rows in non-OPEN modes) are
+                // standalone buttons.
+                if (isActive) {
                     return (
-                        <button
-                            key={tab.id}
-                            type="button"
-                            className="tool-menu-card compact"
-                            onClick={() => onTabClick(tab.id)}
-                            aria-label={`Open ${tab.label} tab`}
-                        >
-                            <div className="tool-menu-card-header">
+                        <div key={tab.id} className="tool-menu-active-card">
+                            <div className="tool-menu-row active" aria-label={`${tab.label} (active)`}>
                                 <Icon size={20} />
-                                <span>{tab.label}</span>
+                                <span className="tool-menu-row-label">{tab.label}</span>
                             </div>
-                        </button>
+                            <div className="tool-menu-active-content">
+                                {contentFor(tab.id)}
+                            </div>
+                        </div>
                     );
-                })}
-            </aside>
-        )
-    }
+                }
+                return (
+                    <button
+                        key={tab.id}
+                        type="button"
+                        className="tool-menu-row"
+                        onClick={() => onTabClick(tab.id)}
+                        aria-label={tab.label}
+                    >
+                        <Icon size={20} />
+                        <span className="tool-menu-row-label">{tab.label}</span>
+                    </button>
+                );
+            })}
+        </aside>
+    );
 }
