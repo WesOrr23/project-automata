@@ -4,7 +4,7 @@
 
 An interactive web-based simulator for deterministic and non-deterministic finite automata (DFA/NFA). This is a learning project built with pair programming approach - no "vibe-coding," everything is intentional and well-structured.
 
-**Current Status**: Iteration 8 complete — NFA support shipped (ε-transitions, multi-state simulation, edge consolidation, branch-death pulse). See `ITERATION8_COMPLETE.md`.
+**Current Status**: Iteration 10 complete — aliveness + smooth tab transitions (eased tool-menu tab swap, idle start-arrow + accept-ring breathing, hover/press/toast polish with a single motion vocabulary). See `ITERATION10_COMPLETE.md`.
 **Development Approach**: Agile iterations with clear deliverables
 **Primary Developer Experience**: Familiar with vanilla HTML/CSS/JS, minimal JavaScript experience, learning React and TypeScript
 

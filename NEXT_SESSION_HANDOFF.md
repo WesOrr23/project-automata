@@ -1,17 +1,19 @@
 # Next Session Handoff
 
-Everything you need to pick up where iteration 8 left off, written for whoever opens the next chat.
+Everything you need to pick up where iteration 10 left off, written for whoever opens the next chat.
 
 ---
 
 ## Where things stand right now
 
-- **Branch**: `iteration-8` (committed and ready; not merged to main)
-- **Tests**: 211 passing, typecheck clean
+- **Branch**: `iteration-10` (committed and ready; not merged to main)
+- **Tests**: 212 passing, typecheck clean
 - **Auto mode**: ON
 - **Notification system**: in place (iter 6) — `useNotifications().notify({...})` available everywhere
 - **Iteration 8 plan + close-out**: see `ITERATION8_PLAN.md` and `ITERATION8_COMPLETE.md`
-- **NFA mode is live**: ε-transitions (configurable reserved char), multi-state simulation with ε-closure, edge consolidation in both DFA and NFA modes, branch-death pulse
+- **Iteration 10 plan + close-out**: see `ITERATION10_PLAN.md` and `ITERATION10_COMPLETE.md`
+- **NFA mode is live** (iter 8): ε-transitions (configurable reserved char), multi-state simulation with ε-closure, edge consolidation in both DFA and NFA modes, branch-death pulse
+- **Aliveness pass shipped** (iter 10): eased tab-card swap in the tool menu, idle breathing on the start arrow and accept rings, single motion vocabulary (220ms hover / 80ms press / 280ms toast spring) across buttons, tool-menu items, alphabet badges, editor row actions, and notification toasts. Engine / tests untouched.
 
 ---
 
@@ -47,9 +49,9 @@ This is the most important section. The user is a CS student building skills as 
 
 ---
 
-## Iteration 9: Undo / Redo (now the next priority)
+## Undo / Redo (still open; was iter-9 candidate, not yet started)
 
-Originally planned for iter 8 but the user pivoted to NFA support. Plan elements (start with these in `ITERATION9_PLAN.md`):
+Iteration 10 jumped ahead to polish work; the undo/redo iteration hasn't started. Plan elements (start with these in the corresponding `ITERATION{N}_PLAN.md`):
 
 ### What needs to be reversible
 - Add / remove state
@@ -110,6 +112,11 @@ warning is most useful before settling on placement.
 - Per-branch NFA simulation UI: tabs or trees showing each branch independently. Right now all active states render in the same layer of blue.
 - More NFA/ε visual tweaks: maybe a subtler dashed style on ε-edge labels (user explicitly said *no* dashed line for ε in iter 8 — keep solid — but the label could still flag it).
 - Reserved-`e` rule on JSON load (auto-handle when import lands).
+
+### From iter 10 (deferred follow-ups)
+- `@media (prefers-reduced-motion: reduce)` — suspend the breathing keyframes (start arrow, accept rings) and drop hover transition durations. Non-blocking; accessibility polish.
+- Page-load entry animation for the canvas.
+- State mount / unmount animation when a state is added or removed (structural change visualization).
 
 ### From CLAUDE.md backlog
 - Iteration 9: Undo/Redo (now scheduled — see above)
