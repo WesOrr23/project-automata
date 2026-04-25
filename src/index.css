@@ -257,11 +257,48 @@ body {
 }
 
 /* ─── Open mode tab cards ─── */
+/*
+ * Tab-swap animation (iter 10):
+ *   The compact↔active swap is a single coordinated motion.
+ *   - `flex-grow` is the load-bearing property: compact cards are 0,
+ *     the active card is 1. Animating flex-grow is flaky on its own
+ *     because flex items do their math before transitions settle,
+ *     but paired with a `min-height: 0` base it behaves consistently
+ *     across Chrome/Safari/Firefox.
+ *   - The card's visual chrome (background, border-color, box-shadow)
+ *     fades in parallel so the whole thing reads as one gesture.
+ *   - The inner `.tool-menu-card-content` is only rendered inside the
+ *     active card (compact cards skip it entirely). To animate its
+ *     appearance we rely on opacity + padding transitioning from 0 to
+ *     full — React mounts the element, CSS starts it transparent via
+ *     an `@starting-style` fallback (commented inline), then it
+ *     transitions to visible. `@starting-style` is broadly supported
+ *     in modern browsers; if absent the element simply appears, which
+ *     is the pre-iter-10 behavior.
+ *   - Duration 300ms, `cubic-bezier(0.2, 0.8, 0.2, 1)` — material-
+ *     style ease-out-quart. Slow enough to read as one motion, fast
+ *     enough not to get in the user's way.
+ */
 .tool-menu-card {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
   background: var(--bg-button);
-  transition: all 0.15s ease;
+  /* The tab-swap transition targets the properties that actually
+   * differ between compact and active. `flex-grow` drives the size
+   * change; `background` / `border-color` / `box-shadow` fade the
+   * chrome in parallel. */
+  transition:
+    flex-grow 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    background 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Shared flex base so compact→active grow is a transition, not a
+   * layout-mode switch. Both kinds share flex-column + min-height:0;
+   * only flex-grow differs. */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 0 1 auto;
 }
 
 /* Compact cards clip their (non-existent) content for the rounded corners.
@@ -270,6 +307,7 @@ body {
 .tool-menu-card.compact {
   cursor: pointer;
   overflow: hidden;
+  flex-grow: 0;
 }
 
 .tool-menu-card.compact:hover {
@@ -283,10 +321,7 @@ body {
   box-shadow: var(--shadow-sm);
   /* Take all space the menu has left over after compact cards.
    * Internal scroll on .tool-menu-card-content. */
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+  flex-grow: 1;
 }
 
 .tool-menu-card-header {
@@ -298,6 +333,12 @@ body {
   font-size: var(--text-base);
   font-weight: var(--weight-bold);
   color: var(--text-heading);
+  /* Color swap (body → blue-700) when the card activates — tied
+   * into the 300ms vocabulary so the header change rides the same
+   * motion as the card grow. */
+  transition:
+    color 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .tool-menu-card.active .tool-menu-card-header {
@@ -314,6 +355,21 @@ body {
    * tab. Children grow naturally; this is what scrolls. */
   overflow-y: auto;
   min-height: 0;
+  /* Reveal eases in alongside the card grow. Starting-style gives us
+   * "fade from 0" when the element first mounts; without support, the
+   * element simply appears at full opacity (no regression). */
+  opacity: 1;
+  transition:
+    opacity 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    padding 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@starting-style {
+  .tool-menu-card-content {
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
 }
 
 /* ─── Alphabet badges (Config tab) ─── */
