@@ -7,6 +7,8 @@ import {
   actionButtonLabel,
   parseSymbolInput,
   formatSymbolsForInput,
+  computePreview,
+  type CreationState,
 } from './creationReducer';
 
 // Default alphabet + reserved-ε symbol shared across most tests. Override
@@ -355,6 +357,128 @@ describe('creationReducer', () => {
 
     it('handles a single ε', () => {
       expect(formatSymbolsForInput([null], EPS)).toBe('e');
+    });
+  });
+
+  describe('computePreview DFA conflict branches', () => {
+    // Helper: build an automaton-like fixture with the supplied transitions.
+    type T = { from: number; to: ReadonlySet<number>; symbol: string | null };
+    function automaton(transitions: T[]) {
+      return { transitions, alphabet: A };
+    }
+    function tr(from: number, to: number, symbol: string | null): T {
+      return { from, to: new Set([to]), symbol };
+    }
+
+    it('single-symbol DFA modify with conflict emits modify + delete edges', () => {
+      // Existing: q0 -0-> q1, q0 -1-> q2.
+      // Form: editing q0 -0-> q1, change symbol to "1" (still source q0 → q1).
+      // The new (q0, 1) collides with the existing q0 -1-> q2 transition.
+      // Expected preview: modify edge for the moved symbol + delete edge
+      // for the conflict (DFA overwrite).
+      const auto = automaton([tr(0, 1, '0'), tr(0, 2, '1')]);
+      const state: CreationState = {
+        phase: 'idle',
+        source: 0,
+        destination: 1,
+        symbol: '1',
+        editingExisting: { from: 0, to: 1, symbols: ['0'] },
+      };
+      const parsed = parseSymbolInput('1', A, EPS);
+      const result = computePreview(auto, state, 'modify', parsed, false);
+      // One modify edge (the new q0 -1-> q1) and one delete edge for
+      // the conflicting q0 -1-> q2.
+      const modifyEdges = result.edges.filter((edge) => edge.kind === 'modify');
+      const deleteEdges = result.edges.filter((edge) => edge.kind === 'delete');
+      expect(modifyEdges).toHaveLength(1);
+      expect(modifyEdges[0]).toMatchObject({
+        from: 0,
+        to: 1,
+        symbol: '1',
+        oldSymbol: '0',
+      });
+      expect(deleteEdges).toHaveLength(1);
+      expect(deleteEdges[0]).toMatchObject({
+        from: 0,
+        to: 2,
+        symbol: '1',
+        kind: 'delete',
+      });
+    });
+
+    it('single-symbol DFA modify in NFA mode does not emit a delete edge', () => {
+      // Same setup as above, but isNFA=true → conflicts are not overwrites,
+      // they accumulate destinations. Only the modify edge survives.
+      const auto = automaton([tr(0, 1, '0'), tr(0, 2, '1')]);
+      const state: CreationState = {
+        phase: 'idle',
+        source: 0,
+        destination: 1,
+        symbol: '1',
+        editingExisting: { from: 0, to: 1, symbols: ['0'] },
+      };
+      const parsed = parseSymbolInput('1', A, EPS);
+      const result = computePreview(auto, state, 'modify', parsed, true);
+      expect(result.edges.filter((e) => e.kind === 'delete')).toHaveLength(0);
+      expect(result.edges.filter((e) => e.kind === 'modify')).toHaveLength(1);
+    });
+
+    it('general-case DFA add with conflict emits add + delete edges', () => {
+      // Existing: q0 -0-> q2.
+      // Form: brand-new transition q0 -0-> q1 (no editingExisting).
+      // The new (q0, 0) collides with q0 -0-> q2 → add + delete preview.
+      const auto = automaton([tr(0, 2, '0')]);
+      const state: CreationState = {
+        ...INITIAL_CREATION_STATE,
+        source: 0,
+        destination: 1,
+        symbol: '0',
+      };
+      const parsed = parseSymbolInput('0', A, EPS);
+      const result = computePreview(auto, state, 'create', parsed, false);
+      const addEdges = result.edges.filter((edge) => edge.kind === 'add');
+      const deleteEdges = result.edges.filter((edge) => edge.kind === 'delete');
+      expect(addEdges).toHaveLength(1);
+      expect(addEdges[0]).toMatchObject({ from: 0, to: 1, symbol: '0', kind: 'add' });
+      expect(deleteEdges).toHaveLength(1);
+      expect(deleteEdges[0]).toMatchObject({ from: 0, to: 2, symbol: '0', kind: 'delete' });
+    });
+
+    it('general-case DFA structural modify (different destination) emits delete-of-original + add', () => {
+      // Existing: q0 -0-> q1.
+      // Form: editing q0 -0-> q1, changes destination to q2.
+      // → structural modify: original goes red (delete), new edge goes
+      //   blue (add). No extra DFA conflict because no other (q0, 0) exists.
+      const auto = automaton([tr(0, 1, '0')]);
+      const state: CreationState = {
+        phase: 'idle',
+        source: 0,
+        destination: 2,
+        symbol: '0',
+        editingExisting: { from: 0, to: 1, symbols: ['0'] },
+      };
+      const parsed = parseSymbolInput('0', A, EPS);
+      const result = computePreview(auto, state, 'modify', parsed, false);
+      const addEdges = result.edges.filter((edge) => edge.kind === 'add');
+      const deleteEdges = result.edges.filter((edge) => edge.kind === 'delete');
+      expect(addEdges).toHaveLength(1);
+      expect(addEdges[0]).toMatchObject({ from: 0, to: 2, symbol: '0' });
+      expect(deleteEdges).toHaveLength(1);
+      expect(deleteEdges[0]).toMatchObject({ from: 0, to: 1, symbol: '0' });
+    });
+
+    it('general-case DFA add does NOT emit delete when isNFA is true', () => {
+      const auto = automaton([tr(0, 2, '0')]);
+      const state: CreationState = {
+        ...INITIAL_CREATION_STATE,
+        source: 0,
+        destination: 1,
+        symbol: '0',
+      };
+      const parsed = parseSymbolInput('0', A, EPS);
+      const result = computePreview(auto, state, 'create', parsed, true);
+      expect(result.edges.filter((e) => e.kind === 'delete')).toHaveLength(0);
+      expect(result.edges.filter((e) => e.kind === 'add')).toHaveLength(1);
     });
   });
 
