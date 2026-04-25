@@ -36,17 +36,30 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* App-wide: chrome text (state labels, transition symbols, button
-   * captions, section headers, tab labels, etc.) is not user-
-   * selectable — the user has no reason to highlight it and the
-   * accidental selection-on-double-click feels off. Selection re-
-   * enabled below for the few places it's genuinely useful (form
-   * inputs, notification body text, anything tagged .selectable). */
+}
+
+/* Chrome text — not user-selectable. Scoped per-container instead of
+ * on body, because user-select: none on body interacts with cursor
+ * inheritance on some browsers and was producing a brief pointer →
+ * default flash on hover of clickable elements. The text we don't
+ * want selectable lives inside these containers; everything else
+ * (inputs, notification details, future article content) gets the
+ * browser default selection behavior. */
+.tool-menu,
+.canvas-area,
+.undo-redo-controls,
+.canvas-tip,
+.notification-toast-title,
+.state-actions-popover,
+.state-picker-popover,
+.btn {
   user-select: none;
   -webkit-user-select: none;
 }
 
-/* Re-enable selection where it's actually useful. */
+/* Inside the above no-select containers, re-enable selection for
+ * specific opt-in elements: form inputs, contenteditable, and
+ * anything explicitly tagged .selectable. */
 input,
 textarea,
 [contenteditable='true'],

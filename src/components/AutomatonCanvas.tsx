@@ -196,6 +196,7 @@ export function AutomatonCanvas({
     panBy,
     atMaxScale,
     atMinScale,
+    isAnimating,
   } = useCanvasViewport({
     contentBoundingBox: { width: contentWidth, height: contentHeight },
     viewportSize,
@@ -300,7 +301,17 @@ export function AutomatonCanvas({
       onPointerUp={handlers.onPointerUp}
       onPointerCancel={handlers.onPointerUp}
     >
-      <g transform={transform}>
+      {/* The user's pan/zoom transform. style.transform (vs the SVG
+          attribute) so CSS transitions can animate it. transform-origin
+          is set to top-left so scale grows the world from origin
+          consistently with the engine's coordinate system. The
+          `canvas-content-animating` class adds a 0.3s transition; it's
+          only applied during button-driven actions so wheel/pinch/drag
+          stay snappy. */}
+      <g
+        style={{ transform, transformOrigin: '0 0' }}
+        className={isAnimating ? 'canvas-content-animating' : undefined}
+      >
         <g transform={`translate(${-START_ARROW_RESERVE} 0)`}>
       {/* Layer 1: Transition edges (background) */}
       {automatonUI.transitions.map((transition, index) => {

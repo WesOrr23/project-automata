@@ -26,7 +26,7 @@
  * canvas off-center but can't lose it entirely).
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export const MIN_SCALE = 0.25;
 export const MAX_SCALE = 4.0;
@@ -34,6 +34,11 @@ const ZOOM_STEP = 1.25;
 const PAN_STEP = 10;
 const PAN_STEP_LARGE = 50;
 const FIT_PADDING = 40;
+/** Duration the `isAnimating` flag stays true after a button-driven
+ * action, so the consumer can apply a CSS / Framer transition for the
+ * resulting transform change. Wheel/pinch/drag are NOT button-driven —
+ * they keep the flag false so each input sample renders instantly. */
+const BUTTON_ANIMATION_MS = 300;
 
 export type CanvasViewport = {
   scale: number;
@@ -76,6 +81,14 @@ export type UseCanvasViewportResult = {
   atMaxScale: boolean;
   /** True when zoomOut is a no-op (already at MIN_SCALE). */
   atMinScale: boolean;
+  /**
+   * True for ~300ms after a button-driven action (zoomIn, zoomOut,
+   * reset, fitToContent, or keyboard equivalents). Consumer should
+   * apply a transform transition while this is true so the view eases
+   * to its new state instead of snapping. Wheel/pinch/drag don't set
+   * this — they're already smooth from the user's input cadence.
+   */
+  isAnimating: boolean;
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -127,6 +140,7 @@ export function useCanvasViewport(
 ): UseCanvasViewportResult {
   const { contentBoundingBox, viewportSize } = args;
   const [viewport, setViewport] = useState<CanvasViewport>(DEFAULT_VIEWPORT);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   // Drag state lives in a ref — it doesn't drive renders, just bookkeeping
   // for the in-progress pan gesture.
@@ -142,6 +156,29 @@ export function useCanvasViewport(
   contentBoxRef.current = contentBoundingBox;
   const viewportSizeRef = useRef(viewportSize);
   viewportSizeRef.current = viewportSize;
+
+  // Mutable timer ref so successive button presses extend (rather than
+  // stack) the animation window.
+  const animationTimerRef = useRef<number | null>(null);
+  const triggerAnimation = useCallback(() => {
+    setIsAnimating(true);
+    if (animationTimerRef.current !== null) {
+      window.clearTimeout(animationTimerRef.current);
+    }
+    animationTimerRef.current = window.setTimeout(() => {
+      setIsAnimating(false);
+      animationTimerRef.current = null;
+    }, BUTTON_ANIMATION_MS);
+  }, []);
+  // Clean up on unmount so the timer doesn't try to setState on a dead
+  // component.
+  useEffect(() => {
+    return () => {
+      if (animationTimerRef.current !== null) {
+        window.clearTimeout(animationTimerRef.current);
+      }
+    };
+  }, []);
 
   const panBy = useCallback((deltaX: number, deltaY: number) => {
     setViewport((current) => {
@@ -160,6 +197,7 @@ export function useCanvasViewport(
   }, []);
 
   const zoomIn = useCallback(() => {
+    triggerAnimation();
     const size = viewportSizeRef.current;
     const anchorX = size ? size.width / 2 : 0;
     const anchorY = size ? size.height / 2 : 0;
@@ -179,9 +217,10 @@ export function useCanvasViewport(
       );
       return { scale: newScale, panX: clamped.panX, panY: clamped.panY };
     });
-  }, []);
+  }, [triggerAnimation]);
 
   const zoomOut = useCallback(() => {
+    triggerAnimation();
     const size = viewportSizeRef.current;
     const anchorX = size ? size.width / 2 : 0;
     const anchorY = size ? size.height / 2 : 0;
@@ -201,11 +240,12 @@ export function useCanvasViewport(
       );
       return { scale: newScale, panX: clamped.panX, panY: clamped.panY };
     });
-  }, []);
+  }, [triggerAnimation]);
 
   const reset = useCallback(() => {
+    triggerAnimation();
     setViewport(DEFAULT_VIEWPORT);
-  }, []);
+  }, [triggerAnimation]);
 
   /**
    * Fit the content bounding box inside the viewport with a small
@@ -213,6 +253,7 @@ export function useCanvasViewport(
    * content is visible (no cropping). Then centers the result.
    */
   const fitToContent = useCallback(() => {
+    triggerAnimation();
     const content = contentBoxRef.current;
     const view = viewportSizeRef.current;
     if (content === null || view === null) return;
@@ -232,7 +273,7 @@ export function useCanvasViewport(
     const panX = (view.width - scaledWidth) / 2;
     const panY = (view.height - scaledHeight) / 2;
     setViewport({ scale: targetScale, panX, panY });
-  }, []);
+  }, [triggerAnimation]);
 
   /**
    * Wheel handler. The browser sets `ctrlKey` for trackpad pinch as
@@ -351,6 +392,7 @@ export function useCanvasViewport(
     panBy,
     atMaxScale: viewport.scale >= MAX_SCALE,
     atMinScale: viewport.scale <= MIN_SCALE,
+    isAnimating,
   };
 }
 

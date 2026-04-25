@@ -18,6 +18,15 @@
   z-index: 0;
 }
 
+/* Smooth eased transition for button/keyboard-driven zoom + reset +
+ * fit. The class is added only while useCanvasViewport's
+ * `isAnimating` flag is true (~300ms after each button-driven action),
+ * so wheel/pinch/drag — which generate their own input cadence — stay
+ * snappy without the transition fighting the per-frame state updates. */
+.canvas-content-animating {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .canvas-card {
   background: var(--bg-card);
   border: 1px solid var(--border-light);
@@ -101,10 +110,14 @@
 /* Vertical stack of 4 small buttons in the bottom-right corner of the
  * viewport. Always visible (zoom is a canvas-wide concern, not gated on
  * a mode). Visual language matches undo-redo: pill card, subtle shadow,
- * hover tint. */
+ * hover tint. Sits ABOVE the canvas-tip so the tip stays in its
+ * historical bottom-right anchor. */
 .canvas-zoom-controls {
   position: fixed;
-  bottom: 16px;
+  /* Tip height (~30px) + tip-bottom (16) + gap (8) = 54. Static even
+   * when the tip isn't visible — keeps the zoom controls in a
+   * predictable spot whether the user is in EDIT mode or not. */
+  bottom: 54px;
   right: 16px;
   z-index: 30;
   display: flex;
@@ -157,7 +170,9 @@
 /* ─── Canvas discoverability hint ─── */
 /* Subtle floating chip at the bottom-right of the viewport. Only visible
  * in EDIT mode at idle (gated by App.tsx). Pointer-events disabled so it
- * never intercepts clicks on the canvas underneath. */
+ * never intercepts clicks on the canvas underneath. Sits BELOW the
+ * canvas-zoom-controls; the zoom stack lifts itself above this spot so
+ * they don't overlap (see `.canvas-zoom-controls` bottom value). */
 .canvas-tip {
   position: fixed;
   bottom: 16px;
