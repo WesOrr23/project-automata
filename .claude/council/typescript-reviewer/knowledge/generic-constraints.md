@@ -3,7 +3,7 @@ agent: typescript-reviewer
 type: knowledge
 topic: generic-constraints
 schema-version: 1
-verified-as-of: 52bdb8e
+verified-as-of: 30eace9
 last-updated: 2026-04-25
 confidence: high
 ---
@@ -47,4 +47,4 @@ This is the canonical example of "the generic is the workaround, not the design.
 
 ## Provenance
 
-`creationReducer.ts` `AutomatonLike` cataloged in iteration-1 review.
+`creationReducer.ts` `AutomatonLike` cataloged in iteration-1 review. **2026-04-25 update**: re-verified during iter 7→8 historical review (commit `1493832`). The generic was born with one `as unknown as T` cast already inside `computePreview`, plus a second cast at the sole caller (`App.tsx`'s `preview.transitions as Automaton['transitions']`). Architect's iter 7→8 revision toward "borderline acceptable" was evaluated and rejected: the "no engine import in UI" motivation is invalid (UI may import engine), and the "would lose info under a union" defense has no referent (single concrete caller, no plan for a second). Position reinforced, not revised.

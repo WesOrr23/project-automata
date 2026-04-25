@@ -25,19 +25,24 @@ The test file `creationReducer.test.ts` (~375 lines) covers happy paths but walk
 
 ### `ui-state/utils.ts` math helpers
 
+Born in `2cf5e42` (iter 3 GraphViz pivot), untested since introduction:
+
 - `parseEdgePos` — parses GraphViz edge position strings into control points.
 - `controlPointsToSvgPath` — converts control points to SVG `path d` strings.
-- `parseEdgeLabel` — parses comma-separated symbol lists (and the empty-label edge case fixed in iteration-1 review).
 - `flipY` — coordinate transform for SVG.
+- `automatonToDot`, `parseGraphvizJson`, `transformPoint`, `buildTransformedPath`, `computeArrowheadAngle` — same iteration, same gap.
+- `parseEdgeLabel` — added in a **later** iteration (NOT iter 3); same gap, different birth commit. (Empty-label edge case was fixed in the iteration-1 code review.)
 
 `utils.test.ts` (~234 lines) covers `computeLayout` integration but not these lower-level helpers. They are the math-heavy parts most likely to subtly break.
+
+**Architectural precondition**: the helpers are module-private at `src/ui-state/utils.ts`. Closing the gap requires exporting them (or extracting to a sibling module like `src/ui-state/graphvizParse.ts`). Until then, tests can only reach them transitively through `computeLayout`.
 
 ### Components — across the board
 
 Zero tests exist for any of these:
 
-- `AutomatonCanvas` — the main rendering surface.
-- `StateNode`, `TransitionEdge`, `StartStateArrow` — primitives.
+- `AutomatonCanvas` — the main rendering surface. Untested since introduction in `ebdb064` (iter 2). The NFA-compatibility flatMap branch and the three missing-UI-data fall-throughs were never test-guarded.
+- `StateNode`, `TransitionEdge`, `StartStateArrow` — primitives. Untested since introduction in `ebdb064` (iter 2).
 - `SimulationControls`, `InputPanel`, `UndoRedoControls`.
 - `ToolMenu` and its panel children (`AlphabetEditor`, `ConfigPanel`, `EditPanel`, `StateEditor`).
 - `TransitionCreator`, `MiniTransitionSVG`.

@@ -19,6 +19,7 @@ confidence: high
 ### Acceptable casts in the codebase
 
 - `parseFloat(coords[0] ?? '0')` style at GraphViz parsing boundaries (`src/ui-state/utils.ts`). The GraphViz output is opaque text; once parsed, types start.
+- The `JSON.parse(jsonString)` → `GraphvizJson` seam in `parseGraphvizJson` (`src/ui-state/utils.ts`) does the assertion via object-literal spread from `any`. The boundary is correct (WASM-produced opaque text), but a shape predicate (`isGraphvizJson`) would convert silent malformation into a typed failure.
 - JSON deserialization seams when loading sample automatons. The on-disk shape is `string | number | array`; we cast the parsed result to the engine's structured types after validating shape.
 - WASM-FFI boundaries (the GraphViz WASM call). We don't control the WASM's TypeScript declarations entirely.
 

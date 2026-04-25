@@ -58,6 +58,12 @@ Track what's tested vs not tested at module granularity. The coverage shape of t
 - Doc, CSS, or comment-only changes: no test impact.
 - Adding new modules with no callers yet: tests should arrive with the first caller, not in isolation.
 
+## Historical provenance of the engine-vs-UI inversion
+
+The inversion was born at `ebdb064` (iter 2 completion). Iter 1 (`14bb9e8`) shipped four engine modules with co-located test files. Iter 2 added `src/components/` and `src/ui-state/` with zero tests, including the pure function `createDefaultLabel` that fits the engine's own unit-test pattern. The components on `known-coverage-gaps.md` (StateNode, TransitionEdge, StartStateArrow, AutomatonCanvas) have been untested since they were introduced — they are not regressions from a tested state.
+
+`ITERATION2_PLAN.md` lists six tasks; none of them is "write tests for the new components." The omission was deliberate scope, not oversight, but it was never scheduled for catch-up either.
+
 ## Provenance
 
-Iteration-1 code review (2026-04-25) catalogued the engine-vs-UI coverage inversion and the `computePreview` gap. Test file line counts verified at commit `52bdb8e`.
+Iteration-1 code review (2026-04-25) catalogued the engine-vs-UI coverage inversion and the `computePreview` gap. Test file line counts verified at commit `52bdb8e`. Historical provenance added during the iter 1→2 retrospective review (2026-04-25).

@@ -9,7 +9,7 @@ Active and archived agents. Updated when agents are added, retired, or change sc
 | typescript-reviewer | active | Type-level correctness; cast discipline; generic constraints | opus | yes | 2026-04-25 (synthetic verification) |
 | security-reviewer | active | Attack surface analysis (deliberately small for this codebase) | opus | yes | 2026-04-25 (synthetic verification) |
 | writer | active | Implementation per iteration | opus | **no — ephemeral** | (per iteration) |
-| auditor | sketched | Internal critic of council memory | opus | yes | (never) |
+| auditor | active | Internal critic of council memory | opus | yes | 2026-04-25 (audit 001) |
 
 ## Status meanings
 
