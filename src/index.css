@@ -202,13 +202,29 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  /* Iter-10 vocabulary. transform is on a shorter press curve so a
+   * click returns to rest quickly even while hover keeps the chrome
+   * changing at 220ms. */
+  transition:
+    background 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* Icons get a small "float": translateY + slight scale. They're
+ * square and isolated, so a scale reads cleanly. Pills (wider) only
+ * get translateY — scaling a pill would distort the text. */
 .tool-menu-icon:hover {
   background: var(--bg-button-hover);
   color: var(--blue-600);
   border-color: rgba(59, 130, 246, 0.2);
+  transform: translateY(-1px) scale(1.05);
+}
+
+.tool-menu-icon:active:not(:disabled) {
+  transform: scale(0.97);
+  transition: transform 80ms ease-out;
 }
 
 /* ─── Expanded mode pills (icon + label) ─── */
@@ -225,14 +241,27 @@ body {
   font-size: var(--text-base);
   font-weight: var(--weight-bold);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    background 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
   text-align: left;
 }
 
+/* Pills are wider than icons — scale would distort the label row.
+ * Just a gentle translateY for hover, same press-scale for tactile
+ * click feedback. */
 .tool-menu-pill:hover {
   background: var(--bg-button-hover);
   color: var(--blue-600);
   border-color: rgba(59, 130, 246, 0.2);
+  transform: translateY(-1px);
+}
+
+.tool-menu-pill:active:not(:disabled) {
+  transform: scale(0.98);
+  transition: transform 80ms ease-out;
 }
 
 /* ─── Back button (open mode) ─── */
@@ -248,12 +277,22 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s ease;
+  transition:
+    background 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .tool-menu-back:hover {
   background: var(--bg-button-hover);
   color: var(--text-body);
+  transform: translateX(-1px);
+}
+
+.tool-menu-back:active:not(:disabled) {
+  transform: scale(0.95);
+  transition: transform 80ms ease-out;
 }
 
 /* ─── Open mode tab cards ─── */
@@ -313,6 +352,15 @@ body {
 .tool-menu-card.compact:hover {
   background: var(--bg-button-hover);
   border-color: rgba(59, 130, 246, 0.2);
+}
+
+/* Press feedback on compact tab cards — tiny squeeze, quickly
+ * reverting. The primary motion when a compact card is clicked is
+ * the activate-expand from Phase 1; this is just the tactile
+ * confirmation that the click registered. */
+.tool-menu-card.compact:active:not(:disabled) {
+  transform: scale(0.98);
+  transition: transform 80ms ease-out;
 }
 
 .tool-menu-card.active {
@@ -408,12 +456,21 @@ body {
   background: transparent;
   color: var(--blue-600);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    background 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .alphabet-badge-remove:hover:not(:disabled) {
   background: var(--blue-200);
   color: var(--error-text);
+  transform: scale(1.1);
+}
+
+.alphabet-badge-remove:active:not(:disabled) {
+  transform: scale(0.92);
+  transition: transform 80ms ease-out;
 }
 
 .alphabet-badge-remove:disabled {
@@ -718,12 +775,22 @@ body {
   background: var(--bg-button);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    background 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .editor-row-action:hover:not(:disabled) {
   background: var(--bg-button-hover);
   color: var(--text-body);
+  transform: scale(1.05);
+}
+
+.editor-row-action:active:not(:disabled) {
+  transform: scale(0.95);
+  transition: transform 80ms ease-out;
 }
 
 .editor-row-action:disabled {
@@ -809,7 +876,15 @@ body {
   background: var(--bg-button);
   color: var(--text-heading);
   cursor: pointer;
-  transition: all 0.15s ease;
+  /* Iter-10 vocabulary: 220ms ease-out-quart for color/chrome,
+   * 80ms ease-out for transform so press feedback snaps back
+   * quickly. `transform` is split out so the hover curve and
+   * the press curve don't fight over the same property. */
+  transition:
+    background 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 80ms ease-out;
   box-shadow: var(--shadow-sm);
   user-select: none;
 }
@@ -819,9 +894,12 @@ body {
   border-color: rgba(59, 130, 246, 0.2);
 }
 
+/* Press feedback: tiny scale-down for ~80ms. Short enough that it
+ * never reads as "slow"; just enough to feel tactile. */
 .btn:active:not(:disabled) {
   background: var(--bg-button-active);
   box-shadow: none;
+  transform: scale(0.97);
 }
 
 .btn:disabled {
@@ -1047,8 +1125,14 @@ button svg {
   box-shadow: var(--shadow-lg);
   cursor: pointer;
   pointer-events: auto;
-  animation: notification-slide-in 0.18s ease-out;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  /* Spring-ish entry (iter 10). cubic-bezier(0.34, 1.56, 0.64, 1)
+   * overshoots slightly at the end — a micro-bounce that reads as
+   * "arriving" rather than "sliding past." 280ms gives the overshoot
+   * room to settle without dragging. */
+  animation: notification-slide-in 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition:
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .notification-toast:hover {
@@ -1391,15 +1475,19 @@ button svg {
 }
 
 /* ─── Canvas state nodes — selectable (idle edit mode) ─── */
-/* Quieter affordance: hover thickens the ring, no constant pulse. */
+/* Quieter affordance: hover thickens the ring and grows a soft
+ * drop-shadow. No constant pulse. Eased at 200ms so the lift has
+ * room to read as a considered response, not a twitch. */
 
 .state-node-selectable circle {
-  transition: stroke-width 0.15s ease, filter 0.15s ease;
+  transition:
+    stroke-width 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .state-node-selectable:hover circle {
   stroke-width: 3;
-  filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.35));
+  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.4));
 }
 
 /* ─── Canvas discoverability hint ─── */
