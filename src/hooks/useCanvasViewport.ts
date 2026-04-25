@@ -379,7 +379,13 @@ export function useCanvasViewport(
     []
   );
 
-  const transform = `translate(${viewport.panX} ${viewport.panY}) scale(${viewport.scale})`;
+  // CSS transform syntax: requires units + commas (vs SVG attribute
+  // syntax which uses bare numbers + spaces). The consumer applies
+  // this via style.transform on a `<g>` element so that CSS
+  // transitions can animate it; bare-number SVG syntax would be
+  // silently rejected by the CSS engine and the transform would
+  // never apply.
+  const transform = `translate(${viewport.panX}px, ${viewport.panY}px) scale(${viewport.scale})`;
 
   return {
     viewport,
