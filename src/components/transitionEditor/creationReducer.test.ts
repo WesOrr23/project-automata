@@ -3,8 +3,16 @@ import {
   creationReducer,
   INITIAL_CREATION_STATE,
   isReady,
+  isModified,
   actionButtonLabel,
+  parseSymbolInput,
+  formatSymbolsForInput,
 } from './creationReducer';
+
+// Default alphabet + reserved-ε symbol shared across most tests. Override
+// per-test only when the case actually depends on a specific alphabet.
+const A = new Set(['0', '1']);
+const EPS = 'e';
 
 describe('creationReducer', () => {
   describe('initial state', () => {
@@ -18,11 +26,11 @@ describe('creationReducer', () => {
     });
 
     it('is not ready', () => {
-      expect(isReady(INITIAL_CREATION_STATE)).toBe(false);
+      expect(isReady(INITIAL_CREATION_STATE, A, EPS)).toBe(false);
     });
 
     it('button label is "Add"', () => {
-      expect(actionButtonLabel(INITIAL_CREATION_STATE)).toBe('Add');
+      expect(actionButtonLabel(INITIAL_CREATION_STATE, A, EPS)).toBe('Add');
     });
   });
 
@@ -82,12 +90,13 @@ describe('creationReducer', () => {
     it('keeps editingExisting through slot changes', () => {
       let state = creationReducer(INITIAL_CREATION_STATE, {
         type: 'loadExisting',
-        transition: { from: 0, to: 1, symbol: '0' },
+        transition: { from: 0, to: 1, symbols: ['0'] },
+        epsilonSymbol: EPS,
       });
       state = creationReducer(state, { type: 'sourcePicked', stateId: 2 });
-      expect(state.editingExisting).toEqual({ from: 0, to: 1, symbol: '0' });
+      expect(state.editingExisting).toEqual({ from: 0, to: 1, symbols: ['0'] });
       state = creationReducer(state, { type: 'destinationPicked', stateId: 3 });
-      expect(state.editingExisting).toEqual({ from: 0, to: 1, symbol: '0' });
+      expect(state.editingExisting).toEqual({ from: 0, to: 1, symbols: ['0'] });
     });
   });
 
@@ -103,77 +112,110 @@ describe('creationReducer', () => {
     it('symbolChanged keeps editingExisting (slot edits do not break the edit link)', () => {
       let state = creationReducer(INITIAL_CREATION_STATE, {
         type: 'loadExisting',
-        transition: { from: 0, to: 1, symbol: '0' },
+        transition: { from: 0, to: 1, symbols: ['0'] },
+        epsilonSymbol: EPS,
       });
       expect(state.editingExisting).not.toBeNull();
       state = creationReducer(state, { type: 'symbolChanged', symbol: '1' });
-      expect(state.editingExisting).toEqual({ from: 0, to: 1, symbol: '0' });
+      expect(state.editingExisting).toEqual({ from: 0, to: 1, symbols: ['0'] });
     });
   });
 
   describe('isReady predicate', () => {
     it('false when source missing', () => {
       const state = { ...INITIAL_CREATION_STATE, destination: 0, symbol: '0' };
-      expect(isReady(state)).toBe(false);
+      expect(isReady(state, A, EPS)).toBe(false);
     });
 
     it('false when destination missing', () => {
       const state = { ...INITIAL_CREATION_STATE, source: 0, symbol: '0' };
-      expect(isReady(state)).toBe(false);
+      expect(isReady(state, A, EPS)).toBe(false);
     });
 
     it('false when symbol empty', () => {
       const state = { ...INITIAL_CREATION_STATE, source: 0, destination: 1 };
-      expect(isReady(state)).toBe(false);
+      expect(isReady(state, A, EPS)).toBe(false);
     });
 
-    it('true when all three filled', () => {
+    it('true when all three filled with a valid symbol', () => {
       const state = {
         ...INITIAL_CREATION_STATE,
         source: 0,
         destination: 1,
         symbol: '0',
       };
-      expect(isReady(state)).toBe(true);
+      expect(isReady(state, A, EPS)).toBe(true);
+    });
+
+    it('true with multi-symbol comma-separated input', () => {
+      const state = {
+        ...INITIAL_CREATION_STATE,
+        source: 0,
+        destination: 1,
+        symbol: '0, 1',
+      };
+      expect(isReady(state, A, EPS)).toBe(true);
+    });
+
+    it('true when ε is the symbol', () => {
+      const state = {
+        ...INITIAL_CREATION_STATE,
+        source: 0,
+        destination: 1,
+        symbol: 'e',
+      };
+      expect(isReady(state, A, EPS)).toBe(true);
     });
   });
 
   describe('action button label', () => {
     it('"Add" in creation mode', () => {
-      expect(actionButtonLabel(INITIAL_CREATION_STATE)).toBe('Add');
+      expect(actionButtonLabel(INITIAL_CREATION_STATE, A, EPS)).toBe('Add');
     });
 
     it('"Delete" when editing an existing transition with no changes', () => {
       const state = creationReducer(INITIAL_CREATION_STATE, {
         type: 'loadExisting',
-        transition: { from: 0, to: 1, symbol: '0' },
+        transition: { from: 0, to: 1, symbols: ['0'] },
+        epsilonSymbol: EPS,
       });
-      expect(actionButtonLabel(state)).toBe('Delete');
+      expect(actionButtonLabel(state, A, EPS)).toBe('Delete');
     });
 
-    it('"Modify" when editing an existing and a slot has been changed', () => {
+    it('"Modify" when editing an existing and the symbol has been changed', () => {
       let state = creationReducer(INITIAL_CREATION_STATE, {
         type: 'loadExisting',
-        transition: { from: 0, to: 1, symbol: '0' },
+        transition: { from: 0, to: 1, symbols: ['0'] },
+        epsilonSymbol: EPS,
       });
       state = creationReducer(state, { type: 'symbolChanged', symbol: '1' });
-      expect(actionButtonLabel(state)).toBe('Modify');
+      expect(actionButtonLabel(state, A, EPS)).toBe('Modify');
     });
   });
 
   describe('isModified', () => {
-    it('false when editingExisting is null', async () => {
-      const { isModified } = await import('./creationReducer');
-      expect(isModified(INITIAL_CREATION_STATE)).toBe(false);
+    it('false when editingExisting is null', () => {
+      expect(isModified(INITIAL_CREATION_STATE, A, EPS)).toBe(false);
     });
 
-    it('false when slots match the original', async () => {
-      const { isModified } = await import('./creationReducer');
+    it('false when slots match the original', () => {
       const state = creationReducer(INITIAL_CREATION_STATE, {
         type: 'loadExisting',
-        transition: { from: 0, to: 1, symbol: '0' },
+        transition: { from: 0, to: 1, symbols: ['0'] },
+        epsilonSymbol: EPS,
       });
-      expect(isModified(state)).toBe(false);
+      expect(isModified(state, A, EPS)).toBe(false);
+    });
+
+    it('false when symbol input is the same group reordered', () => {
+      let state = creationReducer(INITIAL_CREATION_STATE, {
+        type: 'loadExisting',
+        transition: { from: 0, to: 1, symbols: ['0', '1'] },
+        epsilonSymbol: EPS,
+      });
+      // The display text is "0, 1" — re-typing "1, 0" parses to the same set.
+      state = creationReducer(state, { type: 'symbolChanged', symbol: '1, 0' });
+      expect(isModified(state, A, EPS)).toBe(false);
     });
 
     it.each<['symbol' | 'source' | 'destination', () => any]>([
@@ -181,7 +223,8 @@ describe('creationReducer', () => {
         creationReducer(
           creationReducer(INITIAL_CREATION_STATE, {
             type: 'loadExisting',
-            transition: { from: 0, to: 1, symbol: '0' },
+            transition: { from: 0, to: 1, symbols: ['0'] },
+            epsilonSymbol: EPS,
           }),
           { type: 'symbolChanged', symbol: '1' }
         ),
@@ -190,7 +233,8 @@ describe('creationReducer', () => {
         creationReducer(
           creationReducer(INITIAL_CREATION_STATE, {
             type: 'loadExisting',
-            transition: { from: 0, to: 1, symbol: '0' },
+            transition: { from: 0, to: 1, symbols: ['0'] },
+            epsilonSymbol: EPS,
           }),
           { type: 'sourcePicked', stateId: 2 }
         ),
@@ -199,14 +243,14 @@ describe('creationReducer', () => {
         creationReducer(
           creationReducer(INITIAL_CREATION_STATE, {
             type: 'loadExisting',
-            transition: { from: 0, to: 1, symbol: '0' },
+            transition: { from: 0, to: 1, symbols: ['0'] },
+            epsilonSymbol: EPS,
           }),
           { type: 'destinationPicked', stateId: 2 }
         ),
       ],
-    ])('true when %s differs from original', async (_, build) => {
-      const { isModified } = await import('./creationReducer');
-      expect(isModified(build())).toBe(true);
+    ])('true when %s differs from original', (_, build) => {
+      expect(isModified(build(), A, EPS)).toBe(true);
     });
   });
 
@@ -214,13 +258,32 @@ describe('creationReducer', () => {
     it('fills all three slots and binds to the transition identity', () => {
       const state = creationReducer(INITIAL_CREATION_STATE, {
         type: 'loadExisting',
-        transition: { from: 2, to: 3, symbol: '1' },
+        transition: { from: 2, to: 3, symbols: ['1'] },
+        epsilonSymbol: EPS,
       });
       expect(state.source).toBe(2);
       expect(state.destination).toBe(3);
       expect(state.symbol).toBe('1');
-      expect(state.editingExisting).toEqual({ from: 2, to: 3, symbol: '1' });
+      expect(state.editingExisting).toEqual({ from: 2, to: 3, symbols: ['1'] });
       expect(state.phase).toBe('idle');
+    });
+
+    it('joins multi-symbol consolidated edges into the symbol input', () => {
+      const state = creationReducer(INITIAL_CREATION_STATE, {
+        type: 'loadExisting',
+        transition: { from: 0, to: 1, symbols: ['0', '1'] },
+        epsilonSymbol: EPS,
+      });
+      expect(state.symbol).toBe('0, 1');
+    });
+
+    it('renders ε using the configured epsilonSymbol', () => {
+      const state = creationReducer(INITIAL_CREATION_STATE, {
+        type: 'loadExisting',
+        transition: { from: 0, to: 1, symbols: [null] },
+        epsilonSymbol: 'ε',
+      });
+      expect(state.symbol).toBe('ε');
     });
 
     it('overwrites any prior in-progress form', () => {
@@ -231,10 +294,67 @@ describe('creationReducer', () => {
       state = creationReducer(state, { type: 'symbolChanged', symbol: 'x' });
       state = creationReducer(state, {
         type: 'loadExisting',
-        transition: { from: 0, to: 1, symbol: '0' },
+        transition: { from: 0, to: 1, symbols: ['0'] },
+        epsilonSymbol: EPS,
       });
       expect(state.source).toBe(0);
       expect(state.symbol).toBe('0');
+    });
+  });
+
+  describe('parseSymbolInput', () => {
+    it('parses a single symbol', () => {
+      const r = parseSymbolInput('0', A, EPS);
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(r.symbols).toEqual(['0']);
+    });
+
+    it('parses comma-separated symbols (with whitespace)', () => {
+      const r = parseSymbolInput('0,  1', A, EPS);
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(new Set(r.symbols)).toEqual(new Set(['0', '1']));
+    });
+
+    it('maps the ε symbol to null', () => {
+      const r = parseSymbolInput('e', A, EPS);
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(r.symbols).toEqual([null]);
+    });
+
+    it('mixes ε with regular symbols', () => {
+      const r = parseSymbolInput('0, e', A, EPS);
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(new Set(r.symbols)).toEqual(new Set(['0', null]));
+    });
+
+    it('rejects symbols not in the alphabet', () => {
+      const r = parseSymbolInput('z', A, EPS);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.errors[0]).toContain("'z' is not in the alphabet");
+    });
+
+    it('rejects multi-character non-ε tokens', () => {
+      const r = parseSymbolInput('abc', A, EPS);
+      expect(r.ok).toBe(false);
+    });
+
+    it('rejects empty input', () => {
+      const r = parseSymbolInput('', A, EPS);
+      expect(r.ok).toBe(false);
+    });
+  });
+
+  describe('formatSymbolsForInput', () => {
+    it('joins literals alphabetically', () => {
+      expect(formatSymbolsForInput(['1', '0'], EPS)).toBe('0, 1');
+    });
+
+    it('places ε last using the configured symbol', () => {
+      expect(formatSymbolsForInput([null, '0'], 'ε')).toBe('0, ε');
+    });
+
+    it('handles a single ε', () => {
+      expect(formatSymbolsForInput([null], EPS)).toBe('e');
     });
   });
 
@@ -248,8 +368,8 @@ describe('creationReducer', () => {
       state = creationReducer(state, { type: 'destinationPicked', stateId: 1 });
       expect(state.phase).toBe('idle');
       state = creationReducer(state, { type: 'symbolChanged', symbol: '0' });
-      expect(isReady(state)).toBe(true);
-      expect(actionButtonLabel(state)).toBe('Add');
+      expect(isReady(state, A, EPS)).toBe(true);
+      expect(actionButtonLabel(state, A, EPS)).toBe('Add');
     });
   });
 });

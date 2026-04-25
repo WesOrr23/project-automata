@@ -28,19 +28,18 @@ type EditPanelProp = {
   /** Lifted creation form state (so the canvas can dispatch into it). */
   creationState: CreationState;
   creationDispatch: Dispatch<CreationAction>;
+  /** The reserved character that means "ε" in the symbol input. */
+  epsilonSymbol: string;
   onAlphabetAdd: (symbol: string) => void;
   onAlphabetRemove: (symbol: string) => void;
   onAddState: () => void;
   onRemoveState: (stateId: number) => void;
   onSetStartState: (stateId: number) => void;
   onToggleAcceptState: (stateId: number) => void;
-  onSetTransition: (from: number, symbol: string, to: number | null) => void;
-  onReplaceTransition: (
-    oldFrom: number,
-    oldSymbol: string,
-    newFrom: number,
-    newSymbol: string,
-    newTo: number
+  /** Apply a batch transition edit (removes + adds in one update). */
+  onApplyTransitionEdit: (
+    removes: ReadonlyArray<{ from: number; to: number; symbol: string | null }>,
+    adds: ReadonlyArray<{ from: number; to: number; symbol: string | null }>
   ) => void;
 };
 
@@ -51,14 +50,14 @@ export function EditPanel({
   highlightedSymbol,
   creationState,
   creationDispatch,
+  epsilonSymbol,
   onAlphabetAdd,
   onAlphabetRemove,
   onAddState,
   onRemoveState,
   onSetStartState,
   onToggleAcceptState,
-  onSetTransition,
-  onReplaceTransition,
+  onApplyTransitionEdit,
 }: EditPanelProp) {
   return (
     <>
@@ -90,8 +89,8 @@ export function EditPanel({
         displayLabels={displayLabels}
         creationState={creationState}
         creationDispatch={creationDispatch}
-        onSetTransition={onSetTransition}
-        onReplaceTransition={onReplaceTransition}
+        epsilonSymbol={epsilonSymbol}
+        onApplyTransitionEdit={onApplyTransitionEdit}
       />
     </>
   );

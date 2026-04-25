@@ -23,13 +23,25 @@ export type CreationState = {
   phase: CreationPhase;
   source: number | null;
   destination: number | null;
+  /**
+   * Raw user input for the symbol field. May contain a single symbol
+   * (`a`), the configured ε character (`e`), or a comma-separated list
+   * (`a, b, e`). Parsed at commit time by the consumer (which has the
+   * alphabet + reserved-ε symbol on hand).
+   */
   symbol: string;
   /**
-   * If the form is currently bound to an existing transition (because the
-   * user clicked an edge on the canvas), this is its identity. Used to
-   * support the "delete" path. null when creating a new transition.
+   * If the form is currently bound to an existing edge (the user clicked
+   * one on the canvas), this is the consolidated group it came from.
+   * `symbols` carries every symbol on that visual edge — so editing a
+   * consolidated edge lets the user re-enter the whole comma-separated
+   * list. null when authoring a new transition.
    */
-  editingExisting: { from: number; to: number; symbol: string } | null;
+  editingExisting: {
+    from: number;
+    to: number;
+    symbols: ReadonlyArray<string | null>;
+  } | null;
 };
 
 export type CreationAction =
@@ -42,7 +54,18 @@ export type CreationAction =
   | { type: 'reset' }                     // clear everything (e.g. after commit)
   | {
       type: 'loadExisting';
-      transition: { from: number; to: number; symbol: string };
+      transition: {
+        from: number;
+        to: number;
+        symbols: ReadonlyArray<string | null>;
+      };
+      /**
+       * The character that represents ε in the symbol input. Used to format
+       * the loaded symbols back into a comma-separated text the user can edit.
+       * Threaded through the action so the reducer stays free of any UI config
+       * dependency.
+       */
+      epsilonSymbol: string;
     }
   // Initiate a brand-new transition with source pre-filled (used by the
   // state-actions popover's Space shortcut). Equivalent to a reset followed
@@ -100,7 +123,10 @@ export function creationReducer(
         phase: 'idle',
         source: action.transition.from,
         destination: action.transition.to,
-        symbol: action.transition.symbol,
+        symbol: formatSymbolsForInput(
+          action.transition.symbols,
+          action.epsilonSymbol
+        ),
         editingExisting: action.transition,
       };
 
@@ -116,24 +142,107 @@ export function creationReducer(
 }
 
 /**
- * Is the form currently committable (all three slots filled)?
+ * Render a symbol list back into the comma-separated text that goes in
+ * the symbol input. ε (null) is rendered as the configured reserved
+ * character (e.g. `e`). Sorted so two equivalent groups render the same
+ * way regardless of insertion order.
  */
-export function isReady(state: CreationState): boolean {
-  return state.source !== null && state.destination !== null && state.symbol !== '';
+export function formatSymbolsForInput(
+  symbols: ReadonlyArray<string | null>,
+  epsilonSymbol: string
+): string {
+  const parts: string[] = [];
+  const literals = symbols
+    .filter((s): s is string => s !== null)
+    .sort();
+  parts.push(...literals);
+  if (symbols.some((s) => s === null)) {
+    parts.push(epsilonSymbol);
+  }
+  return parts.join(', ');
 }
 
 /**
- * When in edit mode (loaded from an existing transition), has the user
- * modified any of the three slots away from the original? Used to flip
- * the action button between Delete and Modify.
+ * Parse the raw symbol input into a list of canonical engine symbols.
+ *
+ * - Tokens are comma-separated, trimmed.
+ * - The configured ε character maps to `null` (engine ε-transition).
+ * - Other tokens must be a single character that's in the alphabet.
+ *
+ * Returns either a sorted-deduplicated symbol list (success) or a list
+ * of error messages, one per invalid token.
  */
-export function isModified(state: CreationState): boolean {
+export type ParsedSymbols =
+  | { ok: true; symbols: Array<string | null> }
+  | { ok: false; errors: string[] };
+
+export function parseSymbolInput(
+  input: string,
+  alphabet: ReadonlySet<string>,
+  epsilonSymbol: string
+): ParsedSymbols {
+  const tokens = input.split(',').map((t) => t.trim()).filter((t) => t.length > 0);
+  if (tokens.length === 0) {
+    return { ok: false, errors: ['Type a symbol from the alphabet.'] };
+  }
+
+  const result = new Set<string | null>();
+  const errors: string[] = [];
+  for (const token of tokens) {
+    if (token === epsilonSymbol) {
+      result.add(null);
+      continue;
+    }
+    if (token.length !== 1) {
+      errors.push(`'${token}' must be a single character`);
+      continue;
+    }
+    if (!alphabet.has(token)) {
+      errors.push(`'${token}' is not in the alphabet`);
+      continue;
+    }
+    result.add(token);
+  }
+
+  if (errors.length > 0) return { ok: false, errors };
+  return { ok: true, symbols: Array.from(result) };
+}
+
+/** True when the form has all three slots filled with a parseable symbol list. */
+export function isReady(
+  state: CreationState,
+  alphabet: ReadonlySet<string>,
+  epsilonSymbol: string
+): boolean {
+  if (state.source === null || state.destination === null) return false;
+  const parsed = parseSymbolInput(state.symbol, alphabet, epsilonSymbol);
+  return parsed.ok && parsed.symbols.length > 0;
+}
+
+/**
+ * When in edit mode, has the user modified any of the three slots away
+ * from the original? Used to flip the action button between Delete and
+ * Modify. Compares parsed symbols as a set so reordering or whitespace
+ * differences don't count as "modified."
+ */
+export function isModified(
+  state: CreationState,
+  alphabet: ReadonlySet<string>,
+  epsilonSymbol: string
+): boolean {
   if (state.editingExisting === null) return false;
-  return (
-    state.source !== state.editingExisting.from ||
-    state.destination !== state.editingExisting.to ||
-    state.symbol !== state.editingExisting.symbol
-  );
+  if (state.source !== state.editingExisting.from) return true;
+  if (state.destination !== state.editingExisting.to) return true;
+
+  const parsed = parseSymbolInput(state.symbol, alphabet, epsilonSymbol);
+  if (!parsed.ok) return true; // user typed something invalid → counts as modified
+  const newSet = new Set<string | null>(parsed.symbols);
+  const oldSet = new Set<string | null>(state.editingExisting.symbols);
+  if (newSet.size !== oldSet.size) return true;
+  for (const value of newSet) {
+    if (!oldSet.has(value)) return true;
+  }
+  return false;
 }
 
 /**
@@ -141,18 +250,24 @@ export function isModified(state: CreationState): boolean {
  */
 export type ActionMode = 'create' | 'delete' | 'modify';
 
-export function actionMode(state: CreationState): ActionMode {
+export function actionMode(
+  state: CreationState,
+  alphabet: ReadonlySet<string>,
+  epsilonSymbol: string
+): ActionMode {
   if (state.editingExisting === null) return 'create';
-  return isModified(state) ? 'modify' : 'delete';
+  return isModified(state, alphabet, epsilonSymbol) ? 'modify' : 'delete';
 }
 
 /**
- * The label shown on the primary action button. (Used as instruction
- * text — see TransitionCreator's instructionFor for the contextual
- * prose; this is just the button.)
+ * The label shown on the primary action button.
  */
-export function actionButtonLabel(state: CreationState): string {
-  switch (actionMode(state)) {
+export function actionButtonLabel(
+  state: CreationState,
+  alphabet: ReadonlySet<string>,
+  epsilonSymbol: string
+): string {
+  switch (actionMode(state, alphabet, epsilonSymbol)) {
     case 'delete':
       return 'Delete';
     case 'modify':
@@ -232,231 +347,263 @@ type AutomatonLike<T extends TransitionLike = TransitionLike> = {
  * pressing the action button before they press it. Going-away edges stay
  * visible (red) so the user understands what's being lost; new/modified
  * edges show in their post-commit position (blue/purple).
+ *
+ * `parsed` and `mode` come from the caller (which has the alphabet +
+ * reserved-ε symbol on hand). `isNFA` determines overwrite semantics —
+ * NFAs don't overwrite same `(from, symbol)` pairs, they accumulate
+ * destinations.
  */
 export function computePreview<T extends TransitionLike>(
   automaton: AutomatonLike<T>,
-  state: CreationState
+  state: CreationState,
+  mode: ActionMode,
+  parsed: ParsedSymbols,
+  isNFA: boolean
 ): { transitions: ReadonlyArray<T>; edges: EdgePreview[] } {
   const noPreview = { transitions: automaton.transitions, edges: [] as EdgePreview[] };
-  const mode = actionMode(state);
 
-  // Delete mode: an existing transition is loaded but unchanged. Visually
-  // we treat this as 'modify' (purple) — the user has *selected* the edge
-  // for editing, not committed to deleting it. The action button still
-  // says "Delete" (driven by actionMode), so the option is discoverable;
-  // pulsing red would prematurely imply destruction.
+  // Delete mode (loaded, no changes): each symbol on the loaded edge
+  // gets a 'modify' (purple) highlight. The canvas consolidates them
+  // into one visual pulse via symbols.some matching.
   if (mode === 'delete' && state.editingExisting !== null) {
-    return {
-      transitions: automaton.transitions,
-      edges: [
-        {
-          from: state.editingExisting.from,
-          to: state.editingExisting.to,
-          symbol: state.editingExisting.symbol,
-          kind: 'modify',
-        },
-      ],
-    };
+    const edges: EdgePreview[] = state.editingExisting.symbols.map((symbol) => ({
+      from: state.editingExisting!.from,
+      to: state.editingExisting!.to,
+      symbol,
+      kind: 'modify',
+    }));
+    return { transitions: automaton.transitions, edges };
   }
 
-  // Add and modify both require a fully-populated, valid form to preview.
+  // Add / modify both need a fully-populated, valid form to preview.
   if (
     state.source === null ||
     state.destination === null ||
-    state.symbol === '' ||
-    !automaton.alphabet.has(state.symbol)
+    !parsed.ok ||
+    parsed.symbols.length === 0
   ) {
     return noPreview;
   }
+  const newSource = state.source;
+  const newDestination = state.destination;
 
-  // The would-be new edge as a transition record (Set of one destination
-  // — same shape as engine transitions, NFA-compatible).
-  // Cast to T because we don't know which exact T the caller passed; the
-  // structural shape is compatible.
-  const newTransition = {
-    from: state.source,
-    to: new Set([state.destination]),
-    symbol: state.symbol,
-  } as unknown as T;
-
-  if (mode === 'modify' && state.editingExisting !== null) {
+  // Special-case the symbol-only single-symbol modify (the common case
+  // that fueled the iter-7 "old struck-red, new blue" label). Source +
+  // destination unchanged, exactly one symbol on each side, and the
+  // value differs. This stays visually compact — one purple edge with
+  // the diffed label — instead of an add/delete pair.
+  if (
+    mode === 'modify' &&
+    state.editingExisting !== null &&
+    state.editingExisting.from === newSource &&
+    state.editingExisting.to === newDestination &&
+    state.editingExisting.symbols.length === 1 &&
+    parsed.symbols.length === 1 &&
+    state.editingExisting.symbols[0] !== parsed.symbols[0]
+  ) {
     const original = state.editingExisting;
-    const symbolOnly =
-      state.source === original.from && state.destination === original.to;
-
-    // Symbol-only modify: source and destination are unchanged, only the
-    // symbol differs. The edge geometry stays put — it really IS the same
-    // edge with a new label, so a single purple pulse + an old/new label
-    // diff is the right read.
-    if (symbolOnly) {
-      const withoutOriginal = automaton.transitions.filter(
-        (transition) =>
-          !(transition.from === original.from && transition.symbol === original.symbol)
-      );
-
-      // A different existing edge with the same NEW (from, symbol) is being
-      // silently overwritten. Keep it in the preview so the canvas shows
-      // it (red) alongside the modified edge (purple).
-      const conflict = withoutOriginal.find(
-        (transition) =>
-          transition.from === state.source &&
-          transition.symbol === state.symbol &&
-          !(transition.to.size === 1 && transition.to.has(state.destination!))
-      );
-
-      const previewTransitions = [...withoutOriginal, newTransition];
-
-      const edges: EdgePreview[] = [
-        {
-          from: state.source,
-          to: state.destination,
-          symbol: state.symbol,
-          kind: 'modify',
-          oldSymbol: original.symbol,
-        },
-      ];
-      if (conflict !== undefined) {
-        const dest = Array.from(conflict.to)[0];
-        if (dest !== undefined) {
-          edges.push({
-            from: conflict.from,
-            to: dest,
-            symbol: conflict.symbol,
-            kind: 'delete',
-          });
-        }
-      }
-      return { transitions: previewTransitions, edges };
-    }
-
-    // Structural modify: the source or destination changed. Visually this
-    // is two distinct edges — the original geometry goes away and a new
-    // edge appears elsewhere — so a single purple pulse misrepresents
-    // what's happening. Show the original as red (delete) and the new as
-    // blue (add), the same vocabulary as a from-scratch creation that
-    // happens to evict an existing edge.
-    //
-    // Keep the original in the preview transition list so GraphViz lays
-    // it out and the canvas can color it red.
-    const conflict = automaton.transitions.find(
+    const oldSymbol = original.symbols[0]!;
+    const newSymbol = parsed.symbols[0]!;
+    const withoutOriginal = automaton.transitions.filter(
       (transition) =>
-        transition.from === state.source &&
-        transition.symbol === state.symbol &&
-        !(transition.from === original.from && transition.symbol === original.symbol) &&
-        !(transition.to.size === 1 && transition.to.has(state.destination!))
+        !(transition.from === original.from && transition.symbol === oldSymbol)
     );
-
-    const previewTransitions = [...automaton.transitions, newTransition];
-
+    const newTransition = {
+      from: newSource,
+      to: new Set([newDestination]),
+      symbol: newSymbol,
+    } as unknown as T;
+    const conflict = !isNFA
+      ? withoutOriginal.find(
+          (transition) =>
+            transition.from === newSource &&
+            transition.symbol === newSymbol &&
+            !(transition.to.size === 1 && transition.to.has(newDestination))
+        )
+      : undefined;
+    const transitions = [...withoutOriginal, newTransition];
     const edges: EdgePreview[] = [
       {
-        from: state.source,
-        to: state.destination,
-        symbol: state.symbol,
-        kind: 'add',
-      },
-      {
-        from: original.from,
-        to: original.to,
-        symbol: original.symbol,
-        kind: 'delete',
+        from: newSource,
+        to: newDestination,
+        symbol: newSymbol,
+        kind: 'modify',
+        oldSymbol: oldSymbol === null ? undefined : oldSymbol,
       },
     ];
     if (conflict !== undefined) {
-      const dest = Array.from(conflict.to)[0];
-      if (dest !== undefined) {
+      const conflictDest = Array.from(conflict.to)[0];
+      if (conflictDest !== undefined) {
         edges.push({
           from: conflict.from,
-          to: dest,
+          to: conflictDest,
           symbol: conflict.symbol,
           kind: 'delete',
         });
       }
     }
-    return { transitions: previewTransitions, edges };
+    return { transitions, edges };
   }
 
-  // Create mode (no editingExisting).
-  // No-op exact duplicate → don't preview, don't pulse.
-  const exactDuplicate = automaton.transitions.some(
-    (transition) =>
-      transition.from === state.source &&
-      transition.symbol === state.symbol &&
-      transition.to.size === 1 &&
-      transition.to.has(state.destination!)
+  // General case (multi-symbol or structural modify or add):
+  // diff the new symbol set against the original. Each new symbol is
+  // an add; each removed symbol is a delete; symbols present in both
+  // produce no preview (unchanged).
+  const newSymbols = new Set<string | null>(parsed.symbols);
+  const oldSymbols = new Set<string | null>(
+    state.editingExisting?.symbols ?? []
   );
-  if (exactDuplicate) return noPreview;
+  const isStructural =
+    state.editingExisting !== null &&
+    (state.editingExisting.from !== newSource ||
+      state.editingExisting.to !== newDestination);
 
-  // Conflict (same from+symbol, different to) — kept in preview as the
-  // going-away edge.
-  const conflict = automaton.transitions.find(
-    (transition) =>
-      transition.from === state.source &&
-      transition.symbol === state.symbol &&
-      !(transition.to.size === 1 && transition.to.has(state.destination!))
-  );
+  const edges: EdgePreview[] = [];
+  const previewTransitions: T[] = [...automaton.transitions];
 
-  const previewTransitions = [...automaton.transitions, newTransition];
-
-  const edges: EdgePreview[] = [
-    {
-      from: state.source,
-      to: state.destination,
-      symbol: state.symbol,
-      kind: 'add',
-    },
-  ];
-  if (conflict !== undefined) {
-    const dest = Array.from(conflict.to)[0];
-    if (dest !== undefined) {
+  // Removed symbols → delete previews on the original (from, to).
+  // Structural modify: every old symbol moves out (whole group goes red).
+  // Otherwise: only symbols not in the new set go red.
+  if (state.editingExisting !== null) {
+    const original = state.editingExisting;
+    for (const symbol of original.symbols) {
+      const removed = isStructural || !newSymbols.has(symbol);
+      if (!removed) continue;
       edges.push({
-        from: conflict.from,
-        to: dest,
-        symbol: conflict.symbol,
+        from: original.from,
+        to: original.to,
+        symbol,
         kind: 'delete',
       });
+      // For non-structural removal we additionally drop the engine
+      // transition from the preview so GraphViz lays out the post-commit
+      // shape. Structural modify keeps the original around (red) so the
+      // user can see what's being moved away.
+      if (!isStructural) {
+        for (let i = 0; i < previewTransitions.length; i++) {
+          const t = previewTransitions[i]!;
+          if (t.from !== original.from) continue;
+          if (t.symbol !== symbol) continue;
+          if (!t.to.has(original.to)) continue;
+          if (t.to.size === 1) {
+            previewTransitions.splice(i, 1);
+            i--;
+          } else {
+            const newTo = new Set(t.to);
+            newTo.delete(original.to);
+            previewTransitions[i] = { ...t, to: newTo } as T;
+          }
+          break;
+        }
+      }
     }
   }
+
+  // Added symbols → add previews on the new (from, to). Structural
+  // modify: every new symbol is "added" at the new location. Otherwise:
+  // only symbols not in the old set count as added.
+  for (const symbol of parsed.symbols) {
+    const added = isStructural || !oldSymbols.has(symbol);
+    if (!added) continue;
+
+    // No-op duplicate (already exists exactly): don't preview, don't pulse.
+    const exactDuplicate = automaton.transitions.some(
+      (transition) =>
+        transition.from === newSource &&
+        transition.symbol === symbol &&
+        transition.to.has(newDestination)
+    );
+    if (exactDuplicate && !isStructural) continue;
+
+    // DFA mode only: another existing transition with same (from, symbol)
+    // but different destination is an overwrite — show it as going-away red.
+    if (!isNFA) {
+      const conflict = automaton.transitions.find(
+        (transition) =>
+          transition.from === newSource &&
+          transition.symbol === symbol &&
+          !(transition.to.size === 1 && transition.to.has(newDestination)) &&
+          // Don't double-count the editingExisting original — already handled above.
+          !(state.editingExisting !== null &&
+            transition.from === state.editingExisting.from &&
+            state.editingExisting.symbols.includes(symbol))
+      );
+      if (conflict !== undefined) {
+        const conflictDest = Array.from(conflict.to)[0];
+        if (conflictDest !== undefined) {
+          edges.push({
+            from: conflict.from,
+            to: conflictDest,
+            symbol: conflict.symbol,
+            kind: 'delete',
+          });
+        }
+      }
+    }
+
+    previewTransitions.push({
+      from: newSource,
+      to: new Set([newDestination]),
+      symbol,
+    } as unknown as T);
+
+    edges.push({
+      from: newSource,
+      to: newDestination,
+      symbol,
+      kind: 'add',
+    });
+  }
+
+  if (edges.length === 0) return noPreview;
   return { transitions: previewTransitions, edges };
 }
 
 /**
- * If committing the current form would silently overwrite an existing
- * transition (same source + symbol, different destination), return that
- * existing transition. Returns null if commit would just add a new edge
- * or if no commit is possible.
+ * Summarize the transitions that committing the form would silently
+ * overwrite. Drives the orange-ish warning text below the form ("Add
+ * will replace q0 → 0 → q1"). NFA mode never overwrites — same
+ * (from, symbol) just adds another destination — so this returns
+ * `{ count: 0, first: null }` there.
  *
- * In edit mode, the existing transition that matches editingExisting
- * doesn't count as "overwrite" — that's the one being modified.
+ * Returns the count of overwrites and the first one (for the prose
+ * rendering); the canvas highlights are driven independently by
+ * computePreview's delete-kind edges.
  */
-export function findOverwriteTarget(
+export function getOverwriteSummary(
   state: CreationState,
-  transitions: ReadonlyArray<{ from: number; to: ReadonlySet<number>; symbol: string | null }>
-): { from: number; to: number; symbol: string } | null {
-  if (state.source === null || state.symbol === '') return null;
-  for (const transition of transitions) {
-    if (transition.from !== state.source) continue;
-    if (transition.symbol !== state.symbol) continue;
-    // Skip the edit's original — it's getting replaced, not overwritten.
-    if (
-      state.editingExisting !== null &&
-      transition.from === state.editingExisting.from &&
-      transition.symbol === state.editingExisting.symbol
-    ) {
-      continue;
+  transitions: ReadonlyArray<{ from: number; to: ReadonlySet<number>; symbol: string | null }>,
+  parsed: ParsedSymbols,
+  isNFA: boolean
+): { count: number; first: { from: number; to: number; symbol: string | null } | null } {
+  if (isNFA) return { count: 0, first: null };
+  if (state.source === null || state.destination === null) return { count: 0, first: null };
+  if (!parsed.ok) return { count: 0, first: null };
+
+  const editingSet =
+    state.editingExisting !== null && state.editingExisting.from === state.source
+      ? new Set(state.editingExisting.symbols)
+      : new Set<string | null>();
+
+  let count = 0;
+  let first: { from: number; to: number; symbol: string | null } | null = null;
+  for (const symbol of parsed.symbols) {
+    // Symbols already on the loaded edge group are being replaced as part
+    // of the modify, not silently overwritten.
+    if (editingSet.has(symbol)) continue;
+    for (const transition of transitions) {
+      if (transition.from !== state.source) continue;
+      if (transition.symbol !== symbol) continue;
+      // Exact-duplicate: same (from, symbol, dest) → no-op, not an overwrite.
+      if (transition.to.size === 1 && transition.to.has(state.destination)) continue;
+      const dest = Array.from(transition.to)[0];
+      if (dest === undefined) continue;
+      count++;
+      if (first === null) {
+        first = { from: transition.from, to: dest, symbol };
+      }
+      break; // count this symbol once
     }
-    const dest = Array.from(transition.to)[0];
-    if (dest === undefined) continue;
-    // In create mode, if the existing destination matches what the user is
-    // about to set, the commit is a true no-op — no warning.
-    if (
-      state.editingExisting === null &&
-      state.destination !== null &&
-      dest === state.destination
-    ) {
-      return null;
-    }
-    return { from: transition.from, to: dest, symbol: state.symbol };
   }
-  return null;
+  return { count, first };
 }

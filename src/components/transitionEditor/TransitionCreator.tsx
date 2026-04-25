@@ -25,10 +25,13 @@ import { Automaton } from '../../engine/types';
 import {
   actionButtonLabel,
   actionMode,
-  findOverwriteTarget,
+  getOverwriteSummary,
   isReady,
+  parseSymbolInput,
+  type ActionMode,
   type CreationAction,
   type CreationState,
+  type ParsedSymbols,
 } from './creationReducer';
 import { MiniTransitionSVG } from './MiniTransitionSVG';
 import { StatePickerPopover, type PickerOption } from '../popover/StatePickerPopover';
@@ -38,13 +41,12 @@ type TransitionCreatorProp = {
   displayLabels: Map<number, string>;
   creationState: CreationState;
   creationDispatch: Dispatch<CreationAction>;
-  onSetTransition: (from: number, symbol: string, to: number | null) => void;
-  onReplaceTransition: (
-    oldFrom: number,
-    oldSymbol: string,
-    newFrom: number,
-    newSymbol: string,
-    newTo: number
+  /** The reserved character that means "ε" in the symbol input. */
+  epsilonSymbol: string;
+  /** Apply a batch transition edit (removes + adds in one update). */
+  onApplyTransitionEdit: (
+    removes: ReadonlyArray<{ from: number; to: number; symbol: string | null }>,
+    adds: ReadonlyArray<{ from: number; to: number; symbol: string | null }>
   ) => void;
 };
 
@@ -54,28 +56,31 @@ type TransitionCreatorProp = {
  */
 function instructionFor(
   state: CreationState,
-  symbolValid: boolean,
-  overwriteLabel: string | null
+  parsed: ParsedSymbols,
+  mode: ActionMode,
+  overwrite: { count: number; first: { from: number; to: number; symbol: string | null } | null },
+  labelFor: (id: number) => string,
+  epsilonSymbol: string
 ): string {
-  const mode = actionMode(state);
   // Overwrite warning takes precedence over the "ready" message — the user
-  // needs to know they're about to clobber an existing transition.
-  if (overwriteLabel !== null && symbolValid) {
+  // needs to know they're about to clobber existing transitions.
+  if (overwrite.count > 0 && overwrite.first !== null) {
     const verb = mode === 'modify' ? 'Modify' : 'Add';
-    return `${verb} will replace ${overwriteLabel} (highlighted on the canvas).`;
+    const sym = overwrite.first.symbol === null ? epsilonSymbol : overwrite.first.symbol;
+    const triple = `${labelFor(overwrite.first.from)} → ${sym} → ${labelFor(overwrite.first.to)}`;
+    if (overwrite.count === 1) {
+      return `${verb} will replace ${triple} (highlighted on the canvas).`;
+    }
+    return `${verb} will replace ${overwrite.count} transitions (e.g. ${triple}).`;
   }
   if (mode === 'modify') {
-    if (!symbolValid) return `'${state.symbol}' is not in the alphabet.`;
+    if (!parsed.ok) return parsed.errors[0] ?? 'Invalid symbol input.';
     return 'Click Modify to apply your changes (or Cancel to discard).';
   }
   if (mode === 'delete') {
     return 'Editing this transition. Change a slot to modify, or click Delete to remove it.';
   }
   // create mode
-  // The actively-pulsing slot (and the open picker, if any) already show
-  // the user where to act; the directional prose ("Click the right circle…")
-  // is redundant in that case. Nudge toward the canvas-pick option instead,
-  // which isn't visually obvious.
   if (state.phase === 'picking-source' || state.phase === 'picking-destination') {
     return 'Click any state on the canvas to fill the highlighted slot.';
   }
@@ -91,8 +96,8 @@ function instructionFor(
   if (state.symbol === '') {
     return 'Type a symbol from the alphabet.';
   }
-  if (!symbolValid) {
-    return `'${state.symbol}' is not in the alphabet.`;
+  if (!parsed.ok) {
+    return parsed.errors[0] ?? 'Invalid symbol input.';
   }
   return 'Click Add (or press Enter) to create the transition.';
 }
@@ -102,8 +107,8 @@ export function TransitionCreator({
   displayLabels,
   creationState: state,
   creationDispatch: dispatch,
-  onSetTransition,
-  onReplaceTransition,
+  epsilonSymbol,
+  onApplyTransitionEdit,
 }: TransitionCreatorProp) {
   const [pickerSlot, setPickerSlot] = useState<'source' | 'destination' | null>(null);
   const [pickerAnchor, setPickerAnchor] = useState<DOMRect | null>(null);
@@ -163,18 +168,21 @@ export function TransitionCreator({
     label: labelFor(id),
   }));
 
-  const symbolValid = state.symbol === '' || automaton.alphabet.has(state.symbol);
-  const ready = isReady(state) && symbolValid;
-  const mode = actionMode(state);
-  const buttonLabel = actionButtonLabel(state);
+  const parsed = parseSymbolInput(state.symbol, automaton.alphabet, epsilonSymbol);
+  const ready = isReady(state, automaton.alphabet, epsilonSymbol);
+  const mode = actionMode(state, automaton.alphabet, epsilonSymbol);
+  const buttonLabel = actionButtonLabel(state, automaton.alphabet, epsilonSymbol);
 
-  // Compute "would overwrite" for the instruction text. The canvas
-  // highlight is wired separately by the parent (App.tsx) which has the
-  // same data and computes the same value.
-  const overwriteTarget = findOverwriteTarget(state, automaton.transitions);
-  const overwriteLabel = overwriteTarget
-    ? `${labelFor(overwriteTarget.from)} → ${overwriteTarget.symbol} → ${labelFor(overwriteTarget.to)}`
-    : null;
+  // Overwrite summary for the instruction text — only meaningful in DFA
+  // mode (NFAs don't overwrite same (from, symbol) pairs, they accumulate
+  // destinations). The canvas red-pulses are driven independently by
+  // computePreview's delete-kind edges.
+  const overwrite = getOverwriteSummary(
+    state,
+    automaton.transitions,
+    parsed,
+    automaton.type === 'NFA'
+  );
 
   function openPickerForSlot(slot: 'source' | 'destination', anchorEl: HTMLElement) {
     setPickerSlot(slot);
@@ -205,30 +213,51 @@ export function TransitionCreator({
   }
 
   function handleAction() {
+    // Delete mode: remove every symbol on the loaded edge group.
     if (mode === 'delete') {
       if (state.editingExisting === null) return;
-      onSetTransition(
-        state.editingExisting.from,
-        state.editingExisting.symbol,
-        null
-      );
+      const removes = state.editingExisting.symbols.map((symbol) => ({
+        from: state.editingExisting!.from,
+        to: state.editingExisting!.to,
+        symbol,
+      }));
+      onApplyTransitionEdit(removes, []);
       dispatch({ type: 'reset' });
       return;
     }
+
     if (!ready || state.source === null || state.destination === null) return;
+    if (!parsed.ok) return;
+    const newSource = state.source;
+    const newDestination = state.destination;
+
     if (mode === 'modify' && state.editingExisting !== null) {
-      onReplaceTransition(
-        state.editingExisting.from,
-        state.editingExisting.symbol,
-        state.source,
-        state.symbol,
-        state.destination
-      );
+      // Modify: remove the entire original group, add the new symbols at
+      // the new (from, to). Treats the consolidated edge as one unit.
+      const removes = state.editingExisting.symbols.map((symbol) => ({
+        from: state.editingExisting!.from,
+        to: state.editingExisting!.to,
+        symbol,
+      }));
+      const adds = parsed.symbols.map((symbol) => ({
+        from: newSource,
+        to: newDestination,
+        symbol,
+      }));
+      onApplyTransitionEdit(removes, adds);
       dispatch({ type: 'reset' });
       return;
     }
-    // create
-    onSetTransition(state.source, state.symbol, state.destination);
+
+    // Create: add each parsed symbol as a new transition. NFA mode
+    // unions destinations; DFA mode replaces conflicts (handled by
+    // the parent via the type check inside onApplyTransitionEdit).
+    const adds = parsed.symbols.map((symbol) => ({
+      from: newSource,
+      to: newDestination,
+      symbol,
+    }));
+    onApplyTransitionEdit([], adds);
     dispatch({ type: 'reset' });
   }
 
@@ -331,17 +360,20 @@ export function TransitionCreator({
     if (state.source === null) {
       candidates = sortedAlphabet;
     } else {
+      // Build the set of symbols that already have a transition from the
+      // currently-selected source state. Symbols on the loaded edge group
+      // (in modify mode) are treated as available so the user can keep
+      // them without a misleading fallback.
       const definedSymbols = new Set<string>();
+      const editingSymbols = new Set<string | null>(
+        state.editingExisting !== null && state.editingExisting.from === state.source
+          ? state.editingExisting.symbols
+          : []
+      );
       for (const transition of automaton.transitions) {
         if (transition.from !== state.source) continue;
         if (transition.symbol === null) continue;
-        if (
-          state.editingExisting !== null &&
-          transition.from === state.editingExisting.from &&
-          transition.symbol === state.editingExisting.symbol
-        ) {
-          continue;
-        }
+        if (editingSymbols.has(transition.symbol)) continue;
         definedSymbols.add(transition.symbol);
       }
       candidates = sortedAlphabet.filter((symbol) => !definedSymbols.has(symbol));
@@ -380,7 +412,7 @@ export function TransitionCreator({
               ref={symbolInputRef}
               type="text"
               className={`glass-input transition-creator-symbol-input ${
-                state.symbol !== '' && !symbolValid ? 'invalid' : ''
+                state.symbol !== '' && !parsed.ok ? 'invalid' : ''
               }`}
               value={state.symbol}
               onChange={(event) =>
@@ -391,7 +423,6 @@ export function TransitionCreator({
               }
               onKeyDown={handleSymbolKeyDown}
               placeholder={symbolPlaceholder}
-              maxLength={1}
               aria-label="Transition symbol"
             />
             <button
@@ -411,7 +442,7 @@ export function TransitionCreator({
           </div>
 
           <p className="transition-creator-instruction">
-            {instructionFor(state, symbolValid, overwriteLabel)}
+            {instructionFor(state, parsed, mode, overwrite, labelFor, epsilonSymbol)}
           </p>
 
           {state.editingExisting !== null && (

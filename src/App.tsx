@@ -4,6 +4,8 @@ import {
   addState,
   removeState,
   addTransition,
+  addTransitionDestination,
+  removeTransitionDestination,
   setStartState,
   addAcceptState,
   removeAcceptState,
@@ -23,10 +25,12 @@ import { useNotifications } from './notifications/useNotifications';
 import type { NotificationTarget } from './notifications/types';
 import { StateActionsPopover } from './components/popover/StateActionsPopover';
 import {
+  actionMode,
   computePreview,
   creationReducer,
   creationStateKind,
   INITIAL_CREATION_STATE,
+  parseSymbolInput,
 } from './components/transitionEditor/creationReducer';
 import { computeLayout } from './ui-state/utils';
 import { useSimulation } from './hooks/useSimulation';
@@ -92,13 +96,14 @@ function App() {
   // don't want speculative edges polluting the Simulate or collapsed views.
   const editTabOpen =
     menuState.mode === 'OPEN' && menuState.activeTab === 'EDIT';
-  const preview = useMemo(
-    () =>
-      editTabOpen
-        ? computePreview(automaton, creationState)
-        : { transitions: automaton.transitions, edges: [] },
-    [editTabOpen, automaton, creationState]
-  );
+  const preview = useMemo(() => {
+    if (!editTabOpen) {
+      return { transitions: automaton.transitions, edges: [] };
+    }
+    const parsed = parseSymbolInput(creationState.symbol, automaton.alphabet, epsilonSymbol);
+    const mode = actionMode(creationState, automaton.alphabet, epsilonSymbol);
+    return computePreview(automaton, creationState, mode, parsed, automaton.type === 'NFA');
+  }, [editTabOpen, automaton, creationState, epsilonSymbol]);
   const previewSourceAutomaton: Automaton =
     preview.transitions === automaton.transitions
       ? automaton
@@ -131,29 +136,24 @@ function App() {
 
   /**
    * Click an existing transition on the canvas → load it into the
-   * creator form for editing or deletion. Only active in EDITING mode
-   * so that simulation clicks (currently nothing, but future-proof) and
-   * idle hover don't trigger it.
-   *
-   * Phase 3 of iter 8 added edge consolidation — a clicked edge may
-   * carry multiple symbols. For now we load the first non-ε symbol,
-   * which preserves the iter-7 behavior. Phase 4 will load the full
-   * comma-joined list into the form.
+   * creator form for editing or deletion. Loads the entire consolidated
+   * group (every symbol on the visual edge) so the comma-separated
+   * symbol input shows the whole thing — modify/delete then operate on
+   * the group as a unit.
    */
   function handleCanvasEdgeClick(transition: {
     from: number;
     to: number;
     symbols: ReadonlyArray<string | null>;
   }) {
-    const firstNonEpsilon = transition.symbols.find((s) => s !== null);
-    if (firstNonEpsilon === undefined) return;
     creationDispatch({
       type: 'loadExisting',
       transition: {
         from: transition.from,
         to: transition.to,
-        symbol: firstNonEpsilon,
+        symbols: transition.symbols,
       },
+      epsilonSymbol,
     });
   }
 
@@ -397,52 +397,45 @@ function App() {
   }
 
   /**
-   * Set the destination of (from, symbol). Replaces any existing transition
-   * for that pair. If `to` is null, removes the transition (no-op if none
-   * existed). One atomic state update.
+   * Apply a batch transition edit: a list of (from, to, symbol) triples
+   * to remove, and another list to add. Runs all removes then all adds
+   * in a single setAutomaton call so the canvas re-layouts once.
+   *
+   * NFA mode adds via addTransitionDestination — typing a symbol that
+   * already has a transition from the same source unions in a new
+   * destination instead of replacing. DFA mode adds via the
+   * "filter then push" idiom (since DFA addTransition throws on
+   * duplicate (from, symbol) and we want replace semantics).
    */
-  function handleSetTransition(from: number, symbol: string, to: number | null) {
-    setAutomaton((previous) => {
-      const filtered = previous.transitions.filter(
-        (transition) => !(transition.from === from && transition.symbol === symbol)
-      );
-      if (to === null) {
-        return { ...previous, transitions: filtered };
-      }
-      return {
-        ...previous,
-        transitions: [...filtered, { from, to: new Set([to]), symbol }],
-      };
-    });
-  }
-
-  /**
-   * Replace one transition with another in a single atomic update.
-   * Used by the creator form's Modify action: the user loaded an
-   * existing transition, changed one or more slots, and committed.
-   * Removes the original (oldFrom, oldSymbol) and any conflicting
-   * (newFrom, newSymbol), then adds the new one.
-   */
-  function handleReplaceTransition(
-    oldFrom: number,
-    oldSymbol: string,
-    newFrom: number,
-    newSymbol: string,
-    newTo: number
+  function handleApplyTransitionEdit(
+    removes: ReadonlyArray<{ from: number; to: number; symbol: string | null }>,
+    adds: ReadonlyArray<{ from: number; to: number; symbol: string | null }>
   ) {
     setAutomaton((previous) => {
-      const filtered = previous.transitions.filter(
-        (transition) =>
-          !(transition.from === oldFrom && transition.symbol === oldSymbol) &&
-          !(transition.from === newFrom && transition.symbol === newSymbol)
-      );
-      return {
-        ...previous,
-        transitions: [
-          ...filtered,
-          { from: newFrom, to: new Set([newTo]), symbol: newSymbol },
-        ],
-      };
+      let result = previous;
+      for (const r of removes) {
+        result = removeTransitionDestination(result, r.from, r.to, r.symbol);
+      }
+      for (const a of adds) {
+        if (result.type === 'NFA') {
+          result = addTransitionDestination(result, a.from, a.to, a.symbol);
+        } else {
+          // DFA: replace any existing (from, symbol) — DFAs are deterministic
+          // so the form is replacing whatever was previously routed.
+          const filtered = result.transitions.filter(
+            (transition) =>
+              !(transition.from === a.from && transition.symbol === a.symbol)
+          );
+          result = {
+            ...result,
+            transitions: [
+              ...filtered,
+              { from: a.from, to: new Set([a.to]), symbol: a.symbol },
+            ],
+          };
+        }
+      }
+      return result;
     });
   }
 
@@ -508,14 +501,14 @@ function App() {
       highlightedSymbol={highlightedSymbol}
       creationState={creationState}
       creationDispatch={creationDispatch}
+      epsilonSymbol={epsilonSymbol}
       onAlphabetAdd={handleAlphabetAdd}
       onAlphabetRemove={handleAlphabetRemove}
       onAddState={handleAddState}
       onRemoveState={handleRemoveState}
       onSetStartState={handleSetStartState}
       onToggleAcceptState={handleToggleAcceptState}
-      onSetTransition={handleSetTransition}
-      onReplaceTransition={handleReplaceTransition}
+      onApplyTransitionEdit={handleApplyTransitionEdit}
     />
   );
 
