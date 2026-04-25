@@ -110,6 +110,14 @@ type AutomatonCanvasProp = {
   creationSourceId?: number | null;
   creationDestinationId?: number | null;
   creationStateKind?: 'add' | 'modify' | null;
+
+  /**
+   * Whether a simulation is currently running. Threads down to StateNode
+   * so idle-only ambient animations (accept-ring breathing) can suspend
+   * themselves to avoid competing with simulation coloring. Defaults to
+   * false.
+   */
+  isSimulating?: boolean;
 };
 
 export function AutomatonCanvas({
@@ -131,6 +139,7 @@ export function AutomatonCanvas({
   creationSourceId,
   creationDestinationId,
   creationStateKind,
+  isSimulating = false,
 }: AutomatonCanvasProp) {
   // The start-state arrow extends LEFT of the start-state circle by ~50px,
   // which is outside GraphViz's computed bounding box. Extend the SVG
@@ -275,6 +284,7 @@ export function AutomatonCanvas({
             creationKind={stateCreationKind}
             isInteractive={interactive}
             interactionStyle={interactionStyle}
+            isSimulating={isSimulating}
             onClick={handleClick}
           />
         );

@@ -1612,6 +1612,49 @@ button svg {
   animation: pulse-edge-fired 0.5s ease-out 1 forwards;
 }
 
+/* ─── Aliveness (iter 10) ─── */
+/*
+ * Two infinite, low-amplitude breathing cues that make the page feel
+ * awake at idle without ever reading as "busy":
+ *
+ *   1. Start-state arrow: opacity 0.85 ↔ 1.0 over 2s. Marks the entry
+ *      point as "ready." Runs always — the start state is a permanent
+ *      marker, not competing with any simulation visual.
+ *
+ *   2. Accept-state inner ring: scale 0.97 ↔ 1.0 over 3s. Subtle goal
+ *      marker. Suspended during simulation (the class is only applied
+ *      when !isSimulating) so it can't fight with the active/result
+ *      coloring.
+ *
+ * Both use `ease-in-out` so there's no perceptible start/end beat.
+ * Different periods (2s vs 3s) keep them from appearing to pulse in
+ * sync, which would read as a single stronger motion.
+ */
+@keyframes start-arrow-breath {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.85; }
+}
+
+.start-arrow-breath {
+  animation: start-arrow-breath 2s ease-in-out infinite;
+}
+
+@keyframes accept-ring-breath {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(0.97); }
+}
+
+/*
+ * transform-origin must be the circle's own center for the scale to
+ * breathe in place. SVG elements don't respect percentage origins the
+ * way HTML does — the coordinates are in user units relative to the
+ * nearest viewport. StateNode writes `transform-origin: <cx>px <cy>px`
+ * inline so each accept ring scales around its true center.
+ */
+.accept-ring-breath {
+  animation: accept-ring-breath 3s ease-in-out infinite;
+}
+
 /* Branch-death pulse — fires once per dying state when the NFA (or
  * dead-end DFA) loses a branch on a step. Stroke pulses red briefly,
  * then fades back; the eye reads "that branch just died." Single-shot
