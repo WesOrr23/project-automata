@@ -36,6 +36,7 @@ import {
 import { computeLayout } from './ui-state/utils';
 import { useSimulation } from './hooks/useSimulation';
 import { useUndoableAutomaton } from './hooks/useUndoableAutomaton';
+import { useKeyboardScope } from './hooks/useKeyboardScope';
 import { UndoRedoControls } from './components/UndoRedoControls';
 
 /**
@@ -279,33 +280,24 @@ function App() {
     );
   }, [automaton.alphabet]);
 
-  // Global keyboard shortcuts for undo/redo. Suppressed whenever focus is
-  // inside a text field — browsers already handle undo/redo for those, and
-  // hijacking the shortcut there would be worse than useless. Detects Mac
-  // vs Win/Linux by honoring metaKey or ctrlKey respectively.
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
+  // Global undo/redo shortcuts. Registered as a transparent scope so
+  // anything modal layered on top (e.g. a popover) can preempt the key.
+  // Text-input filtering is handled by the scope manager — browsers already
+  // handle Cmd/Ctrl+Z natively in fields, and we don't want to hijack it.
+  useKeyboardScope({
+    id: 'app-undo-redo',
+    active: true,
+    capture: false,
+    onKey: (event) => {
       const isModifier = event.metaKey || event.ctrlKey;
-      if (!isModifier) return;
-      if (event.key.toLowerCase() !== 'z') return;
-
-      const active = document.activeElement;
-      const isTextField =
-        active instanceof HTMLInputElement ||
-        active instanceof HTMLTextAreaElement ||
-        (active instanceof HTMLElement && active.isContentEditable);
-      if (isTextField) return;
-
+      if (!isModifier) return false;
+      if (event.key.toLowerCase() !== 'z') return false;
       event.preventDefault();
-      if (event.shiftKey) {
-        redo();
-      } else {
-        undo();
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo]);
+      if (event.shiftKey) redo();
+      else undo();
+      return true;
+    },
+  });
 
   // Display labels are sequential (q0, q1, q2) regardless of underlying IDs.
   // This detaches stable engine identity from user-visible numbering.

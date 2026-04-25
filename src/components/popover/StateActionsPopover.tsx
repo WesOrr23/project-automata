@@ -10,6 +10,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CircleDot, Circle, CircleCheck, Trash2, MoveRight } from 'lucide-react';
+import { useKeyboardScope } from '../../hooks/useKeyboardScope';
 
 type StateActionsPopoverProp = {
   stateLabel: string;
@@ -53,46 +54,44 @@ export function StateActionsPopover({
     setPos({ top, left });
   }, [anchorRect]);
 
-  useEffect(() => {
-    function handleKey(event: KeyboardEvent) {
-      // Ignore key events while focus is in a text-entry field — typing in
-      // the symbol input shouldn't trigger popover shortcuts.
-      const target = event.target as HTMLElement | null;
-      const inEditable =
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'TEXTAREA' ||
-        target?.isContentEditable;
-      if (inEditable) return;
-
+  // Modal scope: while open, the popover owns Esc / Space / Del. Other
+  // global scopes (e.g. transition-creator-enter) are blocked by capture:true.
+  // Text-input filtering still applies via the scope manager — typing in a
+  // text field elsewhere on the page doesn't trigger these shortcuts.
+  useKeyboardScope({
+    id: 'state-actions-popover',
+    active: true,
+    capture: true,
+    onKey: (event) => {
       if (event.key === 'Escape') {
         event.stopPropagation();
         onClose();
-        return;
+        return true;
       }
       if (event.key === ' ' || event.code === 'Space') {
         event.preventDefault();
         event.stopPropagation();
         onCreateTransition();
-        return;
+        return true;
       }
       if ((event.key === 'Delete' || event.key === 'Backspace') && canDelete) {
         event.preventDefault();
         event.stopPropagation();
         onDelete();
-        return;
+        return true;
       }
-    }
+      return false;
+    },
+  });
+
+  useEffect(() => {
     function handleClick(event: MouseEvent) {
       if (popoverRef.current?.contains(event.target as Node)) return;
       onClose();
     }
-    document.addEventListener('keydown', handleKey);
     document.addEventListener('mousedown', handleClick);
-    return () => {
-      document.removeEventListener('keydown', handleKey);
-      document.removeEventListener('mousedown', handleClick);
-    };
-  }, [onClose, onCreateTransition, onDelete, canDelete]);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [onClose]);
 
   // a11y: capture the element that had focus when the popover mounted so
   // we can restore focus there on unmount. Without this, keyboard users who
