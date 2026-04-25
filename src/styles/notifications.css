@@ -102,6 +102,11 @@
   color: var(--text-body);
   line-height: 1.4;
   word-break: break-word;
+  /* Detail text often contains specifics the user may want to copy
+   * (state IDs, symbols, error specifics). Re-enable selection
+   * against the app-wide user-select: none default. */
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .notification-toast-dismiss {

@@ -641,18 +641,17 @@ function App() {
 
       <NotificationStack />
 
-      {/* Undo/redo only relevant while editing — hide otherwise so the
-          floating controls don't add chrome that doesn't apply to the
-          user's current task. The keyboard shortcut (⌘/Ctrl+Z) is also
-          gated below for the same reason. */}
-      {menuState.mode === 'OPEN' && menuState.activeTab === 'EDIT' && (
-        <UndoRedoControls
-          canUndo={canUndo}
-          canRedo={canRedo}
-          onUndo={undo}
-          onRedo={redo}
-        />
-      )}
+      {/* Undo/redo only relevant while editing — `visible` drives the
+          AnimatePresence inside the component so it fades + slides
+          in/out instead of snapping. The keyboard shortcut (⌘/Ctrl+Z)
+          is gated to the same condition (see useUndoRedoShortcuts call). */}
+      <UndoRedoControls
+        visible={isEditing}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={undo}
+        onRedo={redo}
+      />
 
       {stateActions !== null && (
         <StateActionsPopover

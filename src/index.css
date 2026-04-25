@@ -36,6 +36,25 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* App-wide: chrome text (state labels, transition symbols, button
+   * captions, section headers, tab labels, etc.) is not user-
+   * selectable — the user has no reason to highlight it and the
+   * accidental selection-on-double-click feels off. Selection re-
+   * enabled below for the few places it's genuinely useful (form
+   * inputs, notification body text, anything tagged .selectable). */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Re-enable selection where it's actually useful. */
+input,
+textarea,
+[contenteditable='true'],
+[contenteditable=''],
+.selectable,
+.selectable * {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 #root {
