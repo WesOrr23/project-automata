@@ -1,4 +1,5 @@
 import { useState, useEffect, useReducer, useMemo } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useAutomatonLayout } from './hooks/useAutomatonLayout';
 import {
   createAutomaton,
@@ -688,17 +689,28 @@ function App() {
           it isn't." Surfacing the canvas's primary affordances here means
           the user doesn't have to guess that nodes and edges are clickable.
           Hidden as soon as the user starts an edit so it doesn't compete
-          with the in-form instruction text. */}
-      {appMode === 'EDITING' &&
-        canvasPickMode === null &&
-        creationState.editingExisting === null &&
-        creationState.source === null &&
-        creationState.destination === null &&
-        creationState.symbol === '' && (
-          <div className="canvas-tip" role="note">
-            Click any state for actions, or any edge to edit it.
-          </div>
-        )}
+          with the in-form instruction text. AnimatePresence so the tip
+          fades + slides in/out instead of snapping when stage-specific
+          conditions toggle. */}
+      <AnimatePresence>
+        {appMode === 'EDITING' &&
+          canvasPickMode === null &&
+          creationState.editingExisting === null &&
+          creationState.source === null &&
+          creationState.destination === null &&
+          creationState.symbol === '' && (
+            <motion.div
+              className="canvas-tip"
+              role="note"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+            >
+              Click any state for actions, or any edge to edit it.
+            </motion.div>
+          )}
+      </AnimatePresence>
 
       <main className="canvas-area">
         {automatonUI === null ? (
