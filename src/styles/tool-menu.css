@@ -67,10 +67,24 @@
     width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s;
 }
 
-/* COLLAPSED — narrow icon strip. Inner row width 32 + 8 padding × 2 = 48. */
+/* COLLAPSED — narrow icon strip. Inner row width 32 + 8 padding × 2 = 48.
+ *
+ * Closing transition (any → COLLAPSED): border-radius and width run
+ * concurrently with no delay, so the corners ease back to the pill
+ * *during* the width shrink rather than waiting for it to finish. The
+ * base rule delays width by 0.3s (which is right for opening — radius
+ * lands first, then width grows out from a finished card shape), but
+ * on the close that ordering reads as "shrink first, then re-round."
+ * Overriding the transition list here keeps the ordering correct in
+ * both directions. */
 .tool-menu-collapsed {
   width: 48px;
   max-height: 120px;
+  transition:
+    height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    max-height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-radius 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 /* EXPANDED — same height, wider. Reveals the labels by un-clipping the
