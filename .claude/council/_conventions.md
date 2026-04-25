@@ -96,6 +96,25 @@ Knowledge files are mutable. To update:
 2. Update `last-updated` and `verified-as-of` in frontmatter.
 3. Note the change in the next journal entry (so provenance survives).
 
+## Citation discipline
+
+Knowledge files should cite by **symbol name + file**, not by line number. Line numbers drift even after a single iteration (audit-001 found stale line citations after one round of merges). Acceptable forms:
+
+- "the `as unknown as T` cast inside `computePreview`'s symbol-modify branch" — symbol-relative, survives refactors.
+- "`hasStartState` in `src/engine/validator.ts`" — symbol-relative.
+- Bad: "lines 415, 494, 548 of `creationReducer.ts`" — drifts the moment the file grows.
+
+Line numbers are acceptable in:
+
+- **Audit and journal entries** that explicitly snapshot a commit (`verified-as-of` field documents the reference point).
+- **Side-channel commentary** ("verified at line 437 of HEAD") where the citation is point-in-time and not load-bearing for future reasoning.
+
+When in doubt: use symbol names. If you must use a line number in knowledge, treat it as a hint, and ensure the symbol-name reference is also present so a future reader can re-locate the code.
+
+## Closing the journal-to-knowledge correction loop
+
+If a journal entry contains a queued correction (e.g., "this should propagate to knowledge X"), the orchestrator MUST apply that correction to the knowledge file before the next spawn of the affected agent. Audit-001 finding #4 (the qa-reviewer `startState` correction never reaching knowledge) is the canonical failure mode — a correction visible to the auditor but invisible to the agent on its next read. The mechanical fix is: when applying memory updates after an agent run, scan for "knowledge update queued" or "should propagate" markers and resolve them in the same commit.
+
 ## Quarantine
 
 The orchestrator validates frontmatter on agent spawn. Files with malformed or missing frontmatter are moved to `<agent>/_quarantine/` and a journal entry is written. They do not poison context.

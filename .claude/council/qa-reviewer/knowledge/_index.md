@@ -12,3 +12,4 @@ last-updated: 2026-04-25
 - [test-patterns](test-patterns.md) — Vitest conventions used in this codebase; what good tests look like here
 - [testing-philosophy](testing-philosophy.md) — when to test what; unit vs integration vs component
 - [known-coverage-gaps](known-coverage-gaps.md) — specific identified gaps from the iteration-1 review
+- [data-shape-facts](data-shape-facts.md) — hard facts about engine types (startState non-nullable, transition.to is a Set, etc.) — corrects audit-001 finding

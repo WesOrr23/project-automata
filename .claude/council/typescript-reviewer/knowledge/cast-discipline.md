@@ -25,7 +25,7 @@ confidence: high
 
 ### Smells already catalogued
 
-- `src/components/transitionEditor/creationReducer.ts` uses `as unknown as T` casts at three points (lines 415, 494, 548 — verified at commit `52bdb8e`). These exist to bridge a generic abstraction (`AutomatonLike<T extends TransitionLike>`) that doesn't quite fit. The casts are not at an opaque boundary — they're papering over a type-model mismatch internal to the codebase. Recorded in the project's "Major Changes Proposed" backlog as: kill the generic, import `Automaton` directly.
+- `src/components/transitionEditor/creationReducer.ts` uses `as unknown as T` casts inside `computePreview` (the symbol-modify branch and the structural-modify branch). These exist to bridge a generic abstraction (`AutomatonLike<T extends TransitionLike>`) that doesn't quite fit. The casts are not at an opaque boundary — they're papering over a type-model mismatch internal to the codebase. Recorded in the project's "Major Changes Proposed" backlog as: kill the generic, import `Automaton` directly. The caller of `computePreview` in `src/App.tsx` additionally casts `preview.transitions as Automaton['transitions']`, present since the introducing commit `1493832`. This caller-side cast is part of the same generic-abstraction smell — kill the generic, kill both sides together. Re-verified at HEAD: 2 internal casts + 1 caller cast (audit-001 finding #5).
 
 ### `!` (non-null assertion) usage
 

@@ -18,10 +18,13 @@ Specific, named gaps in test coverage that have been catalogued. The auditor use
 
 ### `computePreview` conflict-detection branches (`src/components/transitionEditor/creationReducer.ts`)
 
-- Lines 416-444: single-symbol DFA modify with conflict detection.
-- Lines 519-541: general-case DFA conflict on add or structural-modify.
+Branches identified by behavior, not line number (line ranges drift; see `_conventions.md` on symbol-relative citations):
 
-The test file `creationReducer.test.ts` (~375 lines) covers happy paths but walks past the conflict branches. These are the most complex paths in the file.
+- The single-symbol DFA modify branch with conflict detection (when `editingExisting` is set and the new symbol overlaps another transition out of the same source).
+- The general-case DFA conflict branch on add or structural-modify (when adding or structurally changing a transition would produce two destinations for the same `(from, symbol)` in DFA mode).
+- As of iter 8 (`30eace9`), both branches gained an `isNFA` short-circuit — NFA mode skips DFA-conflict detection entirely.
+
+The test file `creationReducer.test.ts` (~375 lines at iter-8 head) covers happy paths plus the new helpers (`parseSymbolInput`, `formatSymbolsForInput`, `isModified`) but walks past the conflict branches. These are the most complex paths in the file and are now load-bearing for the iter-8 mode toggle.
 
 ### `ui-state/utils.ts` math helpers
 

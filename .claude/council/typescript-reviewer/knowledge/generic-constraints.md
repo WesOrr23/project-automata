@@ -18,13 +18,14 @@ A generic type parameter only earns its keep when the function genuinely operate
 
 ### The cautionary tale: `AutomatonLike<T extends TransitionLike>`
 
-Defined in `src/components/transitionEditor/creationReducer.ts`. The generic exists to avoid importing the engine's `Automaton` type into a UI-located file. Inside, three `as unknown as T` casts (lines 415, 494, 548 — verified at commit `52bdb8e`) exist because the constraint `T extends TransitionLike` is loose enough that TypeScript can't prove the produced values match `T`. There is exactly one caller, and that caller passes the engine's actual `Automaton`. So:
+Defined in `src/components/transitionEditor/creationReducer.ts`. The generic exists to avoid importing the engine's `Automaton` type into a UI-located file (a motivation that doesn't survive scrutiny — UI importing engine is permitted by the layering rules). Inside `computePreview`, `as unknown as T` casts appear at the synthesized-transition literal in both the symbol-modify branch and the structural-modify branch — the constraint `T extends TransitionLike` is loose enough that TypeScript can't prove the produced values match `T`. There is exactly one caller, and that caller passes the engine's actual `Automaton`, then immediately casts the result back: `preview.transitions as Automaton['transitions']` in `App.tsx`. So:
 
 - The generic isn't ranging over multiple types.
-- The constraint is loose (the casts prove this).
-- Removing the generic and importing `Automaton` directly would give better type information at the callsite *and* eliminate the casts.
+- The constraint is loose (the internal casts prove this).
+- The caller pays a second cast on the way out, so the generic does not even produce a clean callsite — it relocates a cast from inside the function to outside it.
+- Removing the generic and importing `Automaton` directly would give better type information at the callsite *and* eliminate all three casts.
 
-This is the canonical example of "the generic is the workaround, not the design." Recorded in the project's "Major Changes Proposed" backlog.
+This is the canonical example of "the generic is the workaround, not the design." Recorded in the project's "Major Changes Proposed" backlog (gated on user review pending — see `architecture-reviewer/open-questions/automaton-like-pending-user-review.md`).
 
 ### Acceptable generics in the codebase
 
