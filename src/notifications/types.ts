@@ -41,8 +41,8 @@ export type Notification = {
   id: string;
   severity: NotificationSeverity;
   title: string;
-  detail?: string;
-  target?: NotificationTarget;
+  detail?: string | undefined;
+  target?: NotificationTarget | undefined;
   createdAt: number;
   autoDismissMs: number | null;
 };
@@ -54,10 +54,10 @@ export type Notification = {
 export type NotifyInput = {
   severity: NotificationSeverity;
   title: string;
-  detail?: string;
-  target?: NotificationTarget;
+  detail?: string | undefined;
+  target?: NotificationTarget | undefined;
   /** Override the default auto-dismiss for this severity. Null = sticky. */
-  autoDismissMs?: number | null;
+  autoDismissMs?: number | null | undefined;
 };
 
 /**

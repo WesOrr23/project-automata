@@ -22,10 +22,10 @@ type AutomatonCanvasProp = {
   automatonUI: AutomatonUI;
 
   /** State IDs currently active during simulation */
-  activeStateIds?: Set<number>;
+  activeStateIds?: Set<number> | undefined;
 
   /** Result status for highlighting the final state after simulation */
-  resultStatus?: 'accepted' | 'rejected' | null;
+  resultStatus?: 'accepted' | 'rejected' | null | undefined;
 
   /**
    * Every transition that will fire on the next step. For DFAs there's
@@ -36,10 +36,10 @@ type AutomatonCanvasProp = {
     fromStateId: number;
     toStateId: number;
     symbol: string;
-  }>;
+  }> | undefined;
 
   /** State IDs whose branches died on the most recent step — pulse red. */
-  dyingStateIds?: ReadonlySet<number>;
+  dyingStateIds?: ReadonlySet<number> | undefined;
 
   /**
    * Transitions that fired on the most recent step (symbol-driven and
@@ -49,35 +49,35 @@ type AutomatonCanvasProp = {
     from: number;
     to: number;
     symbol: string | null;
-  }>;
+  }> | undefined;
 
   /**
    * Current simulation step index. Threaded into edge keys so the
    * just-fired animation re-runs on every step rather than getting
    * stuck on the first fire.
    */
-  simulationStepIndex?: number;
+  simulationStepIndex?: number | undefined;
 
   /** State ID currently highlighted by an active notification target */
-  highlightedStateId?: number | null;
+  highlightedStateId?: number | null | undefined;
 
   /** Transition currently highlighted by an active notification target */
-  highlightedTransition?: { from: number; to: number; symbol: string | null } | null;
+  highlightedTransition?: { from: number; to: number; symbol: string | null } | null | undefined;
 
   /**
    * When set to 'state', state nodes become clickable for picking
    * (used by TransitionCreator while filling source/destination slots).
    */
-  pickMode?: 'state' | null;
+  pickMode?: 'state' | null | undefined;
 
   /** Called when the user clicks a state node while pickMode === 'state'. */
-  onPickState?: (stateId: number) => void;
+  onPickState?: ((stateId: number) => void) | undefined;
 
   /**
    * Called when the user clicks a state node while NOT in pick mode
    * (typically: edit-mode state actions popover).
    */
-  onStateClick?: (stateId: number, anchorEl: SVGGElement) => void;
+  onStateClick?: ((stateId: number, anchorEl: SVGGElement) => void) | undefined;
 
   /**
    * Called when the user clicks an existing transition edge on the canvas.
@@ -85,11 +85,11 @@ type AutomatonCanvasProp = {
    * edges (multiple symbols sharing the same from→to), the entire group
    * is loaded — `symbols` carries every symbol on the rendered edge.
    */
-  onEdgeClick?: (transition: {
+  onEdgeClick?: ((transition: {
     from: number;
     to: number;
     symbols: ReadonlyArray<string | null>;
-  }) => void;
+  }) => void) | undefined;
 
   /**
    * Per-edge highlights for the in-progress transition edit. Each entry
@@ -98,7 +98,7 @@ type AutomatonCanvasProp = {
    * (from, to, symbol). For modifications with a symbol change, the entry
    * also carries the original symbol so the label renders both.
    */
-  edgePreviews?: ReadonlyArray<EdgePreview>;
+  edgePreviews?: ReadonlyArray<EdgePreview> | undefined;
 
   /**
    * State IDs currently selected as the source / destination of the
@@ -107,9 +107,9 @@ type AutomatonCanvasProp = {
    * used for the edge preview, so the user sees "these are the states in
    * play."
    */
-  creationSourceId?: number | null;
-  creationDestinationId?: number | null;
-  creationStateKind?: 'add' | 'modify' | null;
+  creationSourceId?: number | null | undefined;
+  creationDestinationId?: number | null | undefined;
+  creationStateKind?: 'add' | 'modify' | null | undefined;
 };
 
 export function AutomatonCanvas({

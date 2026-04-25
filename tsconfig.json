@@ -56,7 +56,12 @@
     // Require `override` keyword when subclass methods override base methods.
     // Free here (no code currently uses class inheritance), but enables it
     // for future code without a follow-up tsconfig change.
-    "noImplicitOverride": true
+    "noImplicitOverride": true,
+
+    // Distinguish `field?: T` (omit-only) from `field?: T | undefined` (nullable).
+    // Catches code that explicitly passes `undefined` to a slot meant only to
+    // be omitted. Forces honest prop interfaces.
+    "exactOptionalPropertyTypes": true
   },
 
   // Only compile files in the src/ directory

@@ -409,7 +409,12 @@ export function useSimulation(automaton: Automaton) {
   const stepBack = useCallback(() => dispatch({ type: 'stepBack' }), []);
   const jumpTo = useCallback(
     (index: number, input?: string) =>
-      dispatch({ type: 'jumpTo', index, automaton, input }),
+      dispatch({
+        type: 'jumpTo',
+        index,
+        automaton,
+        ...(input !== undefined && { input }),
+      }),
     [automaton]
   );
   const run = useCallback(() => dispatch({ type: 'run' }), []);

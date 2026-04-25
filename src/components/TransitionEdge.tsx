@@ -29,10 +29,10 @@ type TransitionEdgeProp = {
   labelPosition: { x: number; y: number };
 
   /** Whether this transition is the next one to be taken during simulation */
-  isNextTransition?: boolean;
+  isNextTransition?: boolean | undefined;
 
   /** Whether this transition is the active highlight target of a notification */
-  isHighlighted?: boolean;
+  isHighlighted?: boolean | undefined;
 
   /**
    * Whether this transition fired on the most recent simulation step.
@@ -40,7 +40,7 @@ type TransitionEdgeProp = {
    * the React key when the fire event changes (typically the step
    * index) so the animation re-runs on each step.
    */
-  justFired?: boolean;
+  justFired?: boolean | undefined;
 
   /**
    * If this edge is part of the in-progress transition edit preview, the
@@ -49,17 +49,17 @@ type TransitionEdgeProp = {
    *   - 'modify' → purple: an existing edge whose source / dest / symbol changed
    *   - 'delete' → red:    an edge that will be removed on commit
    */
-  previewKind?: EdgePreview['kind'];
+  previewKind?: EdgePreview['kind'] | undefined;
 
   /**
    * For modify previews where the symbol itself changed, the previous symbol.
    * Triggers the split-label render: old symbol struck-through in red,
    * new symbol in blue.
    */
-  previewOldSymbol?: string;
+  previewOldSymbol?: string | undefined;
 
   /** Called when the user clicks this edge (loads it into the creator form). */
-  onEdgeClick?: () => void;
+  onEdgeClick?: (() => void) | undefined;
 };
 
 const STROKE_WIDTH = 2;
