@@ -8,6 +8,8 @@ import {
   addState,
   removeState,
   addTransition,
+  addTransitionDestination,
+  removeTransitionDestination,
   setStartState,
   addAcceptState,
   removeAcceptState,
@@ -348,5 +350,99 @@ describe('getTransition', () => {
     const transitions = getTransition(dfa2, 0, '1');
 
     expect(transitions).toEqual([]);
+  });
+});
+
+describe('addTransitionDestination', () => {
+  it('creates a new transition record when none exists', () => {
+    let nfa = createAutomaton('NFA', new Set(['a']));
+    const { automaton: n1, stateId: q1 } = addState(nfa);
+    nfa = addTransitionDestination(n1, 0, q1, 'a');
+
+    expect(nfa.transitions).toHaveLength(1);
+    expect(nfa.transitions[0]!.from).toBe(0);
+    expect(nfa.transitions[0]!.symbol).toBe('a');
+    expect(nfa.transitions[0]!.to).toEqual(new Set([q1]));
+  });
+
+  it('unions a new destination into an existing record', () => {
+    let nfa = createAutomaton('NFA', new Set(['a']));
+    const { automaton: n1, stateId: q1 } = addState(nfa);
+    const { automaton: n2, stateId: q2 } = addState(n1);
+    nfa = addTransitionDestination(n2, 0, q1, 'a');
+    nfa = addTransitionDestination(nfa, 0, q2, 'a');
+
+    expect(nfa.transitions).toHaveLength(1);
+    expect(nfa.transitions[0]!.to).toEqual(new Set([q1, q2]));
+  });
+
+  it('is a no-op when the destination is already present', () => {
+    let nfa = createAutomaton('NFA', new Set(['a']));
+    const { automaton: n1, stateId: q1 } = addState(nfa);
+    nfa = addTransitionDestination(n1, 0, q1, 'a');
+    const before = nfa;
+    nfa = addTransitionDestination(nfa, 0, q1, 'a');
+    expect(nfa).toBe(before);
+  });
+
+  it('supports ε-transitions in NFA mode', () => {
+    let nfa = createAutomaton('NFA', new Set(['a']));
+    const { automaton: n1, stateId: q1 } = addState(nfa);
+    nfa = addTransitionDestination(n1, 0, q1, null);
+    expect(nfa.transitions[0]!.symbol).toBe(null);
+  });
+
+  it('throws in DFA mode', () => {
+    let dfa = createAutomaton('DFA', new Set(['a']));
+    const { automaton: d1, stateId: q1 } = addState(dfa);
+    expect(() => addTransitionDestination(d1, 0, q1, 'a')).toThrow(
+      'NFA-only'
+    );
+  });
+
+  it('throws when source state does not exist', () => {
+    const nfa = createAutomaton('NFA', new Set(['a']));
+    expect(() => addTransitionDestination(nfa, 99, 0, 'a')).toThrow(
+      'Source state 99'
+    );
+  });
+});
+
+describe('removeTransitionDestination', () => {
+  it('removes a destination from a multi-destination transition', () => {
+    let nfa = createAutomaton('NFA', new Set(['a']));
+    const { automaton: n1, stateId: q1 } = addState(nfa);
+    const { automaton: n2, stateId: q2 } = addState(n1);
+    nfa = addTransitionDestination(n2, 0, q1, 'a');
+    nfa = addTransitionDestination(nfa, 0, q2, 'a');
+
+    nfa = removeTransitionDestination(nfa, 0, q1, 'a');
+    expect(nfa.transitions).toHaveLength(1);
+    expect(nfa.transitions[0]!.to).toEqual(new Set([q2]));
+  });
+
+  it('drops the entire transition when the last destination is removed', () => {
+    let nfa = createAutomaton('NFA', new Set(['a']));
+    const { automaton: n1, stateId: q1 } = addState(nfa);
+    nfa = addTransitionDestination(n1, 0, q1, 'a');
+
+    nfa = removeTransitionDestination(nfa, 0, q1, 'a');
+    expect(nfa.transitions).toHaveLength(0);
+  });
+
+  it('is a no-op when the (from, symbol) pair has no transition', () => {
+    const nfa = createAutomaton('NFA', new Set(['a']));
+    const result = removeTransitionDestination(nfa, 0, 0, 'a');
+    expect(result).toBe(nfa);
+  });
+
+  it('is a no-op when the destination is not in the to set', () => {
+    let nfa = createAutomaton('NFA', new Set(['a']));
+    const { automaton: n1, stateId: q1 } = addState(nfa);
+    const { automaton: n2, stateId: q2 } = addState(n1);
+    nfa = addTransitionDestination(n2, 0, q1, 'a');
+    const before = nfa;
+    nfa = removeTransitionDestination(nfa, 0, q2, 'a');
+    expect(nfa).toBe(before);
   });
 });

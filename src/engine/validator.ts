@@ -129,28 +129,22 @@ export function hasAcceptStates(automaton: Automaton): boolean {
 }
 
 /**
- * Check if automaton is ready for simulation
+ * Check if automaton is ready for simulation.
  *
- * An automaton is "runnable" if:
- * 1. It's a DFA (NFA support not yet implemented)
- * 2. It has a valid start state
- * 3. It satisfies DFA properties
- * 4. It's complete (all transitions defined)
- *
- * @param automaton - The automaton to validate
- * @returns true if ready to simulate
+ * Both DFAs and NFAs require an alphabet and a start state. DFAs
+ * additionally require structural validity (no ε, no multi-dest, no
+ * non-determinism) and completeness — without those a DFA can crash
+ * mid-step. NFAs tolerate missing transitions because branches dying
+ * is part of the model.
  */
 export function isRunnable(automaton: Automaton): boolean {
-  // Explicit DFA check (NFA simulation not yet supported)
-  if (automaton.type !== 'DFA') {
-    return false;
+  if (automaton.alphabet.size === 0) return false;
+  if (!hasStartState(automaton)) return false;
+  if (automaton.type === 'DFA') {
+    return isDFA(automaton) && isComplete(automaton);
   }
-  // Alphabet must be non-empty
-  if (automaton.alphabet.size === 0) {
-    return false;
-  }
-
-  return hasStartState(automaton) && isDFA(automaton) && isComplete(automaton);
+  // NFA — alphabet + start state are enough.
+  return true;
 }
 
 /**
@@ -247,43 +241,49 @@ export function getValidationReport(
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // Empty alphabet: nothing to simulate over
+  // Empty alphabet: nothing to simulate over.
   if (automaton.alphabet.size === 0) {
     errors.push('Alphabet is empty — add at least one symbol to simulate');
   }
 
-  // Check for start state
+  // Check for start state.
   if (!hasStartState(automaton)) {
     errors.push('No start state defined');
   }
 
-  // Check if it's a valid DFA
-  if (!isDFA(automaton)) {
-    errors.push('Not a valid DFA (check for ε-transitions or non-determinism)');
-  }
+  // DFA-specific structural checks — only meaningful in DFA mode. NFAs
+  // intentionally allow ε-transitions and multiple destinations; the user
+  // toggling DFA mode is the trigger to flag them.
+  if (automaton.type === 'DFA') {
+    if (!isDFA(automaton)) {
+      errors.push('Not a valid DFA (check for ε-transitions or non-determinism)');
+    }
 
-  // Check completeness — list the specific missing transitions so the user
-  // knows exactly what to add.
-  if (isDFA(automaton) && automaton.alphabet.size > 0 && !isComplete(automaton)) {
-    const missing = getMissingTransitions(automaton);
-    if (missing.length === 1) {
-      const m = missing[0]!;
-      errors.push(`Missing transition: q${m.stateId} on '${m.symbol}'`);
-    } else if (missing.length <= 5) {
-      const list = missing.map((m) => `q${m.stateId}/'${m.symbol}'`).join(', ');
-      errors.push(`Missing ${missing.length} transitions: ${list}`);
-    } else {
-      const sample = missing.slice(0, 3).map((m) => `q${m.stateId}/'${m.symbol}'`).join(', ');
-      errors.push(`Missing ${missing.length} transitions (e.g. ${sample}, …)`);
+    // Completeness — list the specific missing transitions so the user
+    // knows exactly what to add. Only checked when the structural
+    // checks above pass; otherwise the missing-transitions list would
+    // be misleading.
+    if (isDFA(automaton) && automaton.alphabet.size > 0 && !isComplete(automaton)) {
+      const missing = getMissingTransitions(automaton);
+      if (missing.length === 1) {
+        const m = missing[0]!;
+        errors.push(`Missing transition: q${m.stateId} on '${m.symbol}'`);
+      } else if (missing.length <= 5) {
+        const list = missing.map((m) => `q${m.stateId}/'${m.symbol}'`).join(', ');
+        errors.push(`Missing ${missing.length} transitions: ${list}`);
+      } else {
+        const sample = missing.slice(0, 3).map((m) => `q${m.stateId}/'${m.symbol}'`).join(', ');
+        errors.push(`Missing ${missing.length} transitions (e.g. ${sample}, …)`);
+      }
     }
   }
 
-  // Check for accept states
+  // Check for accept states.
   if (!hasAcceptStates(automaton)) {
     warnings.push('No accept states defined — every input will be rejected');
   }
 
-  // Check for orphaned states
+  // Check for orphaned states.
   const orphaned = getOrphanedStates(automaton);
   if (orphaned.size > 0) {
     const labels = [...orphaned].sort((a, b) => a - b).map((id) => `q${id}`).join(', ');

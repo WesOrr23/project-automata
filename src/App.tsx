@@ -60,6 +60,10 @@ function App() {
   const [automatonUI, setAutomatonUI] = useState<AutomatonUI | null>(null);
   const [inputString, setInputString] = useState('');
   const [menuState, setMenuState] = useState<ToolMenuState>({ mode: 'COLLAPSED' });
+  // The single character that authors an ε-transition in the symbol input.
+  // UI-only state — not part of the engine model. Defaults to 'e'; can be
+  // changed in the Configure tab when in NFA mode.
+  const [epsilonSymbol, setEpsilonSymbol] = useState('e');
 
   const sim = useSimulation(automaton);
   const { highlightedTarget, notify } = useNotifications();
@@ -268,10 +272,34 @@ function App() {
   }
 
   function handleAlphabetAdd(symbol: string) {
+    // Reject the reserved ε symbol — it's how the user authors ε-transitions
+    // in the symbol input, so it can't double as a regular alphabet symbol.
+    // Only enforced in NFA mode (DFA mode has no ε-transitions, so the
+    // symbol could be used freely there).
+    if (automaton.type === 'NFA' && symbol === epsilonSymbol) {
+      notify({
+        severity: 'error',
+        title: `'${symbol}' is reserved for ε-transitions in NFA mode.`,
+        detail: 'Change the reserved symbol in Configure if you need this character in the alphabet.',
+        autoDismissMs: 6_000,
+      });
+      return;
+    }
     setAutomaton((prev) => ({
       ...prev,
       alphabet: new Set([...prev.alphabet, symbol]),
     }));
+  }
+
+  // Configure-tab handler for the ε symbol. Returns null on accept,
+  // an error string otherwise — the panel surfaces the error inline.
+  function handleEpsilonSymbolChange(newSymbol: string): string | null {
+    if (newSymbol.length !== 1) return 'Use a single character';
+    if (automaton.alphabet.has(newSymbol)) {
+      return `'${newSymbol}' is already in the alphabet`;
+    }
+    setEpsilonSymbol(newSymbol);
+    return null;
   }
 
   function handleAlphabetRemove(symbol: string) {
@@ -466,6 +494,8 @@ function App() {
     <ConfigPanel
       automatonType={automaton.type}
       onTypeChange={handleTypeChange}
+      epsilonSymbol={epsilonSymbol}
+      onEpsilonSymbolChange={handleEpsilonSymbolChange}
       onExportJSON={handleExportJSON}
     />
   );
