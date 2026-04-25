@@ -292,18 +292,33 @@
   /* Fade + slight upward slide every time a panel mounts — both on
    * first OPEN and on tab switches (the React key on this element
    * forces remount per active tab so @starting-style fires every
-   * time, not only once). */
+   * time, not only once).
+   *
+   * The panel also collapses its own max-height + vertical padding to
+   * 0 in @starting-style and grows them back with a 0.3s delay. Without
+   * that, the panel mounts at full height during the first 300ms of the
+   * EXPANDED → OPEN transition (while the container's max-height is
+   * still capped at the EXPANDED 120px), pushing the Simulate row out
+   * of the visible box and clipping it. Delaying the panel's growth
+   * lines it up with the container's max-height stage so the row only
+   * inflates once there's room for it. */
   opacity: 1;
   transform: translateY(0);
+  max-height: 95vh;
   transition:
-    opacity 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
-    transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+    opacity 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s,
+    transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s,
+    max-height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s,
+    padding 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s;
 }
 
 @starting-style {
   .tool-menu-active-content {
     opacity: 0;
     transform: translateY(6px);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
   }
 }
 
