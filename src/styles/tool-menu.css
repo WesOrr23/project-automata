@@ -111,10 +111,31 @@
 /* Once the panel has exited there's nothing below the active row to
  * "merge with," so the squared bottom corners read as a partial-pill
  * mismatch inside the rounding container. Round all four corners
- * during the close — border-radius is in the .tool-menu-row
- * transition list, so the change animates smoothly. */
+ * (transitions immediately) AND fade the blue chrome to neutral —
+ * the chrome fade is delayed to align with stage 2 (the width
+ * shrink), mirroring the label fade. By the time the menu reaches
+ * the COLLAPSED pill, the previously-active row blends into the
+ * default icon-only look. */
 .tool-menu-collapsed.tool-menu-closing-from-open .tool-menu-row.active {
+  background: transparent;
+  border-color: transparent;
+  border-bottom-color: transparent;
+  color: var(--text-body);
   border-radius: var(--radius-sm);
+  transition:
+    background     0.30s cubic-bezier(0.4, 0.0, 0.2, 1) 0.45s,
+    border-color   0.30s cubic-bezier(0.4, 0.0, 0.2, 1) 0.45s,
+    color          0.30s cubic-bezier(0.4, 0.0, 0.2, 1) 0.45s,
+    border-radius  0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Collapse button (chevron) fades along with the rest of the active
+ * chrome during stage 2. pointer-events: none so it's not clickable
+ * once it's invisible. */
+.tool-menu-collapsed.tool-menu-closing-from-open .tool-menu-row-collapse {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.30s cubic-bezier(0.4, 0.0, 0.2, 1) 0.45s;
 }
 
 /* EXPANDED — same height, wider. Reveals the labels by un-clipping the
