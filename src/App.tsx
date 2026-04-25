@@ -248,10 +248,11 @@ function App() {
     setInputString,
   });
 
-  // Global undo/redo shortcuts. Hook owns the keyboard binding; passing
-  // canUndo/canRedo lets it gate logging or future "no-op feedback" without
-  // changing this site.
-  useUndoRedoShortcuts({ undo, redo, canUndo, canRedo });
+  // Global undo/redo shortcuts. Active only while editing — outside
+  // EDIT mode the keyboard shortcut is also off, matching the visible
+  // controls being hidden.
+  const isEditing = menuState.mode === 'OPEN' && menuState.activeTab === 'EDIT';
+  useUndoRedoShortcuts({ undo, redo, canUndo, canRedo, enabled: isEditing });
 
   // Display labels are sequential (q0, q1, q2) regardless of underlying IDs.
   // This detaches stable engine identity from user-visible numbering.
@@ -640,12 +641,18 @@ function App() {
 
       <NotificationStack />
 
-      <UndoRedoControls
-        canUndo={canUndo}
-        canRedo={canRedo}
-        onUndo={undo}
-        onRedo={redo}
-      />
+      {/* Undo/redo only relevant while editing — hide otherwise so the
+          floating controls don't add chrome that doesn't apply to the
+          user's current task. The keyboard shortcut (⌘/Ctrl+Z) is also
+          gated below for the same reason. */}
+      {menuState.mode === 'OPEN' && menuState.activeTab === 'EDIT' && (
+        <UndoRedoControls
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onUndo={undo}
+          onRedo={redo}
+        />
+      )}
 
       {stateActions !== null && (
         <StateActionsPopover

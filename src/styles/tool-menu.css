@@ -33,10 +33,14 @@
   gap: var(--space-1);
   background: var(--bg-sidebar);
   border: 1px solid var(--border-subtle);
-  /* Default radius is the pill — matches undo/redo when COLLAPSED.
-   * EXPANDED/OPEN drop to a much smaller radius (--radius-md) so the
-   * wider container doesn't read as a giant circle. */
-  border-radius: var(--radius-pill);
+  /* Default radius matches COLLAPSED width/2 (48/2 = 24). A fixed
+   * value rather than var(--radius-pill) (999px) so the rendered
+   * radius doesn't dynamically cap at min-dim/2 during transitions —
+   * at intermediate widths (e.g. 178px during a close), 999px would
+   * render as ~89px and look like an unintended stadium. With 24px,
+   * EXPANDED/OPEN render as a small radius (24 < 76 width-cap), and
+   * COLLAPSED renders as a true pill (24 == 48/2). */
+  border-radius: 24px;
   box-shadow: var(--shadow-lg);
   padding: var(--space-2);
   /* Hide row content that overflows the current container width — that
@@ -67,7 +71,7 @@
 .tool-menu-collapsed {
   width: 48px;
   max-height: 120px;
-  border-radius: var(--radius-pill);
+  border-radius: 24px;
   transition:
     height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
     max-height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
@@ -75,20 +79,23 @@
     width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* OPEN → COLLAPSED specifically: reverse the staged opening.
+/* OPEN → COLLAPSED: three-stage close mirroring the three-stage open.
  *
- * Opening (EXPANDED → OPEN) was: width grows first (0–0.3s), then
- * max-height grows with a 0.3s delay (panel reveals). The mirror of
- * that close: max-height shrinks first (0–0.3s, panel exit fades
- * concurrently via Framer), then width and border-radius shrink
- * with a 0.3s delay so the box stays card-shaped while the panel
- * disappears, then narrows + rounds into a pill as the second beat. */
+ * Stage 1 (0–0.3s): max-height shrinks (concurrent with the panel's
+ *   Framer exit which fades opacity + collapses panel max-height).
+ *   Width and border-radius hold.
+ * Stage 2 (0.3–0.6s): width shrinks. Radius still holds — corners
+ *   stay at the card radius (24) while the box narrows.
+ * Stage 3 (0.6–0.9s): border-radius transitions (24 → 24, no visible
+ *   change since the value is the same; kept in the rule for
+ *   completeness). Width is already at 48 so the rendered radius =
+ *   min(24, 24) = 24, a true pill. */
 .tool-menu-collapsed.tool-menu-closing-from-open {
   transition:
     height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
     max-height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
     width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s,
-    border-radius 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s;
+    border-radius 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.6s;
 }
 
 /* EXPANDED — same height, wider. Reveals the labels by un-clipping the

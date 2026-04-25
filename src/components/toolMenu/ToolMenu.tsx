@@ -124,17 +124,44 @@ export function ToolMenu({
                         )}
                         <AnimatePresence onExitComplete={handleExitComplete}>
                             {isOpenWithThisTab && (
-                                // motion.div fades opacity in/out. The panel
-                                // itself does no size animation — it sits at
-                                // its natural flex size, and the container's
-                                // max-height transition reveals/hides it.
+                                // Panel grows max-height from 0 to 95vh on
+                                // mount with a 0.3s delay (waiting for the
+                                // container's width-grow stage to finish).
+                                // While at maxHeight: 0, the panel takes no
+                                // layout space, so the Simulate row below it
+                                // stays in place — no clipping during stage 1.
+                                // On exit, panel collapses immediately (no
+                                // delay): maxHeight + opacity → 0 in 0.3s,
+                                // running concurrently with the container's
+                                // own max-height shrink.
                                 <motion.div
                                     key={`content-${tab.id}`}
                                     className="tool-menu-active-content"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
+                                    initial={{ opacity: 0, maxHeight: 0, paddingTop: 0, paddingBottom: 0 }}
+                                    animate={{
+                                        opacity: 1,
+                                        maxHeight: '95vh',
+                                        paddingTop: 12,
+                                        paddingBottom: 12,
+                                        transition: {
+                                            maxHeight:     { duration: 0.3, delay: 0.3, ease: [0.2, 0.8, 0.2, 1] },
+                                            paddingTop:    { duration: 0.3, delay: 0.3, ease: [0.2, 0.8, 0.2, 1] },
+                                            paddingBottom: { duration: 0.3, delay: 0.3, ease: [0.2, 0.8, 0.2, 1] },
+                                            opacity:       { duration: 0.2, delay: 0.3, ease: [0.2, 0.8, 0.2, 1] },
+                                        },
+                                    }}
+                                    exit={{
+                                        opacity: 0,
+                                        maxHeight: 0,
+                                        paddingTop: 0,
+                                        paddingBottom: 0,
+                                        transition: {
+                                            maxHeight:     { duration: 0.3, ease: [0.2, 0.8, 0.2, 1] },
+                                            paddingTop:    { duration: 0.3, ease: [0.2, 0.8, 0.2, 1] },
+                                            paddingBottom: { duration: 0.3, ease: [0.2, 0.8, 0.2, 1] },
+                                            opacity:       { duration: 0.2, ease: [0.2, 0.8, 0.2, 1] },
+                                        },
+                                    }}
                                 >
                                     {contentFor(tab.id)}
                                 </motion.div>

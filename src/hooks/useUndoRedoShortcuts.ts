@@ -17,6 +17,13 @@ export type UseUndoRedoShortcutsOptions = {
   undo: () => void;
   redo: () => void;
   /**
+   * Whether the shortcut is currently active. Gate this on whichever
+   * UI mode the application considers "editing" — the shortcut should
+   * only fire when undo/redo is meaningful to the user. Defaults to
+   * true for callers that don't care.
+   */
+  enabled?: boolean;
+  /**
    * Reserved for future use — currently the handler always attempts the
    * undo/redo, and the underlying store no-ops when there's nothing to
    * pop. Threaded through so the hook can grow stricter gating without
@@ -26,10 +33,10 @@ export type UseUndoRedoShortcutsOptions = {
   canRedo?: boolean;
 };
 
-export function useUndoRedoShortcuts({ undo, redo }: UseUndoRedoShortcutsOptions): void {
+export function useUndoRedoShortcuts({ undo, redo, enabled = true }: UseUndoRedoShortcutsOptions): void {
   useKeyboardScope({
     id: 'app-undo-redo',
-    active: true,
+    active: enabled,
     capture: false,
     onKey: (event) => {
       const isModifier = event.metaKey || event.ctrlKey;
