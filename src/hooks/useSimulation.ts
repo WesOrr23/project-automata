@@ -245,27 +245,41 @@ export function useSimulation(automaton: Automaton) {
       ? engineIsAccepted(simulation)
       : null;
 
-  // Compute the next transition (for highlighting the edge that will be
-  // taken). DFA-shape only — picks the first active state and looks up
-  // its single transition. Phase 5 of iteration 8 generalizes this to
-  // every possible next transition for NFA mode.
-  const nextTransition: { fromStateId: number; toStateId: number; symbol: string } | null =
-    (() => {
-      if (simulation === null || engineIsFinished(simulation)) return null;
-      if (simulation.currentStates.size === 0) return null;
-      const currentState = Array.from(simulation.currentStates)[0]!;
-      const nextSymbol = simulation.remainingInput[0]!;
+  // Every possible "next transition" — every (state, symbol → dest) edge
+  // that will fire on the next step. For DFAs there's at most one; for
+  // NFAs there can be 0..N (one per active state per matching dest).
+  // Empty if the simulation is finished or every active branch has no
+  // outgoing transition for the next symbol.
+  const nextTransitions: ReadonlyArray<{
+    fromStateId: number;
+    toStateId: number;
+    symbol: string;
+  }> = (() => {
+    if (simulation === null || engineIsFinished(simulation)) return [];
+    if (simulation.currentStates.size === 0) return [];
+    const nextSymbol = simulation.remainingInput[0]!;
+    const result: Array<{ fromStateId: number; toStateId: number; symbol: string }> = [];
+    for (const currentState of simulation.currentStates) {
       const transitions = getTransition(automaton, currentState, nextSymbol);
-      if (transitions.length === 0) return null;
-      const transition = transitions[0]!;
-      const destinationState = Array.from(transition.to)[0];
-      if (destinationState === undefined) return null;
-      return {
-        fromStateId: currentState,
-        toStateId: destinationState,
-        symbol: nextSymbol,
-      };
-    })();
+      for (const transition of transitions) {
+        for (const dest of transition.to) {
+          result.push({
+            fromStateId: currentState,
+            toStateId: dest,
+            symbol: nextSymbol,
+          });
+        }
+      }
+    }
+    return result;
+  })();
+
+  // Dying state IDs from the most recent step — drives the branch-death
+  // pulse. Only populated immediately after a step that killed branches;
+  // step-back returns to a previous step (which may or may not have its
+  // own dying set from when it originally happened).
+  const dyingStateIds: ReadonlySet<number> =
+    simulation?.steps[simulation.steps.length - 1]?.dyingStateIds ?? new Set();
 
   // Actions
   const initialize = useCallback(
@@ -300,7 +314,8 @@ export function useSimulation(automaton: Automaton) {
     stepIndex,
     consumedCount,
     accepted,
-    nextTransition,
+    nextTransitions,
+    dyingStateIds,
 
     // Actions
     initialize,

@@ -27,8 +27,19 @@ type AutomatonCanvasProp = {
   /** Result status for highlighting the final state after simulation */
   resultStatus?: 'accepted' | 'rejected' | null;
 
-  /** The next transition to be taken (for edge highlighting) */
-  nextTransition?: { fromStateId: number; toStateId: number; symbol: string } | null;
+  /**
+   * Every transition that will fire on the next step. For DFAs there's
+   * at most one; for NFAs there can be 0..N. All matching edges glow
+   * blue so the user sees parallel branches about to fire.
+   */
+  nextTransitions?: ReadonlyArray<{
+    fromStateId: number;
+    toStateId: number;
+    symbol: string;
+  }>;
+
+  /** State IDs whose branches died on the most recent step — pulse red. */
+  dyingStateIds?: ReadonlySet<number>;
 
   /** State ID currently highlighted by an active notification target */
   highlightedStateId?: number | null;
@@ -89,7 +100,8 @@ export function AutomatonCanvas({
   automatonUI,
   activeStateIds,
   resultStatus,
-  nextTransition,
+  nextTransitions,
+  dyingStateIds,
   highlightedStateId,
   highlightedTransition,
   pickMode,
@@ -118,12 +130,15 @@ export function AutomatonCanvas({
       {/* Layer 1: Transition edges (background) */}
       {automatonUI.transitions.map((transition, index) => {
         // A consolidated edge matches the simulation's "next transition"
-        // if any of its underlying symbols is the one about to fire.
-        const isNextTransition = nextTransition !== null
-          && nextTransition !== undefined
-          && transition.fromStateId === nextTransition.fromStateId
-          && transition.toStateId === nextTransition.toStateId
-          && transition.symbols.some((s) => s === nextTransition.symbol);
+        // set if any (currentState, symbol → dest) tuple matches one of
+        // its underlying symbols. Multiple matches → still one highlight.
+        const isNextTransition = nextTransitions !== undefined
+          && nextTransitions.some(
+            (next) =>
+              next.fromStateId === transition.fromStateId &&
+              next.toStateId === transition.toStateId &&
+              transition.symbols.some((s) => s === next.symbol)
+          );
 
         const isHighlighted =
           highlightedTransition !== null
@@ -179,6 +194,7 @@ export function AutomatonCanvas({
         const stateResultStatus = isActive ? (resultStatus ?? null) : null;
 
         const isHighlighted = stateUI.id === highlightedStateId;
+        const isDying = dyingStateIds?.has(stateUI.id) ?? false;
         const isCreationParticipant =
           (creationSourceId !== null && creationSourceId !== undefined && stateUI.id === creationSourceId) ||
           (creationDestinationId !== null && creationDestinationId !== undefined && stateUI.id === creationDestinationId);
@@ -210,6 +226,7 @@ export function AutomatonCanvas({
             isActive={isActive}
             resultStatus={stateResultStatus}
             isHighlighted={isHighlighted}
+            isDying={isDying}
             creationKind={stateCreationKind}
             isInteractive={interactive}
             interactionStyle={interactionStyle}

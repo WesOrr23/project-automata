@@ -53,6 +53,7 @@ export function createSimulation(
 
   const initialStep: SimulationStep = {
     currentStates: initialStates,
+    dyingStateIds: new Set(),
     symbolProcessed: null,
     remainingInput: input,
   };
@@ -93,17 +94,22 @@ export function step(simulation: Simulation): Simulation {
     throw new Error(`Symbol '${symbol}' is not in the alphabet`);
   }
 
-  // Collect every state reachable from the current set on this symbol.
-  // We don't dedupe transitions; the destination Set takes care of that.
+  // Collect every state reachable from the current set on this symbol,
+  // and track which currently-active states had no outgoing transition
+  // for this symbol — those are the dying branches.
   const intermediate = new Set<number>();
+  const dyingStateIds = new Set<number>();
   for (const state of currentStates) {
+    let hadAny = false;
     for (const transition of automaton.transitions) {
       if (transition.from !== state) continue;
       if (transition.symbol !== symbol) continue;
+      hadAny = true;
       for (const dest of transition.to) {
         intermediate.add(dest);
       }
     }
+    if (!hadAny) dyingStateIds.add(state);
   }
 
   // DFA invariant: a complete DFA always has a transition. If we got
@@ -122,6 +128,7 @@ export function step(simulation: Simulation): Simulation {
 
   const newStep: SimulationStep = {
     currentStates: nextStates,
+    dyingStateIds,
     symbolProcessed: symbol,
     remainingInput: newRemainingInput,
   };

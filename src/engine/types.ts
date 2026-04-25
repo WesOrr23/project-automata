@@ -98,6 +98,14 @@ export type SimulationStep = {
   currentStates: Set<number>;
 
   /**
+   * States that were active at the start of this step but had no
+   * transition on the input symbol — their branches died here. Drives
+   * the canvas's red-fade pulse so the user sees branches winding down
+   * in real time. Empty for the initial step (no symbol processed yet).
+   */
+  dyingStateIds: Set<number>;
+
+  /**
    * The input symbol that was just processed.
    * null if this is the initial step (before processing any input).
    */

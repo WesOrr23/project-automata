@@ -1539,3 +1539,28 @@ button svg {
  * pulse-canvas-add/-modify/-error). The pulse-canvas-preview keyframe
  * pulses stroke-opacity, which works equally well for circle and path
  * strokes — no separate state-specific CSS needed. */
+
+/* Branch-death pulse — fires once per dying state when the NFA (or
+ * dead-end DFA) loses a branch on a step. Stroke pulses red briefly,
+ * then fades back; the eye reads "that branch just died." Single-shot
+ * (no infinite loop) so a fast play doesn't strobe. */
+@keyframes pulse-die {
+  0% {
+    stroke-width: 2;
+    stroke-opacity: 1;
+    fill-opacity: 1;
+  }
+  40% {
+    stroke-width: 5;
+    stroke-opacity: 1;
+  }
+  100% {
+    stroke-width: 2;
+    stroke-opacity: 0.45;
+    fill-opacity: 0.5;
+  }
+}
+
+.state-dying {
+  animation: pulse-die 0.7s ease-out 1 forwards;
+}

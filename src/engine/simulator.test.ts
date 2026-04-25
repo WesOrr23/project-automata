@@ -61,6 +61,7 @@ describe('createSimulation', () => {
     expect(sim.steps.length).toBe(1);
     expect(sim.steps[0]).toEqual({
       currentStates: new Set([q0]),
+      dyingStateIds: new Set(),
       symbolProcessed: null,
       remainingInput: '101',
     });
@@ -94,6 +95,7 @@ describe('step', () => {
     expect(sim.steps.length).toBe(2);
     expect(sim.steps[1]).toEqual({
       currentStates: new Set([q1]),
+      dyingStateIds: new Set(),
       symbolProcessed: '0',
       remainingInput: '1',
     });
@@ -228,6 +230,7 @@ describe('runSimulation', () => {
     // Step 0: Initial state
     expect(sim.steps[0]).toEqual({
       currentStates: new Set([q0]),
+      dyingStateIds: new Set(),
       symbolProcessed: null,
       remainingInput: '01',
     });
@@ -235,6 +238,7 @@ describe('runSimulation', () => {
     // Step 1: After processing '0'
     expect(sim.steps[1]).toEqual({
       currentStates: new Set([q1]),
+      dyingStateIds: new Set(),
       symbolProcessed: '0',
       remainingInput: '1',
     });
@@ -242,6 +246,7 @@ describe('runSimulation', () => {
     // Step 2: After processing '1'
     expect(sim.steps[2]).toEqual({
       currentStates: new Set([q2]),
+      dyingStateIds: new Set(),
       symbolProcessed: '1',
       remainingInput: '',
     });
@@ -534,6 +539,24 @@ describe('NFA simulation', () => {
     expect(sim.currentStates.has(q0)).toBe(true);
     expect(sim.currentStates.has(2)).toBe(true);
     expect(sim.currentStates.has(1)).toBe(false);
+  });
+
+  it('records dying state IDs on the step where a branch died', () => {
+    // Construct a tiny NFA where one branch unambiguously dies on the
+    // next step. q0 → 'a' → {q1, q2}. q1 has no outgoing transition on
+    // 'b' — it dies. q2 → 'b' → q2 — survives.
+    let nfa = createAutomaton('NFA', new Set(['a', 'b']));
+    const { automaton: n1, stateId: q1 } = addState(nfa);
+    const { automaton: n2, stateId: q2 } = addState(n1);
+    nfa = addTransition(n2, 0, new Set([q1, q2]), 'a');
+    nfa = addTransition(nfa, q2, new Set([q2]), 'b');
+
+    let sim = createSimulation(nfa, 'ab');
+    sim = step(sim); // read 'a' → {q1, q2}, no dying yet
+    expect(sim.steps[1]!.dyingStateIds).toEqual(new Set());
+    sim = step(sim); // read 'b' → q1 dies, q2 self-loops
+    expect(sim.steps[2]!.dyingStateIds).toEqual(new Set([q1]));
+    expect(sim.currentStates).toEqual(new Set([q2]));
   });
 
   it('applies ε-closure after a symbol step', () => {

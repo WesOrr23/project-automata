@@ -613,7 +613,8 @@ function App() {
             automatonUI={automatonUI}
             activeStateIds={appMode === 'SIMULATING' ? sim.currentStateIds : undefined}
             resultStatus={appMode === 'SIMULATING' ? resultStatus : null}
-            nextTransition={appMode === 'SIMULATING' ? sim.nextTransition : null}
+            nextTransitions={appMode === 'SIMULATING' ? sim.nextTransitions : undefined}
+            dyingStateIds={appMode === 'SIMULATING' ? sim.dyingStateIds : undefined}
             highlightedStateId={highlightedStateId}
             highlightedTransition={highlightedTransition}
             pickMode={canvasPickMode}

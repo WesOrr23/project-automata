@@ -34,6 +34,14 @@ type StateNodeProp = {
   isHighlighted?: boolean;
 
   /**
+   * Whether this state's branch died on the most recent simulation
+   * step. Triggers a one-shot fade-to-red animation so the user sees
+   * the branch winding down. Independent of isActive (a dying state
+   * is no longer in the active set by definition).
+   */
+  isDying?: boolean;
+
+  /**
    * If this state is currently selected as the source or destination of
    * the in-progress transition edit, the kind of action — drives a
    * pulsing halo color (blue for add, purple for modify). Null/undefined
@@ -76,6 +84,7 @@ export function StateNode({
   isActive = false,
   resultStatus = null,
   isHighlighted = false,
+  isDying = false,
   creationKind = null,
   isInteractive = false,
   interactionStyle = 'select',
@@ -101,15 +110,25 @@ export function StateNode({
 
   // Override stroke when this state is participating in something the
   // canvas wants to draw attention to — either a notification target
-  // (red), or the source/destination of the in-progress transition edit
-  // (blue/purple). The active-highlight (notification) wins if both
-  // happen to be true at once.
+  // (red), the source/destination of the in-progress transition edit
+  // (blue/purple), or a freshly-died simulation branch (red fade).
+  // Notification highlight wins if multiple are true at once;
+  // dying takes priority over creation since the simulation visual
+  // is more time-sensitive.
   let strokeWidth = STROKE_WIDTH;
   let strokeClass: string | undefined;
   if (creationKind !== null) {
     strokeColor = creationKind === 'add' ? '#2563eb' : '#7c3aed';
     strokeWidth = 3;
     strokeClass = `pulse-canvas pulse-canvas-${creationKind}`;
+  }
+  if (isDying) {
+    // The fill keeps the state-was-active blue tint so the eye sees
+    // "this branch was alive last step"; the stroke fades to red.
+    fillColor = '#bfdbfe';
+    strokeColor = '#dc2626';
+    strokeWidth = 3;
+    strokeClass = 'state-dying';
   }
   if (isHighlighted) {
     strokeColor = '#dc2626'; // --error-stroke
