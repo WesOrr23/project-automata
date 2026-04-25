@@ -99,6 +99,47 @@ These are documented in iteration plans / audits but are still open:
 - Iteration 10: NFA → DFA conversion, minimization, equivalence
 - Iteration 11: Edge routing & overlap prevention
 
+### "Code" / terminal panel for programmatic automaton authoring
+Captured during iter 7 follow-up. Add a fourth tool-menu tab (alongside
+Configure / Edit / Simulate) that exposes a small DSL terminal:
+
+- **Audience**: technical users who'd rather type than click, plus
+  automated agents driving the app via terminal input.
+- **DSL shape**: each command maps 1:1 to an existing engine primitive
+  so the surface area stays small. Sketch:
+  ```
+  add state q3
+  start q0
+  accept q2
+  add transition q0 0 q1
+  remove transition q0 0
+  set type NFA
+  add symbol a
+  ```
+- **Bidirectional**: typing a command updates the model AND vice versa
+  — the panel could echo a command stream as the user clicks around in
+  Edit, which doubles as a tutorial / replay log.
+- **Out of scope for now**: macros, conditionals, file I/O. Just a thin
+  imperative layer over the engine. Aim for "one command per intent."
+
+### Pseudo-`?` state for incomplete DFAs (educational visualization)
+Captured during iter 7 follow-up. When a DFA is incomplete (some
+state/symbol pairs have no transition), the Simulate tab refuses to
+run. That's a teaching opportunity instead of a wall:
+
+- **Idea**: in the Simulate view (and *only* there), render a phantom
+  state labeled `?` and route all undefined transitions to it. Pure
+  visualization — no simulation interactivity, the `?` state isn't
+  reachable for actual runs (the DFA is still flagged as incomplete).
+- **Visual**: dashed stroke on both the `?` circle and the dashed
+  edges going to it. Different enough from a real trap/dead state that
+  the user reads it as "this is a hint, not a real state."
+- **Pedagogy gate**: a one-time explanation tooltip — "Undefined
+  transitions are shown going to a ? state so you can see what's
+  missing. Add the missing transitions to make the DFA complete."
+- **Out of scope**: the `?` state is *not* part of the engine's
+  Automaton type. It's purely UI. Don't pollute the data model.
+
 ---
 
 ## Bugs / issues to watch for

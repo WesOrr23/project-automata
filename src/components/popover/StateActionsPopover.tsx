@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { CircleDot, Circle, CircleCheck, Trash2 } from 'lucide-react';
+import { CircleDot, Circle, CircleCheck, Trash2, MoveRight } from 'lucide-react';
 
 type StateActionsPopoverProp = {
   stateLabel: string;
@@ -20,6 +20,7 @@ type StateActionsPopoverProp = {
   anchorRect: DOMRect | null;
   onSetStart: () => void;
   onToggleAccept: () => void;
+  onCreateTransition: () => void;
   onDelete: () => void;
   onClose: () => void;
 };
@@ -32,6 +33,7 @@ export function StateActionsPopover({
   anchorRect,
   onSetStart,
   onToggleAccept,
+  onCreateTransition,
   onDelete,
   onClose,
 }: StateActionsPopoverProp) {
@@ -53,9 +55,31 @@ export function StateActionsPopover({
 
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
+      // Ignore key events while focus is in a text-entry field — typing in
+      // the symbol input shouldn't trigger popover shortcuts.
+      const target = event.target as HTMLElement | null;
+      const inEditable =
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.isContentEditable;
+      if (inEditable) return;
+
       if (event.key === 'Escape') {
         event.stopPropagation();
         onClose();
+        return;
+      }
+      if (event.key === ' ' || event.code === 'Space') {
+        event.preventDefault();
+        event.stopPropagation();
+        onCreateTransition();
+        return;
+      }
+      if ((event.key === 'Delete' || event.key === 'Backspace') && canDelete) {
+        event.preventDefault();
+        event.stopPropagation();
+        onDelete();
+        return;
       }
     }
     function handleClick(event: MouseEvent) {
@@ -68,7 +92,7 @@ export function StateActionsPopover({
       document.removeEventListener('keydown', handleKey);
       document.removeEventListener('mousedown', handleClick);
     };
-  }, [onClose]);
+  }, [onClose, onCreateTransition, onDelete, canDelete]);
 
   useEffect(() => {
     popoverRef.current?.focus();
@@ -105,6 +129,16 @@ export function StateActionsPopover({
       </button>
       <button
         type="button"
+        className="state-actions-popover-action"
+        onClick={onCreateTransition}
+        title="Start a new transition from this state"
+      >
+        <MoveRight size={14} />
+        <span>New transition</span>
+        <kbd className="state-actions-popover-kbd">Space</kbd>
+      </button>
+      <button
+        type="button"
         className="state-actions-popover-action danger"
         onClick={onDelete}
         disabled={!canDelete}
@@ -112,6 +146,7 @@ export function StateActionsPopover({
       >
         <Trash2 size={14} />
         <span>Delete</span>
+        <kbd className="state-actions-popover-kbd">Del</kbd>
       </button>
     </div>
   );

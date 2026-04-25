@@ -12,6 +12,7 @@ import { STATE_RADIUS } from '../ui-state/constants';
 import { StateNode } from './StateNode';
 import { TransitionEdge } from './TransitionEdge';
 import { StartStateArrow } from './StartStateArrow';
+import type { EdgePreview } from './transitionEditor/creationReducer';
 
 type AutomatonCanvasProp = {
   /** The automaton data from the engine layer */
@@ -57,10 +58,24 @@ type AutomatonCanvasProp = {
   onEdgeClick?: (transition: { from: number; to: number; symbol: string | null }) => void;
 
   /**
-   * Transition that would be silently overwritten by the in-progress
-   * creator form. Highlighted in violet on the canvas as a warning.
+   * Per-edge highlights for the in-progress transition edit. Each entry
+   * recolors and pulses the matching transition (blue for additions,
+   * purple for modifications, red for deletions). The canvas matches by
+   * (from, to, symbol). For modifications with a symbol change, the entry
+   * also carries the original symbol so the label renders both.
    */
-  warnTransition?: { from: number; to: number; symbol: string } | null;
+  edgePreviews?: ReadonlyArray<EdgePreview>;
+
+  /**
+   * State IDs currently selected as the source / destination of the
+   * in-progress transition edit. The canvas draws a pulsing halo of
+   * `creationStateKind` color around them — the same blue/purple language
+   * used for the edge preview, so the user sees "these are the states in
+   * play."
+   */
+  creationSourceId?: number | null;
+  creationDestinationId?: number | null;
+  creationStateKind?: 'add' | 'modify' | null;
 };
 
 export function AutomatonCanvas({
@@ -75,7 +90,10 @@ export function AutomatonCanvas({
   onPickState,
   onStateClick,
   onEdgeClick,
-  warnTransition,
+  edgePreviews,
+  creationSourceId,
+  creationDestinationId,
+  creationStateKind,
 }: AutomatonCanvasProp) {
   // The start-state arrow extends LEFT of the start-state circle by ~50px,
   // which is outside GraphViz's computed bounding box. Extend the SVG
@@ -106,12 +124,15 @@ export function AutomatonCanvas({
           && transition.toStateId === highlightedTransition.to
           && transition.symbol === highlightedTransition.symbol;
 
-        const isWarned =
-          warnTransition !== null
-          && warnTransition !== undefined
-          && transition.fromStateId === warnTransition.from
-          && transition.toStateId === warnTransition.to
-          && transition.symbol === warnTransition.symbol;
+        // Match this rendered edge against the active edge previews. There
+        // can be at most one match per edge (preview entries are unique by
+        // from/to/symbol).
+        const matchingPreview = edgePreviews?.find(
+          (preview) =>
+            preview.from === transition.fromStateId &&
+            preview.to === transition.toStateId &&
+            preview.symbol === transition.symbol
+        ) ?? null;
 
         return (
           <TransitionEdge
@@ -123,7 +144,8 @@ export function AutomatonCanvas({
             labelPosition={transition.labelPosition}
             isNextTransition={isNextTransition}
             isHighlighted={isHighlighted}
-            isWarned={isWarned}
+            previewKind={matchingPreview?.kind}
+            previewOldSymbol={matchingPreview?.oldSymbol}
             onEdgeClick={
               onEdgeClick
                 ? () =>
@@ -147,6 +169,11 @@ export function AutomatonCanvas({
         const stateResultStatus = isActive ? (resultStatus ?? null) : null;
 
         const isHighlighted = stateUI.id === highlightedStateId;
+        const isCreationParticipant =
+          (creationSourceId !== null && creationSourceId !== undefined && stateUI.id === creationSourceId) ||
+          (creationDestinationId !== null && creationDestinationId !== undefined && stateUI.id === creationDestinationId);
+        const stateCreationKind =
+          isCreationParticipant && creationStateKind ? creationStateKind : null;
         const isPickMode = pickMode === 'state';
         // Pick mode wins; otherwise fall back to onStateClick (state actions).
         const interactive = isPickMode
@@ -173,6 +200,7 @@ export function AutomatonCanvas({
             isActive={isActive}
             resultStatus={stateResultStatus}
             isHighlighted={isHighlighted}
+            creationKind={stateCreationKind}
             isInteractive={interactive}
             interactionStyle={interactionStyle}
             onClick={handleClick}

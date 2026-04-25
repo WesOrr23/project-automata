@@ -6,6 +6,8 @@
  * position, label placement) is computed by GraphViz's layout engine.
  */
 
+import type { EdgePreview } from './transitionEditor/creationReducer';
+
 type TransitionEdgeProp = {
   /** SVG path d attribute (cubic bezier spline from GraphViz) */
   pathData: string;
@@ -28,8 +30,21 @@ type TransitionEdgeProp = {
   /** Whether this transition is the active highlight target of a notification */
   isHighlighted?: boolean;
 
-  /** Whether this transition is being warned (e.g. would be silently overwritten). */
-  isWarned?: boolean;
+  /**
+   * If this edge is part of the in-progress transition edit preview, the
+   * kind of change it represents. Drives color and pulse:
+   *   - 'add'    → blue:   a new edge being introduced
+   *   - 'modify' → purple: an existing edge whose source / dest / symbol changed
+   *   - 'delete' → red:    an edge that will be removed on commit
+   */
+  previewKind?: EdgePreview['kind'];
+
+  /**
+   * For modify previews where the symbol itself changed, the previous symbol.
+   * Triggers the split-label render: old symbol struck-through in red,
+   * new symbol in blue.
+   */
+  previewOldSymbol?: string;
 
   /** Called when the user clicks this edge (loads it into the creator form). */
   onEdgeClick?: () => void;
@@ -37,6 +52,15 @@ type TransitionEdgeProp = {
 
 const STROKE_WIDTH = 2;
 const ARROWHEAD_SIZE = 8;
+
+// Preview palette. Kept in one place so the canvas, the action button, and
+// any future UI elements share a single source of truth for the add/modify/
+// delete color theme.
+const PREVIEW_COLOR = {
+  add: '#2563eb',     // blue-600
+  modify: '#7c3aed',  // violet-600
+  delete: '#dc2626',  // red-600
+} as const;
 
 export function TransitionEdge(props: TransitionEdgeProp) {
   const {
@@ -47,26 +71,30 @@ export function TransitionEdge(props: TransitionEdgeProp) {
     labelPosition,
     isNextTransition = false,
     isHighlighted = false,
-    isWarned = false,
+    previewKind,
+    previewOldSymbol,
     onEdgeClick,
   } = props;
 
-  // Color priority: highlighted (red) > warned (violet) > next (blue) > default (slate).
+  // Color priority: notification highlight (red) > active preview > simulation next > default.
+  // The notification system can only highlight one edge at a time and is
+  // user-driven (clicking an alphabet badge etc.), so it should never collide
+  // with an in-progress preview in practice — but if it ever did, we want
+  // the click-driven highlight to win so the user sees what they asked for.
   let edgeColor = isNextTransition ? '#2563eb' : '#334155'; // --blue-600 : --text-body
   let edgeStrokeWidth = isNextTransition ? 3 : STROKE_WIDTH;
-  if (isWarned) {
-    edgeColor = '#7c3aed'; // violet-600 — same family as Modify button
+  let highlightClass: string | undefined = undefined;
+
+  if (previewKind !== undefined) {
+    edgeColor = PREVIEW_COLOR[previewKind];
     edgeStrokeWidth = 3;
+    highlightClass = `pulse-canvas pulse-canvas-${previewKind}`;
   }
   if (isHighlighted) {
     edgeColor = '#dc2626'; // --error-stroke
     edgeStrokeWidth = 3;
+    highlightClass = 'pulse-canvas pulse-canvas-error';
   }
-  const highlightClass = isHighlighted
-    ? 'pulse-canvas pulse-canvas-error'
-    : isWarned
-      ? 'pulse-canvas pulse-canvas-warn'
-      : undefined;
 
   // Calculate arrowhead triangle points from angle
   const arrowheadAngle1 = arrowheadAngle + Math.PI - Math.PI / 6;
@@ -80,6 +108,13 @@ export function TransitionEdge(props: TransitionEdgeProp) {
   const displaySymbol = symbol === null ? 'ε' : symbol;
 
   const groupClass = onEdgeClick ? 'transition-edge-clickable' : undefined;
+
+  // For modify previews where the symbol itself changed, render the label
+  // as two tspans: the original symbol struck-through in red, then the new
+  // symbol in blue. The container <text> still anchors at the GraphViz-
+  // computed midpoint; SVG centers the combined run on textAnchor=middle.
+  const showSymbolDiff =
+    previewKind === 'modify' && previewOldSymbol !== undefined && symbol !== null;
 
   return (
     <g
@@ -112,18 +147,32 @@ export function TransitionEdge(props: TransitionEdgeProp) {
         fill={edgeColor}
       />
 
-      {/* Symbol label */}
+      {/* Symbol label. For symbol-changing modifies, show old (struck red)
+       * then new (blue); otherwise a single colored symbol. */}
       <text
         x={labelPosition.x}
         y={labelPosition.y}
         textAnchor="middle"
         dominantBaseline="middle"
         fontSize="14px"
-        fill={edgeColor}
         fontWeight={isNextTransition ? 'bold' : 'normal'}
         fontFamily="Arial, sans-serif"
       >
-        {displaySymbol}
+        {showSymbolDiff ? (
+          <>
+            <tspan
+              fill={PREVIEW_COLOR.delete}
+              textDecoration="line-through"
+            >
+              {previewOldSymbol}
+            </tspan>
+            <tspan dx="4" fill={PREVIEW_COLOR.add}>
+              {displaySymbol}
+            </tspan>
+          </>
+        ) : (
+          <tspan fill={edgeColor}>{displaySymbol}</tspan>
+        )}
       </text>
     </g>
   );

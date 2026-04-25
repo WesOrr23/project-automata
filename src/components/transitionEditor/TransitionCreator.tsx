@@ -69,9 +69,16 @@ function instructionFor(
     return 'Click Modify to apply your changes (or Cancel to discard).';
   }
   if (mode === 'delete') {
-    return 'Editing this transition. Change a slot to modify, or click Delete.';
+    return 'Editing this transition. Change a slot to modify, or click Delete to remove it.';
   }
   // create mode
+  // The actively-pulsing slot (and the open picker, if any) already show
+  // the user where to act; the directional prose ("Click the right circle…")
+  // is redundant in that case. Nudge toward the canvas-pick option instead,
+  // which isn't visually obvious.
+  if (state.phase === 'picking-source' || state.phase === 'picking-destination') {
+    return 'Click any state on the canvas to fill the highlighted slot.';
+  }
   if (state.source === null && state.destination === null && state.symbol === '') {
     return 'Click a circle to pick a state, or click an existing edge to edit it.';
   }
@@ -87,7 +94,7 @@ function instructionFor(
   if (!symbolValid) {
     return `'${state.symbol}' is not in the alphabet.`;
   }
-  return 'Click Add to create the transition.';
+  return 'Click Add (or press Enter) to create the transition.';
 }
 
 export function TransitionCreator({
@@ -113,9 +120,12 @@ export function TransitionCreator({
     }
   }, [state.phase]);
 
-  // Escape — global abort. Closes the popover (if open) and resets the
-  // form to its initial state. The popover has its own Escape listener
-  // for closing itself; this one resets the underlying state machine.
+  // Escape — closes the local picker popover and resets the form. The
+  // earlier "no-op when loaded-unchanged" behavior was paired with a Del
+  // shortcut for deletion; without that shortcut, Escape needs to be a
+  // reliable way to back out of any state, including "I just clicked an
+  // edge but actually didn't want to do anything." The reset is cheap;
+  // only the picker popover actually loses anything from the early-out.
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
       if (event.key !== 'Escape') return;
@@ -222,15 +232,124 @@ export function TransitionCreator({
     dispatch({ type: 'reset' });
   }
 
+  // Keep refs to the latest handleAction and mode so the document-level
+  // keydown listeners below can call them without needing them in their
+  // deps (which would re-attach listeners every render and is hard to do
+  // right because handleAction closes over many values).
+  const handleActionRef = useRef(handleAction);
+  handleActionRef.current = handleAction;
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+
   function handleSymbolKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
-    if (event.key === 'Enter' && ready) {
-      handleAction();
-    }
+    if (event.key !== 'Enter') return;
+    // Loaded-but-unchanged: Enter is a no-op. The user clicked the edge
+    // to inspect or modify it, not to delete — only Del / the Delete
+    // button should remove an unchanged loaded edge.
+    if (mode === 'delete') return;
+    if (ready) handleAction();
   }
+
+  // Global Enter — commit the form regardless of focus, so the user can
+  // click out of the symbol input (e.g. onto the canvas) and still confirm
+  // by pressing Enter. Skip if focus is in some other input (e.g. the new-
+  // symbol field above) or if the state-actions popover is open. Also
+  // skipped in delete mode (loaded-but-unchanged) — see handleSymbolKeyDown
+  // for the reasoning.
+  useEffect(() => {
+    function onEnter(event: KeyboardEvent) {
+      if (event.key !== 'Enter') return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.isContentEditable
+      ) {
+        // Enter inside the symbol input is handled by handleSymbolKeyDown;
+        // Enter inside other inputs (alphabet field, etc.) shouldn't trigger
+        // a transition commit.
+        return;
+      }
+      if (document.querySelector('.state-actions-popover')) return;
+      if (modeRef.current === 'delete') return;
+      handleActionRef.current();
+    }
+    document.addEventListener('keydown', onEnter);
+    return () => document.removeEventListener('keydown', onEnter);
+  }, []);
+
+  // (No global Del shortcut for transition deletion — was unreliable in
+  // browser testing. The Delete button on the form is the canonical path
+  // to remove a loaded transition. Kept simple intentionally.)
+
+  // Type-to-modify: when an existing transition is loaded and the user
+  // presses a single printable character that's in the alphabet, dispatch
+  // it as the new symbol and move focus into the input. This lets the
+  // user "click an edge, type a new symbol" without an intermediate click,
+  // while leaving Del free to delete (no auto-focused input swallowing
+  // characters first).
+  useEffect(() => {
+    function onChar(event: KeyboardEvent) {
+      if (state.editingExisting === null) return;
+      if (event.key.length !== 1) return; // only single-char printable keys
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) {
+        return;
+      }
+      if (document.querySelector('.state-actions-popover')) return;
+      if (!automaton.alphabet.has(event.key)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      dispatch({ type: 'symbolChanged', symbol: event.key });
+      // Focus after dispatch so the user can keep editing (e.g. backspace
+      // to clear, then re-type). The symbolChanged dispatch happens first
+      // so React renders the new value before focus lands.
+      symbolInputRef.current?.focus();
+    }
+    document.addEventListener('keydown', onChar);
+    return () => document.removeEventListener('keydown', onChar);
+  }, [state.editingExisting, automaton.alphabet, dispatch]);
 
   const sourceLabel = state.source !== null ? labelFor(state.source) : null;
   const destinationLabel =
     state.destination !== null ? labelFor(state.destination) : null;
+
+  // Placeholder hints at what to type next. Once a source state is
+  // selected, narrow it to symbols *not yet* defined for that state —
+  // those are the transitions the user is most likely to be filling in.
+  // When everything is defined (or no source is picked yet), fall back
+  // to the full alphabet (or "Symbol" once the list overflows).
+  //
+  // In edit mode, the original transition's symbol is treated as
+  // "available" so the user can keep it without seeing a misleading
+  // empty / fallback placeholder.
+  const symbolPlaceholder = (() => {
+    if (sortedAlphabet.length === 0) return 'Symbol';
+    let candidates: string[];
+    if (state.source === null) {
+      candidates = sortedAlphabet;
+    } else {
+      const definedSymbols = new Set<string>();
+      for (const transition of automaton.transitions) {
+        if (transition.from !== state.source) continue;
+        if (transition.symbol === null) continue;
+        if (
+          state.editingExisting !== null &&
+          transition.from === state.editingExisting.from &&
+          transition.symbol === state.editingExisting.symbol
+        ) {
+          continue;
+        }
+        definedSymbols.add(transition.symbol);
+      }
+      candidates = sortedAlphabet.filter((symbol) => !definedSymbols.has(symbol));
+    }
+    if (candidates.length === 0) return 'Symbol';
+    if (candidates.length <= 4) return candidates.join(', ');
+    return `${candidates.slice(0, 3).join(', ')}, …`;
+  })();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
@@ -271,7 +390,7 @@ export function TransitionCreator({
                 })
               }
               onKeyDown={handleSymbolKeyDown}
-              placeholder="Symbol"
+              placeholder={symbolPlaceholder}
               maxLength={1}
               aria-label="Transition symbol"
             />
@@ -291,9 +410,7 @@ export function TransitionCreator({
             </button>
           </div>
 
-          <p
-            className={`transition-creator-instruction ${overwriteLabel !== null && symbolValid ? 'warn' : ''}`}
-          >
+          <p className="transition-creator-instruction">
             {instructionFor(state, symbolValid, overwriteLabel)}
           </p>
 

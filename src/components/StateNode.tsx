@@ -34,6 +34,14 @@ type StateNodeProp = {
   isHighlighted?: boolean;
 
   /**
+   * If this state is currently selected as the source or destination of
+   * the in-progress transition edit, the kind of action — drives a
+   * pulsing halo color (blue for add, purple for modify). Null/undefined
+   * leaves the state alone.
+   */
+  creationKind?: 'add' | 'modify' | null;
+
+  /**
    * Whether the state is currently interactive (clickable). Drives the
    * cursor and hover affordance.
    */
@@ -68,6 +76,7 @@ export function StateNode({
   isActive = false,
   resultStatus = null,
   isHighlighted = false,
+  creationKind = null,
   isInteractive = false,
   interactionStyle = 'select',
   onClick,
@@ -90,13 +99,23 @@ export function StateNode({
     strokeColor = '#2563eb'; // --blue-600
   }
 
-  // When this state is the active highlight target, override stroke to the
-  // notification severity color and run the pulse animation.
+  // Override stroke when this state is participating in something the
+  // canvas wants to draw attention to — either a notification target
+  // (red), or the source/destination of the in-progress transition edit
+  // (blue/purple). The active-highlight (notification) wins if both
+  // happen to be true at once.
+  let strokeWidth = STROKE_WIDTH;
+  let strokeClass: string | undefined;
+  if (creationKind !== null) {
+    strokeColor = creationKind === 'add' ? '#2563eb' : '#7c3aed';
+    strokeWidth = 3;
+    strokeClass = `pulse-canvas pulse-canvas-${creationKind}`;
+  }
   if (isHighlighted) {
     strokeColor = '#dc2626'; // --error-stroke
+    strokeWidth = 3;
+    strokeClass = 'pulse-canvas pulse-canvas-error';
   }
-
-  const highlightClass = isHighlighted ? 'pulse-canvas pulse-canvas-error' : undefined;
 
   // Combined classes for visual affordance.
   const groupClassNames = [
@@ -129,15 +148,17 @@ export function StateNode({
       }
       style={isInteractive ? { cursor: 'pointer' } : undefined}
     >
-      {/* Outer circle (always present) */}
+      {/* Outer circle (always present). Stroke pulses when this state is
+       * participating in a notification highlight or the in-progress
+       * transition edit; otherwise renders with the default stroke. */}
       <circle
         cx={x}
         cy={y}
         r={STATE_RADIUS}
         fill={fillColor}
         stroke={strokeColor}
-        strokeWidth={STROKE_WIDTH}
-        className={highlightClass}
+        strokeWidth={strokeWidth}
+        className={strokeClass}
       />
 
       {/* Inner circle (only for accept states) */}

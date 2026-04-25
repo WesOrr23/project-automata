@@ -32,6 +32,11 @@ const NODE_SIZE_INCHES = (STATE_RADIUS * 2) / 72;
  * @param automaton - The engine automaton to convert
  * @returns DOT language string
  */
+/** Name of the invisible phantom node that reserves layout space for the
+ *  start-state arrow. Prefixed with `_` so it sorts away from real states
+ *  and is easy to recognize when filtering layout output. */
+const START_PHANTOM_NAME = '_start';
+
 function automatonToDot(automaton: Automaton): string {
   const lines: string[] = [];
   lines.push('digraph {');
@@ -51,6 +56,19 @@ function automatonToDot(automaton: Automaton): string {
       lines.push(`  ${transition.from} -> ${destinationStateId} [label="${displaySymbol}"];`);
     });
   });
+
+  // Reserve horizontal layout space for the separately-rendered start
+  // arrow. Without this, GraphViz happily places the start state in the
+  // middle of a row, then our arrow draws over whatever's to its left.
+  // The phantom is style=invis (renders nothing) but participates in
+  // layout — it pushes the start state into a column to its right and
+  // expands the bounding box to include the arrow's reserved area.
+  // Width chosen to comfortably hold ARROW_LENGTH (50px) + arrowhead
+  // (~8px) at GraphViz's 72-DPI scale.
+  if (automaton.startState !== null) {
+    lines.push(`  ${START_PHANTOM_NAME} [shape=point, width=0.85, fixedsize=true, style=invis];`);
+    lines.push(`  ${START_PHANTOM_NAME} -> ${automaton.startState} [style=invis];`);
+  }
 
   lines.push('}');
   return lines.join('\n');
@@ -252,6 +270,10 @@ function parseGraphvizJson(
   const states = new Map<number, StateUI>();
 
   for (const node of jsonData.objects) {
+    // The start-arrow phantom is part of the layout output but not a
+    // real state — skip it so it doesn't show up as a rendered node.
+    if (node.name === START_PHANTOM_NAME) continue;
+
     const stateId = parseInt(node.name);
 
     // Skip if this isn't a valid state (shouldn't happen, but be safe)
@@ -279,6 +301,12 @@ function parseGraphvizJson(
     const tailNode = jsonData.objects[edge.tail];
     const headNode = jsonData.objects[edge.head];
     if (!tailNode || !headNode) continue;
+
+    // Skip the phantom start-arrow edge — its only job was to influence
+    // layout, and the actual visible arrow is drawn by StartStateArrow.
+    if (tailNode.name === START_PHANTOM_NAME || headNode.name === START_PHANTOM_NAME) {
+      continue;
+    }
 
     const fromStateId = parseInt(tailNode.name);
     const toStateId = parseInt(headNode.name);

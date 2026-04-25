@@ -1229,12 +1229,8 @@ button svg {
   padding: var(--space-1) 0;
 }
 
-/* Overwrite warning — same violet as the Modify button so the user sees
- * the connection between the warning text and the violet edge on the canvas. */
-.transition-creator-instruction.warn {
-  color: #5b21b6;
-  font-weight: var(--weight-bold);
-}
+/* Instruction text stays in the normal body color — color cues belong on the
+ * canvas (blue for add, purple for modify, red for delete), not in the prose. */
 
 .btn-danger {
   background: var(--error-bg);
@@ -1350,6 +1346,27 @@ button svg {
   filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.35));
 }
 
+/* ─── Canvas discoverability hint ─── */
+/* Subtle floating chip at the bottom-right of the viewport. Only visible
+ * in EDIT mode at idle (gated by App.tsx). Pointer-events disabled so it
+ * never intercepts clicks on the canvas underneath. */
+.canvas-tip {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 5;
+  padding: 6px 10px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+  user-select: none;
+  backdrop-filter: blur(4px);
+}
+
 /* ─── State actions popover ─── */
 .state-actions-popover {
   position: fixed;
@@ -1391,6 +1408,24 @@ button svg {
   cursor: pointer;
   transition: background 0.1s ease, color 0.1s ease;
   text-align: left;
+}
+
+/* The action label sits in the middle; any trailing kbd hint is pushed to the
+ * right edge so the column of shortcuts aligns vertically. */
+.state-actions-popover-action > span {
+  flex: 1;
+}
+
+.state-actions-popover-kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 6px;
+  border: 1px solid var(--border-subtle);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--bg-elevated, #f8fafc);
+  color: var(--text-secondary);
 }
 
 .state-actions-popover-action:hover:not(:disabled) {
@@ -1472,10 +1507,35 @@ button svg {
   50%      { stroke-opacity: 0.55; }
 }
 
-.pulse-canvas-warn {
-  animation: pulse-canvas-warn 1.4s ease-in-out infinite;
-}
-
 .pulse-canvas-warning {
   stroke: #d97706 !important;
 }
+
+/* Live preview of an in-progress transition edit. The opacity-pulse keeps
+ * the edge legible while signalling "this isn't committed yet" — same
+ * cadence across all three kinds so they read as one visual language. */
+@keyframes pulse-canvas-preview {
+  0%, 100% { stroke-opacity: 1; }
+  50%      { stroke-opacity: 0.5; }
+}
+
+.pulse-canvas-add,
+.pulse-canvas-modify,
+.pulse-canvas-delete {
+  animation: pulse-canvas-preview 1.4s ease-in-out infinite;
+  /* Override the brief stroke-width pulse from .pulse-canvas — preview
+   * highlights are continuous, not a one-shot attention grab. */
+  animation-iteration-count: infinite;
+}
+
+/* The actual color is set inline on the <path stroke="..."> for crisp
+ * coordination with the arrowhead fill, but we re-assert it here in case
+ * the path picks up !important from notification highlights. */
+.pulse-canvas-add    { stroke: #2563eb; }   /* blue-600   */
+.pulse-canvas-modify { stroke: #7c3aed; }   /* violet-600 */
+.pulse-canvas-delete { stroke: #dc2626; }   /* red-600    */
+
+/* State circles share the same pulse classes as edges (pulse-canvas +
+ * pulse-canvas-add/-modify/-error). The pulse-canvas-preview keyframe
+ * pulses stroke-opacity, which works equally well for circle and path
+ * strokes — no separate state-specific CSS needed. */

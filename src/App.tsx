@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useReducer } from 'react';
+import { useState, useEffect, useRef, useReducer, useMemo } from 'react';
 import {
   createAutomaton,
   addState,
@@ -23,8 +23,9 @@ import { useNotifications } from './notifications/useNotifications';
 import type { NotificationTarget } from './notifications/types';
 import { StateActionsPopover } from './components/popover/StateActionsPopover';
 import {
+  computePreview,
   creationReducer,
-  findOverwriteTarget,
+  creationStateKind,
   INITIAL_CREATION_STATE,
 } from './components/transitionEditor/creationReducer';
 import { computeLayout } from './ui-state/utils';
@@ -78,9 +79,26 @@ function App() {
       ? 'state'
       : null;
 
-  // Detect a transition that committing the form would silently overwrite,
-  // so the canvas can highlight it as a warning.
-  const overwriteTarget = findOverwriteTarget(creationState, automaton.transitions);
+  // Live preview of "what the canvas will look like after the user commits
+  // the in-progress edit." The preview's transitions are what gets laid out;
+  // the edge highlights tell the canvas which edges to color blue/purple/red.
+  //
+  // Gated on the Edit tab being open: outside of Edit mode the form state may
+  // still hold an in-progress edit (the user could be tab-switching), but we
+  // don't want speculative edges polluting the Simulate or collapsed views.
+  const editTabOpen =
+    menuState.mode === 'OPEN' && menuState.activeTab === 'EDIT';
+  const preview = useMemo(
+    () =>
+      editTabOpen
+        ? computePreview(automaton, creationState)
+        : { transitions: automaton.transitions, edges: [] },
+    [editTabOpen, automaton, creationState]
+  );
+  const previewSourceAutomaton: Automaton =
+    preview.transitions === automaton.transitions
+      ? automaton
+      : { ...automaton, transitions: preview.transitions as Automaton['transitions'] };
 
   // State-actions popover (opened by clicking a state node on the canvas
   // while in EDIT mode and not actively picking).
@@ -158,17 +176,22 @@ function App() {
   const highlightedSymbol =
     highlightedTarget?.kind === 'alphabet' ? highlightedTarget.symbol : null;
 
-  // Recompute layout whenever automaton changes (debounced to absorb rapid edits).
-  // A version counter discards stale promises in case layout N-1 resolves after N.
-  // After layout, we rewrite each state's label to the sequential display label
-  // so the canvas and the tool menu stay consistent.
+  // Recompute layout whenever the automaton (or its preview overlay) changes,
+  // debounced to absorb rapid edits. A version counter discards stale promises
+  // in case layout N-1 resolves after N. After layout, we rewrite each state's
+  // label to the sequential display label so the canvas and the tool menu stay
+  // consistent.
+  //
+  // Layout uses `previewSourceAutomaton` (which equals `automaton` when no
+  // preview is active) so in-progress edits show up on the canvas with full
+  // GraphViz spline routing — not as a simple overlay drawn on top.
   const layoutVersionRef = useRef(0);
   useEffect(() => {
     const version = ++layoutVersionRef.current;
     const timer = setTimeout(() => {
-      computeLayout(automaton).then((layout) => {
+      computeLayout(previewSourceAutomaton).then((layout) => {
         if (version !== layoutVersionRef.current) return;
-        const labels = computeDisplayLabels(automaton.states);
+        const labels = computeDisplayLabels(previewSourceAutomaton.states);
         const relabeled: AutomatonUI = {
           ...layout,
           states: new Map(
@@ -182,7 +205,7 @@ function App() {
       });
     }, 120);
     return () => clearTimeout(timer);
-  }, [automaton]);
+  }, [previewSourceAutomaton]);
 
   // Reset simulation when the automaton structure changes (skip initial mount).
   // Input string is kept; we filter it against the current alphabet separately
@@ -526,6 +549,13 @@ function App() {
             handleToggleAcceptState(stateActions.stateId);
             setStateActions(null);
           }}
+          onCreateTransition={() => {
+            creationDispatch({
+              type: 'startTransitionFrom',
+              stateId: stateActions.stateId,
+            });
+            setStateActions(null);
+          }}
           onDelete={() => {
             handleRemoveState(stateActions.stateId);
             setStateActions(null);
@@ -533,6 +563,23 @@ function App() {
           onClose={() => setStateActions(null)}
         />
       )}
+
+      {/* Discoverability hint while in EDIT mode and the form is at rest.
+          The educational tool aims for "intuitive, with explanations where
+          it isn't." Surfacing the canvas's primary affordances here means
+          the user doesn't have to guess that nodes and edges are clickable.
+          Hidden as soon as the user starts an edit so it doesn't compete
+          with the in-form instruction text. */}
+      {appMode === 'EDITING' &&
+        canvasPickMode === null &&
+        creationState.editingExisting === null &&
+        creationState.source === null &&
+        creationState.destination === null &&
+        creationState.symbol === '' && (
+          <div className="canvas-tip" role="note">
+            Click any state for actions, or any edge to edit it.
+          </div>
+        )}
 
       <main className="canvas-area">
         {automatonUI === null ? (
@@ -554,7 +601,10 @@ function App() {
                 : undefined
             }
             onEdgeClick={appMode === 'EDITING' ? handleCanvasEdgeClick : undefined}
-            warnTransition={appMode === 'EDITING' ? overwriteTarget : null}
+            edgePreviews={appMode === 'EDITING' ? preview.edges : undefined}
+            creationSourceId={appMode === 'EDITING' ? creationState.source : null}
+            creationDestinationId={appMode === 'EDITING' ? creationState.destination : null}
+            creationStateKind={appMode === 'EDITING' ? creationStateKind(creationState) : null}
           />
         )}
       </main>
