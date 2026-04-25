@@ -249,6 +249,34 @@ function App() {
     );
   }, [automaton.alphabet]);
 
+  // Global keyboard shortcuts for undo/redo. Suppressed whenever focus is
+  // inside a text field — browsers already handle undo/redo for those, and
+  // hijacking the shortcut there would be worse than useless. Detects Mac
+  // vs Win/Linux by honoring metaKey or ctrlKey respectively.
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const isModifier = event.metaKey || event.ctrlKey;
+      if (!isModifier) return;
+      if (event.key.toLowerCase() !== 'z') return;
+
+      const active = document.activeElement;
+      const isTextField =
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement ||
+        (active instanceof HTMLElement && active.isContentEditable);
+      if (isTextField) return;
+
+      event.preventDefault();
+      if (event.shiftKey) {
+        redo();
+      } else {
+        undo();
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
+
   // Derived application mode from the active tab. Used to gate visual
   // simulation effects (highlights) — NOT to trigger resets.
   const appMode: 'IDLE' | 'EDITING' | 'SIMULATING' =
@@ -285,6 +313,9 @@ function App() {
   // ─── Config handlers ───
 
   function handleTypeChange(type: 'DFA' | 'NFA') {
+    // No-op guard: spreading into a new object would otherwise push a
+    // new-reference-same-content snapshot onto the undo stack.
+    if (type === automaton.type) return;
     setAutomaton((prev) => ({ ...prev, type }));
   }
 
@@ -302,6 +333,9 @@ function App() {
       });
       return;
     }
+    // No-op guard: re-adding an existing symbol would build a fresh Set
+    // with identical contents, triggering a history push for nothing.
+    if (automaton.alphabet.has(symbol)) return;
     setAutomaton((prev) => ({
       ...prev,
       alphabet: new Set([...prev.alphabet, symbol]),
@@ -315,6 +349,10 @@ function App() {
     if (automaton.alphabet.has(newSymbol)) {
       return `'${newSymbol}' is already in the alphabet`;
     }
+    // setEpsilonSymbol in the hook already no-ops on identical values, so
+    // no additional guard is needed here — but returning null early also
+    // avoids the redundant call in the identical case.
+    if (newSymbol === epsilonSymbol) return null;
     setEpsilonSymbol(newSymbol);
     return null;
   }
@@ -324,6 +362,9 @@ function App() {
     // is gated on a non-empty alphabet via isRunnable, so this can't produce
     // a runnable-but-broken automaton. Empty alphabet is a useful editing
     // intermediate state (e.g. wholesale switching from 0/1 to a/b).
+    // No-op guard: removing a symbol that isn't in the alphabet shouldn't
+    // consume a history slot.
+    if (!automaton.alphabet.has(symbol)) return;
     setAutomaton((prev) => {
       const newAlphabet = new Set(prev.alphabet);
       newAlphabet.delete(symbol);
@@ -418,6 +459,9 @@ function App() {
   }
 
   function handleSetStartState(stateId: number) {
+    // No-op guard: setting the start state to its current value would push
+    // a same-content new-reference snapshot.
+    if (stateId === automaton.startState) return;
     applyEdit((prev) => setStartState(prev, stateId));
   }
 
@@ -444,6 +488,10 @@ function App() {
     removes: ReadonlyArray<{ from: number; to: number; symbol: string | null }>,
     adds: ReadonlyArray<{ from: number; to: number; symbol: string | null }>
   ) {
+    // No-op guard: a form submission with no changes shouldn't push
+    // history. The loops below would still build a new object even when
+    // both lists are empty.
+    if (removes.length === 0 && adds.length === 0) return;
     setAutomaton((previous) => {
       let result = previous;
       for (const r of removes) {
