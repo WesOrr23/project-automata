@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useReducer, useMemo } from 'react';
+import { useState, useEffect, useReducer, useMemo } from 'react';
 import { useAutomatonLayout } from './hooks/useAutomatonLayout';
 import {
   createAutomaton,
@@ -37,6 +37,7 @@ import {
 import { useSimulation } from './hooks/useSimulation';
 import { useUndoableAutomaton } from './hooks/useUndoableAutomaton';
 import { useUndoRedoShortcuts } from './hooks/useUndoRedoShortcuts';
+import { useAutomatonSimulationGlue } from './hooks/useAutomatonSimulationGlue';
 import { UndoRedoControls } from './components/UndoRedoControls';
 
 /**
@@ -237,26 +238,15 @@ function App() {
   // spline routing — not as a simple overlay drawn on top.
   const { automatonUI } = useAutomatonLayout(previewSourceAutomaton);
 
-  // Reset simulation when the automaton structure changes (skip initial mount).
-  // Input string is kept; we filter it against the current alphabet separately
-  // so the user doesn't lose their test string just because they edited a state.
-  const isFirstRender = useRef(true);
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    sim.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [automaton]);
-
-  // If the alphabet changed (e.g. a symbol used in the input was removed),
-  // filter the input string to only contain characters still in the alphabet.
-  useEffect(() => {
-    setInputString((previous) =>
-      [...previous].filter((ch) => automaton.alphabet.has(ch)).join('')
-    );
-  }, [automaton.alphabet]);
+  // Keeps the simulation and the input string in sync with structural
+  // changes to the automaton: reset sim on edits (skipping initial mount)
+  // and filter the input down to symbols still in the alphabet.
+  useAutomatonSimulationGlue({
+    automaton,
+    resetSimulation: sim.reset,
+    inputString,
+    setInputString,
+  });
 
   // Global undo/redo shortcuts. Hook owns the keyboard binding; passing
   // canUndo/canRedo lets it gate logging or future "no-op feedback" without
