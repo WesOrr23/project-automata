@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useReducer, useMemo } from 'react';
+import { useAutomatonLayout } from './hooks/useAutomatonLayout';
 import {
   createAutomaton,
   addState,
@@ -13,7 +14,7 @@ import {
 import { isRunnable, getValidationReport } from './engine/validator';
 import { Automaton } from './engine/types';
 import { type Result, errorMessage } from './engine/result';
-import { AutomatonUI, computeDisplayLabels } from './ui-state/types';
+import { computeDisplayLabels } from './ui-state/types';
 import { AutomatonCanvas } from './components/AutomatonCanvas';
 import { InputPanel } from './components/InputPanel';
 import { SimulationControls } from './components/SimulationControls';
@@ -33,7 +34,6 @@ import {
   INITIAL_CREATION_STATE,
   parseSymbolInput,
 } from './components/transitionEditor/creationReducer';
-import { computeLayout } from './ui-state/utils';
 import { useSimulation } from './hooks/useSimulation';
 import { useUndoableAutomaton } from './hooks/useUndoableAutomaton';
 import { useKeyboardScope } from './hooks/useKeyboardScope';
@@ -97,7 +97,6 @@ function App() {
     canRedo,
     clearHistory,
   } = useUndoableAutomaton(initialSnapshot);
-  const [automatonUI, setAutomatonUI] = useState<AutomatonUI | null>(null);
   const [inputString, setInputString] = useState('');
   const [menuState, setMenuState] = useState<ToolMenuState>({ mode: 'COLLAPSED' });
 
@@ -228,36 +227,15 @@ function App() {
     : null;
   const highlightedSymbol = pickHighlight('alphabet')?.symbol ?? null;
 
-  // Recompute layout whenever the automaton (or its preview overlay) changes,
-  // debounced to absorb rapid edits. A version counter discards stale promises
-  // in case layout N-1 resolves after N. After layout, we rewrite each state's
-  // label to the sequential display label so the canvas and the tool menu stay
-  // consistent.
+  // Recompute layout whenever the automaton (or its preview overlay) changes.
+  // The hook handles debouncing, stale-promise rejection via a version
+  // counter, and the post-layout relabel pass that maps engine IDs to
+  // sequential display labels (q0, q1, q2...).
   //
-  // Layout uses `previewSourceAutomaton` (which equals `automaton` when no
-  // preview is active) so in-progress edits show up on the canvas with full
-  // GraphViz spline routing — not as a simple overlay drawn on top.
-  const layoutVersionRef = useRef(0);
-  useEffect(() => {
-    const version = ++layoutVersionRef.current;
-    const timer = setTimeout(() => {
-      computeLayout(previewSourceAutomaton).then((layout) => {
-        if (version !== layoutVersionRef.current) return;
-        const labels = computeDisplayLabels(previewSourceAutomaton.states);
-        const relabeled: AutomatonUI = {
-          ...layout,
-          states: new Map(
-            Array.from(layout.states.entries()).map(([id, stateUI]) => [
-              id,
-              { ...stateUI, label: labels.get(id) ?? stateUI.label },
-            ])
-          ),
-        };
-        setAutomatonUI(relabeled);
-      });
-    }, 120);
-    return () => clearTimeout(timer);
-  }, [previewSourceAutomaton]);
+  // We feed `previewSourceAutomaton` (which equals `automaton` when no
+  // preview is active) so in-progress edits show up with full GraphViz
+  // spline routing — not as a simple overlay drawn on top.
+  const { automatonUI } = useAutomatonLayout(previewSourceAutomaton);
 
   // Reset simulation when the automaton structure changes (skip initial mount).
   // Input string is kept; we filter it against the current alphabet separately
