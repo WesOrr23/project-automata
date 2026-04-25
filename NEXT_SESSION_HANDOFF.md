@@ -73,8 +73,8 @@ These are documented in iteration plans / audits but are still open:
 - "Warn before delete if there are dependents" preference toggle
 
 ### From iter 6 audit (deferred, still open)
-- Self-loop visualization in the mini SVG
 - Notification system polish (already shipped, no major issues known)
+- ~~Self-loop visualization in the mini SVG~~ (dropped — explicit decision: rendering source = destination as the same pair-graphic is desirable; clearly two distinct slots)
 
 ### From iter 7
 - State rename in the actions popover
