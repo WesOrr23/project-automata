@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { ToolMenuState, ToolTabID, toolTabs } from './types';
 
@@ -16,17 +16,23 @@ type ToolMenuProp = {
 /**
  * ToolMenu — single architecture, three sizes.
  *
- * The menu always renders the same three tab rows; the container
+ * Same DOM shape across modes: three rows, one per tab. Container
  * width controls how much of each row is visible. COLLAPSED clips
- * everything past the icon; EXPANDED reveals the labels; OPEN reveals
- * the labels AND grows vertically to host the active tab's content.
+ * past the icon; EXPANDED reveals the labels; OPEN reveals the
+ * labels AND renders the active tab's content as a SIBLING beneath
+ * its row.
  *
- * Vertical center of the menu is pinned to the viewport center, so
- * height changes are symmetric about that axis (no top-anchor jump).
+ * Visual unity: even though the active row and its content panel are
+ * DOM siblings, they're styled to look like one card — matching
+ * borders + flattened inner corners on the row's bottom and the
+ * panel's top so the seam is invisible.
  *
- * Two-stage OPEN transition: width animates first, max-height delayed
- * — see `.tool-menu-open` in index.css for the per-state transition
- * declarations that drive the effect.
+ * Collapse affordance lives at the right edge of the active row's
+ * header (only in OPEN mode). No separate top-of-menu back button.
+ *
+ * Vertical center pinned via translateY(-50%) so OPEN's height
+ * growth — including tab-switch resizes — is symmetric about the
+ * screen center.
  */
 export function ToolMenu({
     state,
@@ -67,49 +73,52 @@ export function ToolMenu({
             onMouseEnter={onMouseEnter}
             onMouseLeave={onMouseLeave}
         >
-            {state.mode === 'OPEN' && (
-                <button
-                    type="button"
-                    className="tool-menu-back"
-                    onClick={onCollapse}
-                    aria-label="Collapse menu"
-                >
-                    <ChevronLeft size={14} />
-                    <span className="tool-menu-row-label">Collapse</span>
-                </button>
-            )}
             {toolTabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = tab.id === activeTab;
-
-                // The active row is wrapped in a card containing both the
-                // header (a non-interactive row) and the content panel
-                // beneath. Compact rows (and rows in non-OPEN modes) are
-                // standalone buttons.
-                if (isActive) {
-                    return (
-                        <div key={tab.id} className="tool-menu-active-card">
+                return (
+                    <Fragment key={tab.id}>
+                        {isActive ? (
+                            // Active row in OPEN mode: a div (not a button) so
+                            // we can nest a collapse button on the right without
+                            // invalid button-in-button markup.
                             <div className="tool-menu-row active" aria-label={`${tab.label} (active)`}>
                                 <Icon size={20} />
                                 <span className="tool-menu-row-label">{tab.label}</span>
+                                <button
+                                    type="button"
+                                    className="tool-menu-row-collapse"
+                                    onClick={onCollapse}
+                                    aria-label="Collapse menu"
+                                    title="Collapse menu"
+                                >
+                                    <ChevronLeft size={14} />
+                                </button>
                             </div>
-                            <div className="tool-menu-active-content">
+                        ) : (
+                            <button
+                                type="button"
+                                className="tool-menu-row"
+                                onClick={() => onTabClick(tab.id)}
+                                aria-label={tab.label}
+                            >
+                                <Icon size={20} />
+                                <span className="tool-menu-row-label">{tab.label}</span>
+                            </button>
+                        )}
+                        {isActive && state.mode === 'OPEN' && (
+                            // Keyed on tab.id so React unmounts the old content
+                            // and mounts the new on tab switch — that lets the
+                            // @starting-style fade fire for every switch, not
+                            // just the first OPEN.
+                            <div
+                                key={`content-${tab.id}`}
+                                className="tool-menu-active-content"
+                            >
                                 {contentFor(tab.id)}
                             </div>
-                        </div>
-                    );
-                }
-                return (
-                    <button
-                        key={tab.id}
-                        type="button"
-                        className="tool-menu-row"
-                        onClick={() => onTabClick(tab.id)}
-                        aria-label={tab.label}
-                    >
-                        <Icon size={20} />
-                        <span className="tool-menu-row-label">{tab.label}</span>
-                    </button>
+                        )}
+                    </Fragment>
                 );
             })}
         </aside>

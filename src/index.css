@@ -8,6 +8,12 @@
    =================================== */
 
 :root {
+  /* Opt into the modern keyword-interpolation behavior so transitions
+   * to/from `auto` heights animate (rather than snap). Drives the
+   * smooth tab-swap height adjustment in the tool menu. Browsers
+   * without support fall back to instant snaps — same as before. */
+  interpolate-size: allow-keywords;
+
   /* ─── Layer 1: Neutral Foundation (blue-tinted) ─── */
 
   --bg-page: #f0f3f8;
@@ -176,14 +182,28 @@ body {
    * clipping is what creates the icon-only look in COLLAPSED mode. */
   overflow: hidden;
   /* Default transition (used when target is COLLAPSED or EXPANDED).
-   * max-height animates first so OPEN-collapse drops height before
-   * shrinking width — feels like one motion, not two awkward stages.
-   * border-radius rides the same curve as width so the pill→rectangle
-   * shape change finishes when the width does. */
+   *
+   * Order: border-radius FIRST (no delay), then width (delayed by
+   * 0.3s). Why split them: border-radius 999px caps at min-dim/2, so
+   * if both width and border-radius transition together, the rendered
+   * radius LOOKS pill-shaped the entire time (because min(width/2,
+   * transitioning-value) stays at width/2 for narrow widths). Letting
+   * border-radius finish first means the corners are already at their
+   * destination shape (12px or pill) before the width starts moving.
+   *
+   * max-height also has no delay — collapsed and expanded share the
+   * same max-height value so this transition is mostly a no-op for
+   * those, but it kicks in cleanly when leaving OPEN: height drops
+   * first, then width and radius shape back into a pill. */
+  /* Auto-height baseline so tab-switch height adjustments transition
+   * via interpolate-size. height itself is included in the transition
+   * list. */
+  height: auto;
   transition:
+    height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
     max-height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
-    width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s,
-    border-radius 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s;
+    border-radius 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s;
 }
 
 /* COLLAPSED — narrow icon strip. Inner row width 32 + 8 padding × 2 = 48. */
@@ -202,7 +222,12 @@ body {
 
 /* OPEN — wider still, height grows to fit content. Width transitions
  * FIRST (no delay), max-height SECOND (delayed) — explicit two-stage
- * "open out, then drop down" gesture the user asked for. */
+ * "open out, then drop down" gesture the user asked for.
+ *
+ * height: auto on the base + interpolate-size: allow-keywords means
+ * subsequent tab swaps re-resize the menu smoothly without needing a
+ * separate transition rule. The `height` curve here is shared — it
+ * picks up tab-switch resize too. */
 .tool-menu-open {
   width: 280px;
   max-height: 95vh;
@@ -210,6 +235,7 @@ body {
   transition:
     width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
     border-radius 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
     max-height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s;
 }
 
@@ -305,105 +331,105 @@ body {
   transition: transform 80ms ease-out;
 }
 
+/* ─── Active row + content panel: visually united ─── */
+/*
+ * DOM-wise these are siblings (the row stays stable across mode
+ * changes, the panel just appears beneath). Visually we glue them
+ * into one rounded card by:
+ *   - active row: full chrome on top, left, right; bottom corners
+ *     squared off; bottom border swapped for the panel-shared color
+ *     so the seam reads as a header divider, not a card edge.
+ *   - active content panel: top corners squared off; left, right,
+ *     bottom borders matching the row's accent color; no top border
+ *     (the row's bottom border supplies it).
+ * Together they look like one card with a header strip.
+ */
 .tool-menu-row.active {
-  background: var(--bg-sidebar);
-  border-color: var(--blue-300);
   color: var(--blue-700);
-  box-shadow: var(--shadow-sm);
+  background: var(--blue-50);
+  border-color: var(--blue-300);
+  /* Square the bottom corners so the active row visually merges with
+   * the content panel beneath. */
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  /* Slightly darker bottom border = the "header divider" between the
+   * active row and the content panel. */
+  border-bottom-color: var(--blue-300);
   cursor: default;
+  /* Keep header height aligned with regular rows so the menu's
+   * vertical rhythm doesn't lurch when a tab activates. */
 }
 
 .tool-menu-row.active:hover {
-  background: var(--bg-sidebar);
+  /* No hover chrome change on the active row — it's already where the
+   * user just clicked. */
+  background: var(--blue-50);
   color: var(--blue-700);
   border-color: var(--blue-300);
 }
 
-/* ─── Active row content (only in OPEN mode) ─── */
-/*
- * In OPEN mode the active row turns into a card: header on top
- * (the row itself), content panel beneath. The content panel is a
- * flex child of the active card with flex-grow: 1 so it absorbs
- * whatever vertical space the menu has left after the compact rows
- * and gaps; internal scroll if the content exceeds that.
- */
-.tool-menu-active-card {
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-sidebar);
-  border: 1px solid var(--blue-300);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.tool-menu-active-card .tool-menu-row {
-  /* The active row is the card's header — flatten its bottom corners
-   * so it visually merges with the content panel below. */
+/* Inline collapse button on the right edge of the active row. */
+.tool-menu-row-collapse {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 50%;
   border: none;
   background: transparent;
-  border-radius: 0;
-  border-bottom: 1px solid var(--border-subtle);
-  cursor: default;
-  flex: 0 0 36px;
-  height: 36px;
   color: var(--blue-700);
-}
-
-.tool-menu-active-card .tool-menu-row:hover {
-  background: transparent;
-}
-
-.tool-menu-active-content {
-  padding: var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  overflow-y: auto;
-  min-height: 0;
-  /* Content fades in once the card finishes opening — riding the
-   * second half of the two-stage open transition. */
-  opacity: 1;
-  transition: opacity 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s;
-}
-
-@starting-style {
-  .tool-menu-active-content {
-    opacity: 0;
-  }
-}
-
-/* Back button — appears at the top of OPEN mode, collapses the menu
- * to icon-only. Sized to match the row height so the menu's vertical
- * rhythm stays consistent. */
-.tool-menu-back {
-  width: 100%;
-  height: 24px;
-  flex: 0 0 24px;
-  border-radius: var(--radius-pill);
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-secondary);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  padding: 0 6px;
   transition:
     background 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
     color 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.tool-menu-back:hover {
-  background: var(--bg-button-hover);
-  color: var(--text-body);
+.tool-menu-row-collapse:hover {
+  background: rgba(59, 130, 246, 0.18);
+  color: var(--blue-800);
 }
 
-.tool-menu-back:active:not(:disabled) {
-  transform: scale(0.95);
+.tool-menu-row-collapse:active:not(:disabled) {
+  transform: scale(0.92);
   transition: transform 80ms ease-out;
+}
+
+.tool-menu-active-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow-y: auto;
+  background: var(--bg-sidebar);
+  /* Top corners flat — the row above provides the top edge. */
+  border: 1px solid var(--blue-300);
+  border-top: none;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  /* Pull the panel's top edge up so its border continues the active
+   * row's bottom border with no visible gap. The container's `gap`
+   * would otherwise insert space between the two siblings. */
+  margin-top: calc(var(--space-1) * -1);
+  /* Fade + slight upward slide every time a panel mounts — both on
+   * first OPEN and on tab switches (the React key on this element
+   * forces remount per active tab so @starting-style fires every
+   * time, not only once). */
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@starting-style {
+  .tool-menu-active-content {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 /* ─── Alphabet badges (Config tab) ─── */
@@ -1028,7 +1054,7 @@ body {
 .glass-input:focus-visible,
 .speed-toggle-option:focus-visible,
 .tool-menu-row:focus-visible,
-.tool-menu-back:focus-visible,
+.tool-menu-row-collapse:focus-visible,
 .editor-row-action:focus-visible,
 .alphabet-badge-remove:focus-visible,
 .editor-select:focus-visible {
