@@ -160,13 +160,18 @@ export function TransitionEdge(props: TransitionEdgeProp) {
     >
       {/* Edge spline path. The visible stroke is the colored one;
        * a wider transparent stroke beneath it gives a generous click
-       * target on thin edges. */}
+       * target on thin edges. Round linecap so the spline endpoints
+       * (where the click target tapers off) stay grabbable, not
+       * sliced off square. Width chosen to roughly match a node's
+       * radius — wider was tested but starts to overlap adjacent
+       * edges in dense graphs. */}
       {onEdgeClick && (
         <path
           d={pathData}
           fill="none"
           stroke="transparent"
-          strokeWidth={14}
+          strokeWidth={22}
+          strokeLinecap="round"
         />
       )}
       <path
