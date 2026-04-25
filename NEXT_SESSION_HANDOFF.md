@@ -96,6 +96,16 @@ These are documented in iteration plans / audits but are still open:
 - State rename in the actions popover
 - Maybe: hover preview of the to-be-deleted edge before clicking Delete
 
+### Unreachable-state warning surfacing
+The validator already detects unreachable states (`getOrphanedStates`,
+surfaced as a warning in `getValidationReport`). But warnings only render
+in the Simulate tab when the automaton isn't runnable — a runnable
+automaton with orphans never shows the warning. Future iteration: surface
+warnings persistently (top of canvas? toast on edit?) so the user knows
+about unreachable states even when sim is fine. Could also be a soft visual
+on the canvas (faded state? dashed outline?). Worth checking how the
+warning is most useful before settling on placement.
+
 ### From iter 8 audit (deferred / nice-to-have)
 - Per-branch NFA simulation UI: tabs or trees showing each branch independently. Right now all active states render in the same layer of blue.
 - More NFA/ε visual tweaks: maybe a subtler dashed style on ε-edge labels (user explicitly said *no* dashed line for ε in iter 8 — keep solid — but the label could still flag it).

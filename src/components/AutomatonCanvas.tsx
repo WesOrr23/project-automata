@@ -190,8 +190,16 @@ export function AutomatonCanvas({
         const isStart = automaton.startState === stateUI.id;
         const isAccept = automaton.acceptStates.has(stateUI.id);
         const isActive = activeStateIds?.has(stateUI.id) ?? false;
-        // Only show result status on the active (current) state
-        const stateResultStatus = isActive ? (resultStatus ?? null) : null;
+        // For accepted results, only the branches that actually landed
+        // in an accept state get the green coloring — that's the answer
+        // to "why did this accept?". Other still-active branches stay
+        // blue (alive but not why we accepted). Rejected colors every
+        // surviving branch red.
+        const stateResultStatus = !isActive
+          ? null
+          : resultStatus === 'accepted' && !isAccept
+            ? null
+            : resultStatus ?? null;
 
         const isHighlighted = stateUI.id === highlightedStateId;
         const isDying = dyingStateIds?.has(stateUI.id) ?? false;

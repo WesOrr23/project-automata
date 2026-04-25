@@ -123,9 +123,11 @@ export function StateNode({
     strokeClass = `pulse-canvas pulse-canvas-${creationKind}`;
   }
   if (isDying) {
-    // The fill keeps the state-was-active blue tint so the eye sees
-    // "this branch was alive last step"; the stroke fades to red.
-    fillColor = '#bfdbfe';
+    // Light red fill so the eye reads "this branch died" all at once,
+    // not "blue (active) but with a red outline". Matches the rejected
+    // result-status fill so the death visual ties to the broader
+    // "this branch failed" vocabulary.
+    fillColor = '#fee2e2'; // --error-fill
     strokeColor = '#dc2626';
     strokeWidth = 3;
     strokeClass = 'state-dying';

@@ -315,6 +315,18 @@ function App() {
     });
   }
 
+  // "Clear canvas" — reset to a minimal automaton: one state, no
+  // transitions, alphabet inherited from the current automaton (so the
+  // user doesn't have to retype 0/1 or whatever they were working with).
+  // Type also persists since it's a separate setting.
+  function handleClearCanvas() {
+    setAutomaton((prev) => ({
+      ...createAutomaton(prev.type, prev.alphabet.size > 0 ? prev.alphabet : new Set(['0'])),
+    }));
+    creationDispatch({ type: 'reset' });
+    sim.reset();
+  }
+
   function handleExportJSON() {
     const serializable = {
       type: automaton.type,
@@ -489,6 +501,7 @@ function App() {
       onTypeChange={handleTypeChange}
       epsilonSymbol={epsilonSymbol}
       onEpsilonSymbolChange={handleEpsilonSymbolChange}
+      onClearCanvas={handleClearCanvas}
       onExportJSON={handleExportJSON}
     />
   );

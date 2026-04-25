@@ -19,6 +19,8 @@ type ConfigPanelProp = {
   epsilonSymbol: string;
   /** Validation: returns null if accepted, an error message otherwise. */
   onEpsilonSymbolChange: (newSymbol: string) => string | null;
+  /** Reset the automaton to a single state with the current alphabet preserved. */
+  onClearCanvas: () => void;
   onExportJSON?: () => void;
 };
 
@@ -27,6 +29,7 @@ export function ConfigPanel({
   onTypeChange,
   epsilonSymbol,
   onEpsilonSymbolChange,
+  onClearCanvas,
   onExportJSON,
 }: ConfigPanelProp) {
   // Local draft so the user can clear the field while typing without
@@ -80,8 +83,13 @@ export function ConfigPanel({
 
       {automatonType === 'NFA' && (
         <div>
-          <span className="label" style={{ display: 'block', marginBottom: 'var(--space-2)' }}>
-            ε symbol
+          {/* Keep the .label class's uppercase styling for "SYMBOL", but
+            * exempt the Greek lowercase ε so it doesn't render as "E". */}
+          <span
+            className="label"
+            style={{ display: 'block', marginBottom: 'var(--space-2)' }}
+          >
+            <span style={{ textTransform: 'none' }}>ε</span> symbol
           </span>
           <input
             type="text"
@@ -99,13 +107,20 @@ export function ConfigPanel({
         </div>
       )}
 
+      <div className="divider" />
+      <button
+        className="btn btn-danger"
+        onClick={onClearCanvas}
+        style={{ width: '100%' }}
+        title="Reset the canvas: one state, no transitions. Alphabet and type are kept."
+      >
+        Clear canvas
+      </button>
+
       {onExportJSON && (
-        <>
-          <div className="divider" />
-          <button className="btn" onClick={onExportJSON} style={{ width: '100%' }}>
-            Export JSON
-          </button>
-        </>
+        <button className="btn" onClick={onExportJSON} style={{ width: '100%' }}>
+          Export JSON
+        </button>
       )}
     </>
   );
