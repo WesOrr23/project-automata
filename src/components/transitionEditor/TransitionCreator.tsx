@@ -25,7 +25,6 @@ import { Automaton } from '../../engine/types';
 import {
   actionButtonLabel,
   actionMode,
-  getOverwriteSummary,
   isReady,
   parseSymbolInput,
   type ActionMode,
@@ -33,6 +32,7 @@ import {
   type CreationState,
   type ParsedSymbols,
 } from './creationReducer';
+import { getOverwriteSummary } from '../../engine/preview';
 import { MiniTransitionSVG } from './MiniTransitionSVG';
 import { StatePickerPopover, type PickerOption } from '../popover/StatePickerPopover';
 import { useKeyboardScope } from '../../hooks/useKeyboardScope';
@@ -181,9 +181,11 @@ export function TransitionCreator({
   // destinations). The canvas red-pulses are driven independently by
   // computePreview's delete-kind edges.
   const overwrite = getOverwriteSummary(
-    state,
-    automaton.transitions,
-    parsed,
+    automaton,
+    state.source,
+    state.destination,
+    parsed.ok ? parsed.symbols : [],
+    state.editingExisting,
     automaton.type === 'NFA'
   );
 

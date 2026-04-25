@@ -12,7 +12,7 @@ import { STATE_RADIUS } from '../ui-state/constants';
 import { StateNode } from './StateNode';
 import { TransitionEdge } from './TransitionEdge';
 import { StartStateArrow } from './StartStateArrow';
-import type { EdgePreview } from './transitionEditor/creationReducer';
+import type { EdgeOverlay } from '../engine/preview';
 
 type AutomatonCanvasProp = {
   /** The automaton data from the engine layer */
@@ -98,7 +98,7 @@ type AutomatonCanvasProp = {
    * (from, to, symbol). For modifications with a symbol change, the entry
    * also carries the original symbol so the label renders both.
    */
-  edgePreviews?: ReadonlyArray<EdgePreview> | undefined;
+  edgePreviews?: ReadonlyArray<EdgeOverlay> | undefined;
 
   /**
    * State IDs currently selected as the source / destination of the

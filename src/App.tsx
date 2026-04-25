@@ -29,12 +29,12 @@ import type { NotificationTarget } from './notifications/types';
 import { StateActionsPopover } from './components/popover/StateActionsPopover';
 import {
   actionMode,
-  computePreview,
   creationReducer,
   creationStateKind,
   INITIAL_CREATION_STATE,
   parseSymbolInput,
 } from './components/transitionEditor/creationReducer';
+import { computePreview } from './engine/preview';
 import { useSimulation } from './hooks/useSimulation';
 import { useUndoableAutomaton } from './hooks/useUndoableAutomaton';
 import { useUndoRedoShortcuts } from './hooks/useUndoRedoShortcuts';
@@ -141,16 +141,29 @@ function App() {
   // speculative edges polluting the Simulate or collapsed views.
   const preview = useMemo(() => {
     if (appMode !== 'EDITING') {
-      return { transitions: automaton.transitions, edges: [] };
+      return { automaton, overlays: [] };
     }
     const parsed = parseSymbolInput(creationState.symbol, automaton.alphabet, epsilonSymbol);
     const mode = actionMode(creationState, automaton.alphabet, epsilonSymbol);
-    return computePreview(automaton, creationState, mode, parsed, automaton.type === 'NFA');
+    // ActionMode names the UI button ('create' / 'modify' / 'delete');
+    // PreviewMode names the engine semantics ('add' / 'modify' /
+    // 'delete'). They line up except for the create→add rename.
+    const previewMode = mode === 'create' ? 'add' : mode;
+    // computePreview takes a primitive symbol list — when the user's
+    // input doesn't parse, we feed an empty list and the function falls
+    // through to the no-preview branch (which still honors delete mode).
+    const symbols = parsed.ok ? parsed.symbols : [];
+    return computePreview(
+      automaton,
+      creationState.source,
+      creationState.destination,
+      symbols,
+      previewMode,
+      creationState.editingExisting,
+      automaton.type === 'NFA'
+    );
   }, [appMode, automaton, creationState, epsilonSymbol]);
-  const previewSourceAutomaton: Automaton =
-    preview.transitions === automaton.transitions
-      ? automaton
-      : { ...automaton, transitions: preview.transitions as Automaton['transitions'] };
+  const previewSourceAutomaton: Automaton = preview.automaton;
 
   // State-actions popover (opened by clicking a state node on the canvas
   // while in EDIT mode and not actively picking).
@@ -741,7 +754,7 @@ function App() {
                 : undefined
             }
             onEdgeClick={appMode === 'EDITING' ? handleCanvasEdgeClick : undefined}
-            edgePreviews={appMode === 'EDITING' ? preview.edges : undefined}
+            edgePreviews={appMode === 'EDITING' ? preview.overlays : undefined}
             creationSourceId={appMode === 'EDITING' ? creationState.source : null}
             creationDestinationId={appMode === 'EDITING' ? creationState.destination : null}
             creationStateKind={appMode === 'EDITING' ? creationStateKind(creationState) : null}

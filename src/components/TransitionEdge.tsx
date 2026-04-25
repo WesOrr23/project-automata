@@ -6,7 +6,7 @@
  * position, label placement) is computed by GraphViz's layout engine.
  */
 
-import type { EdgePreview } from './transitionEditor/creationReducer';
+import type { EdgeOverlay } from '../engine/preview';
 
 type TransitionEdgeProp = {
   /** SVG path d attribute (cubic bezier spline from GraphViz) */
@@ -49,7 +49,7 @@ type TransitionEdgeProp = {
    *   - 'modify' → purple: an existing edge whose source / dest / symbol changed
    *   - 'delete' → red:    an edge that will be removed on commit
    */
-  previewKind?: EdgePreview['kind'] | undefined;
+  previewKind?: EdgeOverlay['kind'] | undefined;
 
   /**
    * For modify previews where the symbol itself changed, the previous symbol.

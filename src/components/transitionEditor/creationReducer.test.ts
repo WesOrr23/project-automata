@@ -7,9 +7,10 @@ import {
   actionButtonLabel,
   parseSymbolInput,
   formatSymbolsForInput,
-  computePreview,
   type CreationState,
 } from './creationReducer';
+import { computePreview, type PreviewMode } from '../../engine/preview';
+import type { Automaton, Transition } from '../../engine/types';
 
 // Default alphabet + reserved-ε symbol shared across most tests. Override
 // per-test only when the case actually depends on a specific alphabet.
@@ -361,13 +362,49 @@ describe('creationReducer', () => {
   });
 
   describe('computePreview DFA conflict branches', () => {
-    // Helper: build an automaton-like fixture with the supplied transitions.
-    type T = { from: number; to: ReadonlySet<number>; symbol: string | null };
-    function automaton(transitions: T[]) {
-      return { transitions, alphabet: A };
+    // Helper: build an Automaton fixture with just enough structure for
+    // computePreview to work. Real automaton operations would build this
+    // through addState/addTransition; the tests only need the transitions
+    // and alphabet to drive the diff logic.
+    function automaton(transitions: Transition[]): Automaton {
+      const states = new Set<number>();
+      for (const t of transitions) {
+        states.add(t.from);
+        for (const dest of t.to) states.add(dest);
+      }
+      return {
+        type: 'DFA',
+        states,
+        alphabet: A,
+        transitions,
+        startState: 0,
+        acceptStates: new Set<number>(),
+        nextStateId: Math.max(0, ...states) + 1,
+      };
     }
-    function tr(from: number, to: number, symbol: string | null): T {
+    function tr(from: number, to: number, symbol: string | null): Transition {
       return { from, to: new Set([to]), symbol };
+    }
+    // Bridges the tests' (state, mode, parsed) shape to the new primitive-
+    // arg signature on computePreview, so each individual case stays a
+    // one-liner. ActionMode 'create' maps to PreviewMode 'add'.
+    function preview(
+      auto: Automaton,
+      state: CreationState,
+      mode: 'create' | 'modify' | 'delete',
+      symbols: ReadonlyArray<string | null>,
+      isNFA: boolean
+    ) {
+      const previewMode: PreviewMode = mode === 'create' ? 'add' : mode;
+      return computePreview(
+        auto,
+        state.source,
+        state.destination,
+        symbols,
+        previewMode,
+        state.editingExisting,
+        isNFA
+      );
     }
 
     it('single-symbol DFA modify with conflict emits modify + delete edges', () => {
@@ -385,11 +422,11 @@ describe('creationReducer', () => {
         editingExisting: { from: 0, to: 1, symbols: ['0'] },
       };
       const parsed = parseSymbolInput('1', A, EPS);
-      const result = computePreview(auto, state, 'modify', parsed, false);
+      const result = preview(auto, state, 'modify', parsed.ok ? parsed.symbols : [], false);
       // One modify edge (the new q0 -1-> q1) and one delete edge for
       // the conflicting q0 -1-> q2.
-      const modifyEdges = result.edges.filter((edge) => edge.kind === 'modify');
-      const deleteEdges = result.edges.filter((edge) => edge.kind === 'delete');
+      const modifyEdges = result.overlays.filter((edge) => edge.kind === 'modify');
+      const deleteEdges = result.overlays.filter((edge) => edge.kind === 'delete');
       expect(modifyEdges).toHaveLength(1);
       expect(modifyEdges[0]).toMatchObject({
         from: 0,
@@ -418,9 +455,9 @@ describe('creationReducer', () => {
         editingExisting: { from: 0, to: 1, symbols: ['0'] },
       };
       const parsed = parseSymbolInput('1', A, EPS);
-      const result = computePreview(auto, state, 'modify', parsed, true);
-      expect(result.edges.filter((e) => e.kind === 'delete')).toHaveLength(0);
-      expect(result.edges.filter((e) => e.kind === 'modify')).toHaveLength(1);
+      const result = preview(auto, state, 'modify', parsed.ok ? parsed.symbols : [], true);
+      expect(result.overlays.filter((e) => e.kind === 'delete')).toHaveLength(0);
+      expect(result.overlays.filter((e) => e.kind === 'modify')).toHaveLength(1);
     });
 
     it('general-case DFA add with conflict emits add + delete edges', () => {
@@ -435,9 +472,9 @@ describe('creationReducer', () => {
         symbol: '0',
       };
       const parsed = parseSymbolInput('0', A, EPS);
-      const result = computePreview(auto, state, 'create', parsed, false);
-      const addEdges = result.edges.filter((edge) => edge.kind === 'add');
-      const deleteEdges = result.edges.filter((edge) => edge.kind === 'delete');
+      const result = preview(auto, state, 'create', parsed.ok ? parsed.symbols : [], false);
+      const addEdges = result.overlays.filter((edge) => edge.kind === 'add');
+      const deleteEdges = result.overlays.filter((edge) => edge.kind === 'delete');
       expect(addEdges).toHaveLength(1);
       expect(addEdges[0]).toMatchObject({ from: 0, to: 1, symbol: '0', kind: 'add' });
       expect(deleteEdges).toHaveLength(1);
@@ -458,9 +495,9 @@ describe('creationReducer', () => {
         editingExisting: { from: 0, to: 1, symbols: ['0'] },
       };
       const parsed = parseSymbolInput('0', A, EPS);
-      const result = computePreview(auto, state, 'modify', parsed, false);
-      const addEdges = result.edges.filter((edge) => edge.kind === 'add');
-      const deleteEdges = result.edges.filter((edge) => edge.kind === 'delete');
+      const result = preview(auto, state, 'modify', parsed.ok ? parsed.symbols : [], false);
+      const addEdges = result.overlays.filter((edge) => edge.kind === 'add');
+      const deleteEdges = result.overlays.filter((edge) => edge.kind === 'delete');
       expect(addEdges).toHaveLength(1);
       expect(addEdges[0]).toMatchObject({ from: 0, to: 2, symbol: '0' });
       expect(deleteEdges).toHaveLength(1);
@@ -476,9 +513,9 @@ describe('creationReducer', () => {
         symbol: '0',
       };
       const parsed = parseSymbolInput('0', A, EPS);
-      const result = computePreview(auto, state, 'create', parsed, true);
-      expect(result.edges.filter((e) => e.kind === 'delete')).toHaveLength(0);
-      expect(result.edges.filter((e) => e.kind === 'add')).toHaveLength(1);
+      const result = preview(auto, state, 'create', parsed.ok ? parsed.symbols : [], true);
+      expect(result.overlays.filter((e) => e.kind === 'delete')).toHaveLength(0);
+      expect(result.overlays.filter((e) => e.kind === 'add')).toHaveLength(1);
     });
   });
 
