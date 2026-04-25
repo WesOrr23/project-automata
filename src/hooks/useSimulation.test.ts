@@ -14,6 +14,12 @@ import {
 } from '../engine/automaton';
 import { isAccepted as engineIsAccepted } from '../engine/simulator';
 import { Simulation } from '../engine/types';
+import type { Result } from '../engine/result';
+
+function expectOk<T>(result: Result<T>): T {
+  if (!result.ok) throw new Error(`expected ok, got err: ${result.error}`);
+  return result.value;
+}
 import {
   simulationReducer,
   initialState,
@@ -29,14 +35,14 @@ function createEndsWith01DFA() {
   const { automaton: dfa1, stateId: state1 } = addState(dfa);
   const { automaton: dfa2, stateId: state2 } = addState(dfa1);
 
-  dfa = addAcceptState(dfa2, state2);
+  dfa = expectOk(addAcceptState(dfa2, state2));
 
-  dfa = addTransition(dfa, 0, new Set([state1]), '0');
-  dfa = addTransition(dfa, 0, new Set([0]), '1');
-  dfa = addTransition(dfa, state1, new Set([state1]), '0');
-  dfa = addTransition(dfa, state1, new Set([state2]), '1');
-  dfa = addTransition(dfa, state2, new Set([state1]), '0');
-  dfa = addTransition(dfa, state2, new Set([0]), '1');
+  dfa = expectOk(addTransition(dfa, 0, new Set([state1]), '0'));
+  dfa = expectOk(addTransition(dfa, 0, new Set([0]), '1'));
+  dfa = expectOk(addTransition(dfa, state1, new Set([state1]), '0'));
+  dfa = expectOk(addTransition(dfa, state1, new Set([state2]), '1'));
+  dfa = expectOk(addTransition(dfa, state2, new Set([state1]), '0'));
+  dfa = expectOk(addTransition(dfa, state2, new Set([0]), '1'));
 
   return { dfa, q0: 0, q1: state1, q2: state2 };
 }

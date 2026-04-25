@@ -108,7 +108,15 @@ export function simulationReducer(
 ): SimulationState {
   switch (action.type) {
     case 'initialize': {
-      const simulation = createSimulation(action.automaton, action.input);
+      // createSimulation returns Result. A failure here means the
+      // automaton isn't runnable (incomplete DFA, no start state, etc.) —
+      // the UI gates initialization on isRunnable already, so reaching
+      // this branch means a stale snapshot. Stay idle with empty history.
+      const result = createSimulation(action.automaton, action.input);
+      if (!result.ok) {
+        return { ...state, history: [], historyIndex: -1, status: 'idle' };
+      }
+      const simulation = result.value;
       const status = engineIsFinished(simulation) ? 'finished' : 'idle';
       return { ...state, history: [simulation], historyIndex: 0, status };
     }
@@ -124,17 +132,16 @@ export function simulationReducer(
       // itself stays pure.
       if (state.history.length >= SIMULATION_HISTORY_CAP) return state;
 
-      // engineStep throws on a DFA dead-end (incomplete DFA). The
-      // creator gating (isRunnable) makes that combination unreachable
-      // through the UI today, but a stale snapshot or a future code path
-      // shouldn't crash the React tree. Catch and finish the simulation
-      // so the caller can surface the error via a notification.
-      let newSimulation;
-      try {
-        newSimulation = engineStep(simulation);
-      } catch {
+      // engineStep returns err on a DFA dead-end (e.g. an incomplete DFA
+      // surviving past the runnable gate). The creator gating
+      // (isRunnable) makes that unreachable through the UI today, but a
+      // stale snapshot shouldn't crash the React tree — finish the
+      // simulation in place so the user can reset.
+      const stepResult = engineStep(simulation);
+      if (!stepResult.ok) {
         return { ...state, status: 'finished' };
       }
+      const newSimulation = stepResult.value;
       const isNowFinished = engineIsFinished(newSimulation);
 
       // Truncate any forward history (if we stepped back then step forward again)
@@ -170,8 +177,13 @@ export function simulationReducer(
       let workingState = state;
       if ((currentSimulation(state) === null || state.status === 'finished')
           && action.automaton && action.input) {
-        const newSimulation = createSimulation(action.automaton, action.input);
-        workingState = { ...state, history: [newSimulation], historyIndex: 0, status: 'idle' };
+        const result = createSimulation(action.automaton, action.input);
+        if (!result.ok) {
+          // Same fall-through as the 'initialize' case: structural
+          // failure means the automaton isn't runnable, stay idle.
+          return state;
+        }
+        workingState = { ...state, history: [result.value], historyIndex: 0, status: 'idle' };
       }
 
       const simulation = currentSimulation(workingState);
@@ -189,12 +201,17 @@ export function simulationReducer(
         };
       }
 
-      // Forward jump — step forward from current history end to reach target
+      // Forward jump — step forward from current history end to reach target.
+      // engineStep returns Result; if it errs (e.g. DFA dead-end on a
+      // stale automaton) we stop advancing and surface what we got so
+      // far rather than crashing the reducer.
       let latestSimulation = workingState.history[workingState.history.length - 1]!;
       const newHistory = [...workingState.history];
 
       while (newHistory.length - 1 < action.index && !engineIsFinished(latestSimulation)) {
-        latestSimulation = engineStep(latestSimulation);
+        const stepResult = engineStep(latestSimulation);
+        if (!stepResult.ok) break;
+        latestSimulation = stepResult.value;
         newHistory.push(latestSimulation);
       }
 
@@ -221,12 +238,14 @@ export function simulationReducer(
         return { ...state, status: 'paused' };
       }
 
-      let newSimulation;
-      try {
-        newSimulation = engineStep(simulation);
-      } catch {
+      // Same pattern as the 'step' case: a Result err here means a
+      // structural problem; finish the simulation so the timer effect
+      // tears down and the user can reset.
+      const stepResult = engineStep(simulation);
+      if (!stepResult.ok) {
         return { ...state, status: 'finished' };
       }
+      const newSimulation = stepResult.value;
       const isNowFinished = engineIsFinished(newSimulation);
 
       const newHistory = [...state.history.slice(0, state.historyIndex + 1), newSimulation];
