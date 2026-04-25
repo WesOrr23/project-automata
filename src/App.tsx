@@ -36,7 +36,7 @@ import {
 } from './components/transitionEditor/creationReducer';
 import { useSimulation } from './hooks/useSimulation';
 import { useUndoableAutomaton } from './hooks/useUndoableAutomaton';
-import { useKeyboardScope } from './hooks/useKeyboardScope';
+import { useUndoRedoShortcuts } from './hooks/useUndoRedoShortcuts';
 import { UndoRedoControls } from './components/UndoRedoControls';
 
 /**
@@ -258,24 +258,10 @@ function App() {
     );
   }, [automaton.alphabet]);
 
-  // Global undo/redo shortcuts. Registered as a transparent scope so
-  // anything modal layered on top (e.g. a popover) can preempt the key.
-  // Text-input filtering is handled by the scope manager — browsers already
-  // handle Cmd/Ctrl+Z natively in fields, and we don't want to hijack it.
-  useKeyboardScope({
-    id: 'app-undo-redo',
-    active: true,
-    capture: false,
-    onKey: (event) => {
-      const isModifier = event.metaKey || event.ctrlKey;
-      if (!isModifier) return false;
-      if (event.key.toLowerCase() !== 'z') return false;
-      event.preventDefault();
-      if (event.shiftKey) redo();
-      else undo();
-      return true;
-    },
-  });
+  // Global undo/redo shortcuts. Hook owns the keyboard binding; passing
+  // canUndo/canRedo lets it gate logging or future "no-op feedback" without
+  // changing this site.
+  useUndoRedoShortcuts({ undo, redo, canUndo, canRedo });
 
   // Display labels are sequential (q0, q1, q2) regardless of underlying IDs.
   // This detaches stable engine identity from user-visible numbering.
