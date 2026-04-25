@@ -1,5 +1,6 @@
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { ChevronLeft } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { ToolMenuState, ToolTabID, toolTabs } from './types';
 
 type ToolMenuProp = {
@@ -17,22 +18,17 @@ type ToolMenuProp = {
  * ToolMenu — single architecture, three sizes.
  *
  * Same DOM shape across modes: three rows, one per tab. Container
- * width controls how much of each row is visible. COLLAPSED clips
- * past the icon; EXPANDED reveals the labels; OPEN reveals the
- * labels AND renders the active tab's content as a SIBLING beneath
- * its row.
+ * width/max-height/border-radius animate via CSS, scoped per
+ * destination class so each transition has the right staging.
  *
- * Visual unity: even though the active row and its content panel are
- * DOM siblings, they're styled to look like one card — matching
- * borders + flattened inner corners on the row's bottom and the
- * panel's top so the seam is invisible.
+ * The active panel content is wrapped in AnimatePresence so its
+ * unmount is delayed for an exit fade. While the panel is fading
+ * out, the active row keeps its styling — `displayedActiveTab` lags
+ * `state.mode` until AnimatePresence's onExitComplete fires.
  *
- * Collapse affordance lives at the right edge of the active row's
- * header (only in OPEN mode). No separate top-of-menu back button.
- *
- * Vertical center pinned via translateY(-50%) so OPEN's height
- * growth — including tab-switch resizes — is symmetric about the
- * screen center.
+ * The combination `.tool-menu-collapsed.tool-menu-closing-from-open`
+ * gets a reversed-staging transition (max-height shrinks first, width
+ * + radius shrink with a delay), mirroring the staged opening.
  */
 export function ToolMenu({
     state,
@@ -55,6 +51,29 @@ export function ToolMenu({
         }
     }
 
+    // displayedActiveTab is the tab whose row gets active styling. It
+    // tracks state.activeTab while OPEN, and lingers after state.mode
+    // leaves OPEN until the panel's exit animation completes (cleared
+    // by handleExitComplete). This is what keeps the active row blue
+    // and the collapse button visible during the close.
+    const [displayedActiveTab, setDisplayedActiveTab] = useState<ToolTabID | null>(
+        state.mode === 'OPEN' ? state.activeTab : null
+    );
+
+    useEffect(() => {
+        if (state.mode === 'OPEN') {
+            setDisplayedActiveTab(state.activeTab);
+        }
+    }, [state.mode, state.mode === 'OPEN' ? state.activeTab : null]);
+
+    const handleExitComplete = () => {
+        if (state.mode !== 'OPEN') {
+            setDisplayedActiveTab(null);
+        }
+    };
+
+    const isClosingFromOpen = state.mode !== 'OPEN' && displayedActiveTab !== null;
+
     const modeClass =
         state.mode === 'COLLAPSED' ? 'tool-menu-collapsed'
       : state.mode === 'EXPANDED'  ? 'tool-menu-expanded'
@@ -65,23 +84,19 @@ export function ToolMenu({
     const onMouseEnter = state.mode === 'COLLAPSED' ? onHoverEvent : undefined;
     const onMouseLeave = state.mode === 'EXPANDED'  ? onHoverLeave : undefined;
 
-    const activeTab = state.mode === 'OPEN' ? state.activeTab : null;
-
     return (
         <aside
-            className={`tool-menu ${modeClass}`}
+            className={`tool-menu ${modeClass}${isClosingFromOpen ? ' tool-menu-closing-from-open' : ''}`}
             onMouseEnter={onMouseEnter}
             onMouseLeave={onMouseLeave}
         >
             {toolTabs.map((tab) => {
                 const Icon = tab.icon;
-                const isActive = tab.id === activeTab;
+                const isActive = tab.id === displayedActiveTab;
+                const isOpenWithThisTab = state.mode === 'OPEN' && state.activeTab === tab.id;
                 return (
                     <Fragment key={tab.id}>
                         {isActive ? (
-                            // Active row in OPEN mode: a div (not a button) so
-                            // we can nest a collapse button on the right without
-                            // invalid button-in-button markup.
                             <div className="tool-menu-row active" aria-label={`${tab.label} (active)`}>
                                 <Icon size={20} />
                                 <span className="tool-menu-row-label">{tab.label}</span>
@@ -89,6 +104,7 @@ export function ToolMenu({
                                     type="button"
                                     className="tool-menu-row-collapse"
                                     onClick={onCollapse}
+                                    disabled={isClosingFromOpen}
                                     aria-label="Collapse menu"
                                     title="Collapse menu"
                                 >
@@ -106,18 +122,24 @@ export function ToolMenu({
                                 <span className="tool-menu-row-label">{tab.label}</span>
                             </button>
                         )}
-                        {isActive && state.mode === 'OPEN' && (
-                            // Keyed on tab.id so React unmounts the old content
-                            // and mounts the new on tab switch — that lets the
-                            // @starting-style fade fire for every switch, not
-                            // just the first OPEN.
-                            <div
-                                key={`content-${tab.id}`}
-                                className="tool-menu-active-content"
-                            >
-                                {contentFor(tab.id)}
-                            </div>
-                        )}
+                        <AnimatePresence onExitComplete={handleExitComplete}>
+                            {isOpenWithThisTab && (
+                                // motion.div fades opacity in/out. The panel
+                                // itself does no size animation — it sits at
+                                // its natural flex size, and the container's
+                                // max-height transition reveals/hides it.
+                                <motion.div
+                                    key={`content-${tab.id}`}
+                                    className="tool-menu-active-content"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
+                                >
+                                    {contentFor(tab.id)}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </Fragment>
                 );
             })}

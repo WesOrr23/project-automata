@@ -59,26 +59,36 @@
 
 /* COLLAPSED — narrow icon strip. Inner row width 32 + 8 padding × 2 = 48.
  *
- * Closing transition (any → COLLAPSED): width, max-height, and
- * border-radius all run concurrently with no delay. Two reasons:
- *
- *  - Border-radius pill caps at min-dim/2, so as width shrinks the
- *    rendered corners track width/2 and read as "rounding back into
- *    the pill" *during* the shrink rather than snapping at the end.
- *
- *  - From OPEN, max-height (95vh → 120px) shrinks alongside width
- *    (280 → 48px) so the box contracts as one continuous gesture
- *    that mirrors the opening grow-out, instead of dropping height
- *    first (content snap-clipped) and then collapsing width as a
- *    separate beat. */
+ * Default closing transition (e.g. EXPANDED → COLLAPSED on hover-out):
+ * width, max-height, and border-radius all run concurrently. The pill
+ * radius caps at min-dim/2, so as width shrinks the rendered corners
+ * track width/2 — they read as "rounding back into the pill" during
+ * the shrink, not snapping at the end. */
 .tool-menu-collapsed {
   width: 48px;
   max-height: 120px;
+  border-radius: var(--radius-pill);
   transition:
     height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
     max-height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
     border-radius 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
     width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* OPEN → COLLAPSED specifically: reverse the staged opening.
+ *
+ * Opening (EXPANDED → OPEN) was: width grows first (0–0.3s), then
+ * max-height grows with a 0.3s delay (panel reveals). The mirror of
+ * that close: max-height shrinks first (0–0.3s, panel exit fades
+ * concurrently via Framer), then width and border-radius shrink
+ * with a 0.3s delay so the box stays card-shaped while the panel
+ * disappears, then narrows + rounds into a pill as the second beat. */
+.tool-menu-collapsed.tool-menu-closing-from-open {
+  transition:
+    height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    max-height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s,
+    border-radius 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s;
 }
 
 /* EXPANDED — same height, wider. Reveals the labels by un-clipping the
@@ -300,37 +310,11 @@
    * row's bottom border with no visible gap. The container's `gap`
    * would otherwise insert space between the two siblings. */
   margin-top: calc(var(--space-1) * -1);
-  /* Fade + slight upward slide every time a panel mounts — both on
-   * first OPEN and on tab switches (the React key on this element
-   * forces remount per active tab so @starting-style fires every
-   * time, not only once).
-   *
-   * The panel also collapses its own max-height + vertical padding to
-   * 0 in @starting-style and grows them back with a 0.3s delay. Without
-   * that, the panel mounts at full height during the first 300ms of the
-   * EXPANDED → OPEN transition (while the container's max-height is
-   * still capped at the EXPANDED 120px), pushing the Simulate row out
-   * of the visible box and clipping it. Delaying the panel's growth
-   * lines it up with the container's max-height stage so the row only
-   * inflates once there's room for it. */
-  opacity: 1;
-  transform: translateY(0);
-  max-height: 95vh;
-  transition:
-    opacity 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s,
-    transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s,
-    max-height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s,
-    padding 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s;
-}
-
-@starting-style {
-  .tool-menu-active-content {
-    opacity: 0;
-    transform: translateY(6px);
-    max-height: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-  }
+  /* No own size or opacity transitions. The panel sits at its natural
+   * flex-shrunk height; the container's max-height transition reveals
+   * or hides it. Framer Motion handles opacity fade in/out (initial /
+   * animate / exit) so the panel can outlive its React unmount during
+   * the close. */
 }
 
 /* ─── Alphabet badges (Config tab) ─── */
