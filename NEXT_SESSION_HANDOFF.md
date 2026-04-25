@@ -1,17 +1,19 @@
 # Next Session Handoff
 
-Everything you need to pick up where iteration 8 left off, written for whoever opens the next chat.
+Everything you need to pick up where iteration 9 left off, written for whoever opens the next chat.
 
 ---
 
 ## Where things stand right now
 
-- **Branch**: `iteration-8` (committed and ready; not merged to main)
-- **Tests**: 211 passing, typecheck clean
+- **Branch**: `iteration-9` (committed and ready; not merged to main)
+- **Tests**: 225 passing, typecheck clean
 - **Auto mode**: ON
 - **Notification system**: in place (iter 6) — `useNotifications().notify({...})` available everywhere
 - **Iteration 8 plan + close-out**: see `ITERATION8_PLAN.md` and `ITERATION8_COMPLETE.md`
+- **Iteration 9 plan + close-out**: see `ITERATION9_PLAN.md` and `ITERATION9_COMPLETE.md`
 - **NFA mode is live**: ε-transitions (configurable reserved char), multi-state simulation with ε-closure, edge consolidation in both DFA and NFA modes, branch-death pulse
+- **Undo/Redo is live**: snapshot stack capped at 50, two floating circular buttons at top-center, `⌘/Ctrl+Z` and `⌘/Ctrl+Shift+Z` shortcuts (suppressed in text fields), Clear canvas wipes both stacks
 
 ---
 
@@ -47,34 +49,16 @@ This is the most important section. The user is a CS student building skills as 
 
 ---
 
-## Iteration 9: Undo / Redo (now the next priority)
+## Iteration 9: Undo / Redo — shipped
 
-Originally planned for iter 8 but the user pivoted to NFA support. Plan elements (start with these in `ITERATION9_PLAN.md`):
+All edits are reversible via snapshot-stack undo/redo. Details in
+`ITERATION9_COMPLETE.md`. The snapshot tuple is `{ automaton,
+epsilonSymbol }` — folded together so one undo action = one user-visible
+state restoration. Stacks capped at 50; Clear canvas wipes both.
 
-### What needs to be reversible
-- Add / remove state
-- Set start state, toggle accept state
-- Add / remove / replace transition (use the new `handleApplyTransitionEdit(removes, adds)` as the primitive)
-- Alphabet add / remove
-- Type change (DFA / NFA)
-- Reserved ε-symbol change (UI state but worth tracking)
-- Probably NOT: simulation control (that has its own history via the simulation reducer)
-
-### Architecture options to consider
-- **Snapshot stack**: every edit pushes the prior `Automaton` onto a history stack. Undo pops, applies. Simple, memory hog at scale (each Automaton is big-ish).
-- **Inverse-action stack**: every edit records its inverse (e.g. "addState 3" → "removeState 3"). Smaller per entry, more complex to define inverses for cascade ops (e.g. removeState removes transitions too).
-- **Immer-like diff**: structural sharing means snapshots are cheap. May not be worth a new dependency.
-
-Recommendation: **snapshot stack** for simplicity. The Automaton is a small object even with many states. Cap at ~50 entries. Iter 8's `handleApplyTransitionEdit` makes this easier — one batch update per user action means one snapshot.
-
-### UI placement
-- Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z keyboard shortcuts.
-- Visual buttons: probably small Undo / Redo icons in a corner — could go in the Configure tab, or as a floating control near the canvas.
-
-### Edge cases
-- Reset history when the automaton is wholesale replaced (e.g. JSON import — when that lands).
-- Don't push history for no-op edits (e.g. setStartState to current start).
-- The simulation hook owns its own history — undo/redo shouldn't touch it.
+One follow-up worth noting: when JSON import eventually lands, its
+handler should call `clearHistory()` after replacing the automaton, same
+as `handleClearCanvas` does today.
 
 ---
 
@@ -112,7 +96,7 @@ warning is most useful before settling on placement.
 - Reserved-`e` rule on JSON load (auto-handle when import lands).
 
 ### From CLAUDE.md backlog
-- Iteration 9: Undo/Redo (now scheduled — see above)
+- Iteration 9: Undo/Redo — shipped (see `ITERATION9_COMPLETE.md`)
 - Iteration 10: NFA → DFA conversion (subset construction), minimization, equivalence testing
 - Iteration 11: Edge routing & overlap prevention
 

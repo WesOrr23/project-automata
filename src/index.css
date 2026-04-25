@@ -1580,3 +1580,52 @@ button svg {
 .state-dying {
   animation: pulse-die 0.7s ease-out 1 forwards;
 }
+
+/* ─── Undo / Redo controls ─── */
+/* Two circular icon buttons centered at the top of the viewport, floating
+   above the canvas. Fixed position so they stay put regardless of canvas
+   scroll or tool-menu state. */
+.undo-redo-controls {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  gap: var(--space-2);
+  padding: 4px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(4px);
+}
+
+.undo-redo-button {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  color: var(--text-body);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.undo-redo-button:hover:not(:disabled) {
+  background: var(--bg-button-hover);
+  color: var(--text-heading);
+}
+
+.undo-redo-button:active:not(:disabled) {
+  background: var(--bg-button-active);
+}
+
+.undo-redo-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
