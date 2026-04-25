@@ -1,0 +1,85 @@
+/* ===================================
+   Canvas — automaton viewport, state nodes, edges, start arrow,
+   discoverability hints. Pure rendering surface; tool-menu / popover
+   styles live elsewhere.
+   =================================== */
+
+/* ─── Canvas Area ─── */
+
+.canvas-area {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+}
+
+.canvas-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-5);
+}
+
+/* ─── Canvas transition edges (clickable when in Edit tab) ─── */
+.transition-edge-clickable path {
+  transition: stroke-width 0.12s ease;
+}
+
+.transition-edge-clickable:hover path {
+  stroke-width: 4;
+}
+
+/* ─── Canvas state nodes — pick mode (active picking) ─── */
+/* Pulsing ring + cursor:pointer tells the user "click one of these." */
+
+.state-node-pickable circle {
+  transition: stroke-width 0.15s ease, filter 0.15s ease;
+}
+
+.state-node-pickable:hover circle {
+  stroke-width: 4;
+  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.5));
+}
+
+.state-node-pickable circle:not(:hover) {
+  animation: state-node-pickable-breath 2s ease-in-out infinite;
+}
+
+/* ─── Canvas state nodes — selectable (idle edit mode) ─── */
+/* Quieter affordance: hover thickens the ring and grows a soft
+ * drop-shadow. No constant pulse. Eased at 200ms so the lift has
+ * room to read as a considered response, not a twitch. */
+
+.state-node-selectable circle {
+  transition:
+    stroke-width 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.state-node-selectable:hover circle {
+  stroke-width: 3;
+  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.4));
+}
+
+/* ─── Canvas discoverability hint ─── */
+/* Subtle floating chip at the bottom-right of the viewport. Only visible
+ * in EDIT mode at idle (gated by App.tsx). Pointer-events disabled so it
+ * never intercepts clicks on the canvas underneath. */
+.canvas-tip {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 5;
+  padding: 6px 10px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+  user-select: none;
+  backdrop-filter: blur(4px);
+}

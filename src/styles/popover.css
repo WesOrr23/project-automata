@@ -1,0 +1,128 @@
+/* ===================================
+   Popovers — state actions popover and state picker popover.
+   The transition-cell popover lives with the tool menu (it's
+   anchored inside the transition grid).
+   =================================== */
+
+/* ─── State picker popover (anchored right of menu) ─── */
+
+.state-picker-popover {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-sidebar);
+  box-shadow: var(--shadow-lg);
+  max-height: 240px;
+  overflow-y: auto;
+  outline: none;
+  min-width: 100px;
+}
+
+.state-picker-popover-option {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  padding: var(--space-1) var(--space-3);
+  border: none;
+  background: transparent;
+  color: var(--text-heading);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.1s ease;
+}
+
+.state-picker-popover-option.highlighted {
+  background: var(--blue-100);
+  color: var(--blue-700);
+}
+
+.state-picker-popover-option[aria-selected='true'] {
+  background: var(--blue-500);
+  color: white;
+}
+
+.state-picker-popover-option[aria-selected='true'].highlighted {
+  background: var(--blue-600);
+}
+
+/* ─── State actions popover ─── */
+.state-actions-popover {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-sidebar);
+  box-shadow: var(--shadow-lg);
+  min-width: 160px;
+  outline: none;
+}
+
+.state-actions-popover-header {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-secondary);
+  text-align: center;
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 2px;
+}
+
+.state-actions-popover-action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  background: transparent;
+  color: var(--text-heading);
+  font: inherit;
+  font-size: var(--text-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+  text-align: left;
+}
+
+/* The action label sits in the middle; any trailing kbd hint is pushed to the
+ * right edge so the column of shortcuts aligns vertically. */
+.state-actions-popover-action > span {
+  flex: 1;
+}
+
+.state-actions-popover-kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 6px;
+  border: 1px solid var(--border-subtle);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--bg-elevated, #f8fafc);
+  color: var(--text-secondary);
+}
+
+.state-actions-popover-action:hover:not(:disabled) {
+  background: var(--blue-50);
+  color: var(--blue-700);
+}
+
+.state-actions-popover-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.state-actions-popover-action.danger:hover:not(:disabled) {
+  background: var(--error-bg);
+  color: var(--error-text);
+}
