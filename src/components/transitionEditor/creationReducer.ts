@@ -336,6 +336,28 @@ type AutomatonLike<T extends TransitionLike = TransitionLike> = {
 };
 
 /**
+ * True iff `transition` is the same engine transition that the form is
+ * currently editing — i.e. it lives at the original (from, *) location and
+ * carries one of the symbols originally loaded into the form.
+ *
+ * Used by the conflict-detection branch of computePreview: when scanning for
+ * "another transition with the same (from, symbol) but different destination"
+ * we must NOT count the original being edited as a conflict, since the form
+ * would replace it on commit.
+ */
+function isOriginalEdge(
+  transition: TransitionLike,
+  editingExisting: CreationState['editingExisting'],
+  symbol: string | null
+): boolean {
+  if (editingExisting === null) return false;
+  return (
+    transition.from === editingExisting.from &&
+    editingExisting.symbols.includes(symbol)
+  );
+}
+
+/**
  * Build a "what the canvas should look like with the in-progress edit
  * applied" view. Returns:
  *   - transitions: the transition list to lay out (may include speculative
@@ -524,9 +546,7 @@ export function computePreview<T extends TransitionLike>(
           transition.symbol === symbol &&
           !(transition.to.size === 1 && transition.to.has(newDestination)) &&
           // Don't double-count the editingExisting original — already handled above.
-          !(state.editingExisting !== null &&
-            transition.from === state.editingExisting.from &&
-            state.editingExisting.symbols.includes(symbol))
+          !isOriginalEdge(transition, state.editingExisting, symbol)
       );
       if (conflict !== undefined) {
         const conflictDest = Array.from(conflict.to)[0];

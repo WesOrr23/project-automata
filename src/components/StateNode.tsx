@@ -5,6 +5,8 @@
  * Accept states are rendered with a double circle (concentric circles).
  */
 
+import { STATE_RADIUS } from '../ui-state/constants';
+
 type StateNodeProp = {
   /** Numeric ID of the state (from engine layer) */
   stateId: number;
@@ -17,9 +19,6 @@ type StateNodeProp = {
 
   /** Y coordinate on the SVG canvas */
   y: number;
-
-  /** Whether this is the start state (reserved for future use) */
-  isStart: boolean;
 
   /** Whether this is an accept state (renders double circle) */
   isAccept: boolean;
@@ -68,9 +67,10 @@ type StateNodeProp = {
 };
 
 /**
- * Visual constants for state rendering
+ * Visual constants for state rendering. STATE_RADIUS is imported from
+ * ui-state/constants so the layout (which feeds GraphViz the same radius)
+ * and the rendered circles can never disagree.
  */
-const STATE_RADIUS = 30;
 const INNER_CIRCLE_OFFSET = 6; // Distance between outer and inner circles for accept states
 const STROKE_WIDTH = 2;
 
@@ -79,7 +79,6 @@ export function StateNode({
   label,
   x,
   y,
-  isStart: _isStart,
   isAccept,
   isActive = false,
   resultStatus = null,

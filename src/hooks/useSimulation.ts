@@ -24,7 +24,7 @@
  *   ANY → initialize → idle
  */
 
-import { useReducer, useEffect, useCallback } from 'react';
+import { useReducer, useEffect, useCallback, useMemo } from 'react';
 import { Automaton, Simulation } from '../engine/types';
 import {
   createSimulation,
@@ -98,7 +98,17 @@ export function simulationReducer(
       if (simulation === null) return state;
       if (state.status === 'finished' || state.status === 'running') return state;
 
-      const newSimulation = engineStep(simulation);
+      // engineStep throws on a DFA dead-end (incomplete DFA). The
+      // creator gating (isRunnable) makes that combination unreachable
+      // through the UI today, but a stale snapshot or a future code path
+      // shouldn't crash the React tree. Catch and finish the simulation
+      // so the caller can surface the error via a notification.
+      let newSimulation;
+      try {
+        newSimulation = engineStep(simulation);
+      } catch {
+        return { ...state, status: 'finished' };
+      }
       const isNowFinished = engineIsFinished(newSimulation);
 
       // Truncate any forward history (if we stepped back then step forward again)
@@ -178,7 +188,12 @@ export function simulationReducer(
       const simulation = currentSimulation(state);
       if (simulation === null || state.status !== 'running') return state;
 
-      const newSimulation = engineStep(simulation);
+      let newSimulation;
+      try {
+        newSimulation = engineStep(simulation);
+      } catch {
+        return { ...state, status: 'finished' };
+      }
       const isNowFinished = engineIsFinished(newSimulation);
 
       const newHistory = [...state.history.slice(0, state.historyIndex + 1), newSimulation];
@@ -250,11 +265,16 @@ export function useSimulation(automaton: Automaton) {
   // NFAs there can be 0..N (one per active state per matching dest).
   // Empty if the simulation is finished or every active branch has no
   // outgoing transition for the next symbol.
+  //
+  // Memoized so renders that don't change the active set or pending
+  // input (e.g. unrelated UI state changes) reuse the previous array.
+  // For larger NFAs this saves an O(active × transitions) scan per
+  // render.
   const nextTransitions: ReadonlyArray<{
     fromStateId: number;
     toStateId: number;
     symbol: string;
-  }> = (() => {
+  }> = useMemo(() => {
     if (simulation === null || engineIsFinished(simulation)) return [];
     if (simulation.currentStates.size === 0) return [];
     const nextSymbol = simulation.remainingInput[0]!;
@@ -272,7 +292,7 @@ export function useSimulation(automaton: Automaton) {
       }
     }
     return result;
-  })();
+  }, [automaton, simulation]);
 
   // Dying state IDs from the most recent step — drives the branch-death
   // pulse. Only populated immediately after a step that killed branches;

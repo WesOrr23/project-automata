@@ -51,7 +51,12 @@
 
     // Treat array/object access as possibly undefined (safer!)
     // Example: array[0] has type 'T | undefined', not 'T'
-    "noUncheckedIndexedAccess": true
+    "noUncheckedIndexedAccess": true,
+
+    // Require `override` keyword when subclass methods override base methods.
+    // Free here (no code currently uses class inheritance), but enables it
+    // for future code without a follow-up tsconfig change.
+    "noImplicitOverride": true
   },
 
   // Only compile files in the src/ directory

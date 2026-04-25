@@ -94,8 +94,20 @@ export function StateActionsPopover({
     };
   }, [onClose, onCreateTransition, onDelete, canDelete]);
 
+  // a11y: capture the element that had focus when the popover mounted so
+  // we can restore focus there on unmount. Without this, keyboard users who
+  // open the popover via Space/Enter on a state node lose focus when the
+  // popover closes — a real keyboard-navigation regression.
   useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
     popoverRef.current?.focus();
+    return () => {
+      // Only restore if the previous element is still in the DOM and
+      // focusable; otherwise let the browser pick a default.
+      if (previouslyFocused && document.contains(previouslyFocused)) {
+        previouslyFocused.focus();
+      }
+    };
   }, []);
 
   return (

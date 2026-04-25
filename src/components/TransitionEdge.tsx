@@ -192,7 +192,7 @@ export function TransitionEdge(props: TransitionEdgeProp) {
         dominantBaseline="middle"
         fontSize="14px"
         fontWeight={isNextTransition ? 'bold' : 'normal'}
-        fontFamily="Arial, sans-serif"
+        fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
       >
         {showSymbolDiff ? (
           <>

@@ -40,12 +40,12 @@ const START_PHANTOM_NAME = '_start';
 /**
  * Inverse of joinSymbols: split GraphViz's edge label back into the
  * underlying symbol list. 'ε' round-trips to null; commas separate
- * multiple symbols. An empty/missing label produces [null] (treated
- * as a single ε-transition — defensive fallback that should never
- * trigger in practice).
+ * multiple symbols. Returns an empty array for missing/empty labels
+ * (the caller treats edges with no symbols as ill-formed and can choose
+ * to drop them).
  */
 function parseEdgeLabel(rawLabel: string | undefined): Array<string | null> {
-  if (rawLabel === undefined || rawLabel === '') return [null];
+  if (rawLabel === undefined || rawLabel === '') return [];
   return rawLabel
     .split(',')
     .map((part) => part.trim())
@@ -116,10 +116,10 @@ function automatonToDot(automaton: Automaton): string {
   // expands the bounding box to include the arrow's reserved area.
   // Width chosen to comfortably hold ARROW_LENGTH (50px) + arrowhead
   // (~8px) at GraphViz's 72-DPI scale.
-  if (automaton.startState !== null) {
-    lines.push(`  ${START_PHANTOM_NAME} [shape=point, width=0.85, fixedsize=true, style=invis];`);
-    lines.push(`  ${START_PHANTOM_NAME} -> ${automaton.startState} [style=invis];`);
-  }
+  // (startState is non-nullable per the engine type — createAutomaton
+  // always seeds state 0 and removeState reassigns rather than clearing.)
+  lines.push(`  ${START_PHANTOM_NAME} [shape=point, width=0.85, fixedsize=true, style=invis];`);
+  lines.push(`  ${START_PHANTOM_NAME} -> ${automaton.startState} [style=invis];`);
 
   lines.push('}');
   return lines.join('\n');
@@ -187,6 +187,19 @@ function controlPointsToSvgPath(points: { x: number; y: number }[]): string {
 
   const startPoint = points[0]!;
   let path = `M ${startPoint.x},${startPoint.y}`;
+
+  // GraphViz emits a B-spline as one start point + N cubic Bezier
+  // segments of 3 control points each, so we expect points.length to be
+  // 1 + 3 × N. If it isn't (malformed output), the loop below silently
+  // truncates the leftover 1 or 2 trailing points — warn so a partial
+  // arrow on screen has a console trail back to here.
+  const remainder = (points.length - 1) % 3;
+  if (remainder !== 0) {
+    console.warn(
+      `controlPointsToSvgPath: expected 1 + 3N points, got ${points.length} ` +
+        `(${remainder} trailing point${remainder === 1 ? '' : 's'} dropped)`
+    );
+  }
 
   // Remaining points come in groups of 3 for cubic Bezier segments
   for (let i = 1; i + 2 <= points.length - 1; i += 3) {
@@ -363,10 +376,12 @@ function parseGraphvizJson(
     const toStateId = parseInt(headNode.name);
 
     // Parse the (possibly comma-joined) consolidated label back into a
-    // symbol array. ε round-trips to null. An edge with no label
-    // somehow makes it through with a single null symbol — better than
-    // dropping it silently.
+    // symbol array. ε round-trips to null. Skip edges without a parseable
+    // label — automatonToDot always emits one, so an empty label here
+    // means GraphViz returned something we don't understand; better to
+    // drop one edge than render an invented ε.
     const symbols = parseEdgeLabel(edge.label);
+    if (symbols.length === 0) continue;
 
     // Parse edge spline
     const parsedPos = parseEdgePos(edge.pos);

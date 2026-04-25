@@ -75,7 +75,7 @@ type Automaton = {
   states: Set<number>;              // State IDs (auto-incremented integers)
   alphabet: Set<string>;            // Input alphabet
   transitions: Transition[];        // All transitions
-  startState: number | null;        // ID of start state (null = not set)
+  startState: number;               // ID of start state (always set: createAutomaton seeds state 0)
   acceptStates: Set<number>;        // IDs of accept states
   nextStateId: number;              // Auto-increment counter for new states
 };

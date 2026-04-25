@@ -123,6 +123,15 @@ export function useUndoableAutomaton(
     redoStackRef.current = [];
     // Force re-render so canUndo/canRedo update. The snapshot itself is
     // unchanged but consumers need to see the new false/false flags.
+    //
+    // CONTRACT (fragile, intentional): canUndo/canRedo are derived from
+    // ref'd stacks (see top-of-file rationale). React doesn't re-read those
+    // unless something else triggers a render. Every stack-mutating method
+    // in this hook ALSO calls setCurrent — that's what keeps the derived
+    // flags honest. clearHistory has nothing semantic to commit, so it
+    // pushes a same-content new-reference snapshot purely to provoke a
+    // render. If you add another stack-mutating method, you must do the
+    // same — or migrate canUndo/canRedo into useState (see Major Changes).
     setCurrent((snapshot) => ({ ...snapshot }));
   }, []);
 

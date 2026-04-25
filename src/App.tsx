@@ -104,23 +104,33 @@ function App() {
       ? 'state'
       : null;
 
+  // Derived application mode from the active tab. Used to gate visual
+  // simulation effects (highlights), the preview overlay, and canvas
+  // affordances — NOT to trigger resets.
+  const appMode: 'IDLE' | 'EDITING' | 'SIMULATING' =
+    menuState.mode === 'OPEN'
+      ? (menuState.activeTab === 'EDIT'
+          ? 'EDITING'
+          : menuState.activeTab === 'SIMULATE'
+            ? 'SIMULATING'
+            : 'IDLE')
+      : 'IDLE';
+
   // Live preview of "what the canvas will look like after the user commits
   // the in-progress edit." The preview's transitions are what gets laid out;
   // the edge highlights tell the canvas which edges to color blue/purple/red.
   //
-  // Gated on the Edit tab being open: outside of Edit mode the form state may
-  // still hold an in-progress edit (the user could be tab-switching), but we
-  // don't want speculative edges polluting the Simulate or collapsed views.
-  const editTabOpen =
-    menuState.mode === 'OPEN' && menuState.activeTab === 'EDIT';
+  // Gated on EDITING: outside of Edit mode the form state may still hold an
+  // in-progress edit (the user could be tab-switching), but we don't want
+  // speculative edges polluting the Simulate or collapsed views.
   const preview = useMemo(() => {
-    if (!editTabOpen) {
+    if (appMode !== 'EDITING') {
       return { transitions: automaton.transitions, edges: [] };
     }
     const parsed = parseSymbolInput(creationState.symbol, automaton.alphabet, epsilonSymbol);
     const mode = actionMode(creationState, automaton.alphabet, epsilonSymbol);
     return computePreview(automaton, creationState, mode, parsed, automaton.type === 'NFA');
-  }, [editTabOpen, automaton, creationState, epsilonSymbol]);
+  }, [appMode, automaton, creationState, epsilonSymbol]);
   const previewSourceAutomaton: Automaton =
     preview.transitions === automaton.transitions
       ? automaton
@@ -183,19 +193,25 @@ function App() {
 
   // Derive per-component highlight props from the active notification target.
   // Each component only cares about one kind of target; everything else stays
-  // null so React can early-bail on equality.
-  const highlightedStateId =
-    highlightedTarget?.kind === 'state' ? highlightedTarget.stateId : null;
-  const highlightedTransition =
-    highlightedTarget?.kind === 'transition'
-      ? {
-          from: highlightedTarget.from,
-          to: highlightedTarget.to,
-          symbol: highlightedTarget.symbol,
-        }
+  // null so React can early-bail on equality. `pickHighlight` returns the
+  // payload only when the target's discriminant matches the requested kind.
+  function pickHighlight<K extends NotificationTarget['kind']>(
+    kind: K
+  ): Extract<NotificationTarget, { kind: K }> | null {
+    return highlightedTarget?.kind === kind
+      ? (highlightedTarget as Extract<NotificationTarget, { kind: K }>)
       : null;
-  const highlightedSymbol =
-    highlightedTarget?.kind === 'alphabet' ? highlightedTarget.symbol : null;
+  }
+  const highlightedStateId = pickHighlight('state')?.stateId ?? null;
+  const highlightedTransitionTarget = pickHighlight('transition');
+  const highlightedTransition = highlightedTransitionTarget
+    ? {
+        from: highlightedTransitionTarget.from,
+        to: highlightedTransitionTarget.to,
+        symbol: highlightedTransitionTarget.symbol,
+      }
+    : null;
+  const highlightedSymbol = pickHighlight('alphabet')?.symbol ?? null;
 
   // Recompute layout whenever the automaton (or its preview overlay) changes,
   // debounced to absorb rapid edits. A version counter discards stale promises
@@ -276,17 +292,6 @@ function App() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
-
-  // Derived application mode from the active tab. Used to gate visual
-  // simulation effects (highlights) — NOT to trigger resets.
-  const appMode: 'IDLE' | 'EDITING' | 'SIMULATING' =
-    menuState.mode === 'OPEN'
-      ? (menuState.activeTab === 'EDIT'
-          ? 'EDITING'
-          : menuState.activeTab === 'SIMULATE'
-            ? 'SIMULATING'
-            : 'IDLE')
-      : 'IDLE';
 
   // Display labels are sequential (q0, q1, q2) regardless of underlying IDs.
   // This detaches stable engine identity from user-visible numbering.

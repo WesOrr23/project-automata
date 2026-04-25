@@ -224,7 +224,6 @@ export function AutomatonCanvas({
 
       {/* Layer 2: State nodes (foreground) */}
       {Array.from(automatonUI.states.values()).map((stateUI) => {
-        const isStart = automaton.startState === stateUI.id;
         const isAccept = automaton.acceptStates.has(stateUI.id);
         const isActive = activeStateIds?.has(stateUI.id) ?? false;
         // For accepted results, only the branches that actually landed
@@ -266,7 +265,6 @@ export function AutomatonCanvas({
             label={stateUI.label}
             x={stateUI.position.x}
             y={stateUI.position.y}
-            isStart={isStart}
             isAccept={isAccept}
             isActive={isActive}
             resultStatus={stateResultStatus}
@@ -280,11 +278,13 @@ export function AutomatonCanvas({
         );
       })}
 
-      {/* Layer 3: Start state arrow (foreground) */}
-      {automaton.startState !== null && (() => {
+      {/* Layer 3: Start state arrow (foreground). The start state is
+          always set by the engine (createAutomaton seeds state 0), so no
+          null check is needed; we only guard the layout-map lookup,
+          which can briefly miss during the layout debounce. */}
+      {(() => {
         const startStateUI = automatonUI.states.get(automaton.startState);
         if (!startStateUI) return null;
-
         return (
           <StartStateArrow
             targetX={startStateUI.position.x}

@@ -110,13 +110,13 @@ export function removeState(
     (t) => t.from !== stateId && !t.to.has(stateId)
   );
 
-  // Auto-assign start state if we're removing current start state
+  // Auto-assign start state if we're removing current start state.
+  // The size === 1 guard above makes newStates non-empty here, which
+  // is why the [0]! assertion is sound — not a bare guess.
   let newStartState = automaton.startState;
   if (automaton.startState === stateId) {
-    // Since we already checked that this isn't the last state,
-    // there must be at least one remaining state
     const remaining = Array.from(newStates).sort((a, b) => a - b);
-    newStartState = remaining[0]!; // First remaining state (always exists)
+    newStartState = remaining[0]!;
   }
 
   return {
