@@ -108,6 +108,15 @@
     transform 0.30s cubic-bezier(0.4, 0.0, 0.2, 1) 0.45s;
 }
 
+/* Once the panel has exited there's nothing below the active row to
+ * "merge with," so the squared bottom corners read as a partial-pill
+ * mismatch inside the rounding container. Round all four corners
+ * during the close — border-radius is in the .tool-menu-row
+ * transition list, so the change animates smoothly. */
+.tool-menu-collapsed.tool-menu-closing-from-open .tool-menu-row.active {
+  border-radius: var(--radius-sm);
+}
+
 /* EXPANDED — same height, wider. Reveals the labels by un-clipping the
  * row content.
  *
@@ -189,6 +198,7 @@
     background 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
     border-color 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
     color 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-radius 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
     transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
