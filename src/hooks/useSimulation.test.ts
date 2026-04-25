@@ -18,6 +18,7 @@ import {
   simulationReducer,
   initialState,
   SimulationState,
+  SIMULATION_HISTORY_CAP,
 } from './useSimulation';
 
 // Helper: Create a simple DFA that accepts strings ending in "01"
@@ -488,6 +489,96 @@ describe('simulationReducer', () => {
       });
 
       expect(state.speed).toBe(3000);
+    });
+  });
+
+  describe('history cap', () => {
+    it('refuses to advance past SIMULATION_HISTORY_CAP via step', () => {
+      const { dfa } = createEndsWith01DFA();
+      const longInput = '0'.repeat(SIMULATION_HISTORY_CAP + 50);
+
+      let state = simulationReducer(initialState, {
+        type: 'initialize',
+        automaton: dfa,
+        input: longInput,
+      });
+
+      // Step until we hit the cap.
+      for (let i = 0; i < SIMULATION_HISTORY_CAP + 10; i++) {
+        state = simulationReducer(state, { type: 'step' });
+      }
+
+      // History never exceeds the cap.
+      expect(state.history.length).toBe(SIMULATION_HISTORY_CAP);
+      // We are not finished — input is still remaining.
+      expect(getSimulation(state)!.remainingInput.length).toBeGreaterThan(0);
+      // Further step is a no-op.
+      const stateAfterExtraStep = simulationReducer(state, { type: 'step' });
+      expect(stateAfterExtraStep).toBe(state);
+    });
+
+    it('autoStep transitions to paused when the cap is hit', () => {
+      const { dfa } = createEndsWith01DFA();
+      const longInput = '0'.repeat(SIMULATION_HISTORY_CAP + 50);
+
+      let state = simulationReducer(initialState, {
+        type: 'initialize',
+        automaton: dfa,
+        input: longInput,
+      });
+      state = simulationReducer(state, { type: 'run' });
+
+      // Drive the auto-step loop until the cap halts it.
+      for (let i = 0; i < SIMULATION_HISTORY_CAP + 5; i++) {
+        state = simulationReducer(state, { type: 'autoStep' });
+        if (state.status !== 'running') break;
+      }
+
+      expect(state.history.length).toBe(SIMULATION_HISTORY_CAP);
+      expect(state.status).toBe('paused');
+    });
+
+    it('stepBack still works at the cap', () => {
+      const { dfa } = createEndsWith01DFA();
+      const longInput = '0'.repeat(SIMULATION_HISTORY_CAP + 50);
+
+      let state = simulationReducer(initialState, {
+        type: 'initialize',
+        automaton: dfa,
+        input: longInput,
+      });
+      for (let i = 0; i < SIMULATION_HISTORY_CAP; i++) {
+        state = simulationReducer(state, { type: 'step' });
+      }
+      expect(state.history.length).toBe(SIMULATION_HISTORY_CAP);
+
+      const indexBefore = state.historyIndex;
+      state = simulationReducer(state, { type: 'stepBack' });
+      expect(state.historyIndex).toBe(indexBefore - 1);
+    });
+
+    it('reset clears the cap so stepping resumes', () => {
+      const { dfa } = createEndsWith01DFA();
+      const longInput = '0'.repeat(SIMULATION_HISTORY_CAP + 50);
+
+      let state = simulationReducer(initialState, {
+        type: 'initialize',
+        automaton: dfa,
+        input: longInput,
+      });
+      for (let i = 0; i < SIMULATION_HISTORY_CAP + 5; i++) {
+        state = simulationReducer(state, { type: 'step' });
+      }
+      expect(state.history.length).toBe(SIMULATION_HISTORY_CAP);
+
+      state = simulationReducer(state, { type: 'reset' });
+      state = simulationReducer(state, {
+        type: 'initialize',
+        automaton: dfa,
+        input: '01',
+      });
+      state = simulationReducer(state, { type: 'step' });
+      expect(state.history.length).toBe(2);
     });
   });
 

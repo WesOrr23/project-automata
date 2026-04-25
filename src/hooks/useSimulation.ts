@@ -24,7 +24,7 @@
  *   ANY → initialize → idle
  */
 
-import { useReducer, useEffect, useCallback, useMemo } from 'react';
+import { useReducer, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Automaton, Simulation } from '../engine/types';
 import {
   createSimulation,
@@ -38,6 +38,26 @@ import {
   SIMULATION_SPEED_MAX,
   SIMULATION_SPEED_DEFAULT,
 } from '../ui-state/constants';
+import { useNotifications } from '../notifications/useNotifications';
+
+/**
+ * Cap on the number of simulation snapshots retained in history.
+ *
+ * Each `step` / `autoStep` appends a new Simulation to `state.history`. Without
+ * a cap, long inputs (e.g. a million-character string) grow memory linearly
+ * with input length and re-clone the array each step (quadratic work). 1000
+ * comfortably covers the educational use case (the longest pedagogically
+ * meaningful inputs are dozens of symbols, not thousands), while bounding
+ * worst-case memory.
+ *
+ * Behavior at the cap:
+ * - `step` and `autoStep` refuse to advance further forward.
+ * - The hook surfaces a notification so the user understands why stepping
+ *   stopped and what to do (reset).
+ * - `stepBack` still works — the user can navigate the existing history.
+ * - `reset` clears history and the cap.
+ */
+export const SIMULATION_HISTORY_CAP = 1000;
 
 // --- Types ---
 
@@ -97,6 +117,12 @@ export function simulationReducer(
       const simulation = currentSimulation(state);
       if (simulation === null) return state;
       if (state.status === 'finished' || state.status === 'running') return state;
+
+      // History cap: refuse to advance once we've recorded
+      // SIMULATION_HISTORY_CAP snapshots. The dispatcher boundary (in the
+      // hook) surfaces a notification on the first refusal — the reducer
+      // itself stays pure.
+      if (state.history.length >= SIMULATION_HISTORY_CAP) return state;
 
       // engineStep throws on a DFA dead-end (incomplete DFA). The
       // creator gating (isRunnable) makes that combination unreachable
@@ -188,6 +214,13 @@ export function simulationReducer(
       const simulation = currentSimulation(state);
       if (simulation === null || state.status !== 'running') return state;
 
+      // History cap: stop the auto-step loop by transitioning out of
+      // 'running'. We move to 'paused' so the user can step back or
+      // reset; the dispatcher surfaces a notification.
+      if (state.history.length >= SIMULATION_HISTORY_CAP) {
+        return { ...state, status: 'paused' };
+      }
+
       let newSimulation;
       try {
         newSimulation = engineStep(simulation);
@@ -235,19 +268,48 @@ export function simulationReducer(
 
 export function useSimulation(automaton: Automaton) {
   const [state, dispatch] = useReducer(simulationReducer, initialState);
+  const { notify } = useNotifications();
 
   const simulation = currentSimulation(state);
 
-  // Auto-step timer: schedules the next step when status is 'running'
+  // Suppress duplicate cap notifications. We only want to inform the user
+  // once per "session at the cap" — re-arm only after history shrinks
+  // (reset, or step-back below the cap).
+  const capNotifiedRef = useRef(false);
+  useEffect(() => {
+    if (state.history.length < SIMULATION_HISTORY_CAP) {
+      capNotifiedRef.current = false;
+    }
+  }, [state.history.length]);
+
+  const notifyCapReached = useCallback(() => {
+    if (capNotifiedRef.current) return;
+    capNotifiedRef.current = true;
+    notify({
+      severity: 'warning',
+      title: `Simulation step limit reached (${SIMULATION_HISTORY_CAP}). Reset to continue.`,
+    });
+  }, [notify]);
+
+  // Auto-step timer: schedules the next step when status is 'running'.
+  // When we hit the cap mid-run, the reducer flips status to 'paused' on
+  // the next autoStep dispatch — that re-renders this effect with a non-
+  // 'running' status and clears the timer. We also surface the cap
+  // notification here so the user sees why playback stopped.
   useEffect(() => {
     if (state.status !== 'running' || simulation === null) return;
+
+    if (state.history.length >= SIMULATION_HISTORY_CAP) {
+      notifyCapReached();
+      return;
+    }
 
     const timerId = setTimeout(() => {
       dispatch({ type: 'autoStep' });
     }, state.speed);
 
     return () => clearTimeout(timerId);
-  }, [state.status, simulation, state.speed]);
+  }, [state.status, simulation, state.speed, state.history.length, notifyCapReached]);
 
   // Derived values
   const currentStateIds: Set<number> = simulation?.currentStates ?? new Set();
@@ -316,7 +378,15 @@ export function useSimulation(automaton: Automaton) {
     (input: string) => dispatch({ type: 'initialize', automaton, input }),
     [automaton]
   );
-  const stepForward = useCallback(() => dispatch({ type: 'step' }), []);
+  const stepForward = useCallback(() => {
+    if (state.history.length >= SIMULATION_HISTORY_CAP
+        && state.status !== 'finished'
+        && state.status !== 'running') {
+      notifyCapReached();
+      return;
+    }
+    dispatch({ type: 'step' });
+  }, [state.history.length, state.status, notifyCapReached]);
   const stepBack = useCallback(() => dispatch({ type: 'stepBack' }), []);
   const jumpTo = useCallback(
     (index: number, input?: string) =>
