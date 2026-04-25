@@ -52,7 +52,9 @@ export type UseUndoableAutomatonResult = {
   clearHistory: () => void;
 };
 
-export function useUndoableAutomaton(initial: Snapshot): UseUndoableAutomatonResult {
+export function useUndoableAutomaton(
+  initial: Snapshot | (() => Snapshot)
+): UseUndoableAutomatonResult {
   const [current, setCurrent] = useState<Snapshot>(initial);
   const undoStackRef = useRef<Snapshot[]>([]);
   const redoStackRef = useRef<Snapshot[]>([]);

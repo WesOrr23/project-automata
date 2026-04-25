@@ -34,6 +34,8 @@ import {
 } from './components/transitionEditor/creationReducer';
 import { computeLayout } from './ui-state/utils';
 import { useSimulation } from './hooks/useSimulation';
+import { useUndoableAutomaton } from './hooks/useUndoableAutomaton';
+import { UndoRedoControls } from './components/UndoRedoControls';
 
 /**
  * Build the sample DFA that accepts binary strings ending in "01"
@@ -59,15 +61,30 @@ function buildSampleDFA(): Automaton {
   return dfa;
 }
 
+function initialSnapshot() {
+  return { automaton: buildSampleDFA(), epsilonSymbol: 'e' };
+}
+
 function App() {
-  const [automaton, setAutomaton] = useState<Automaton>(() => buildSampleDFA());
+  // Undo/redo-aware store for the two pieces of state that change together
+  // under user edits: the automaton itself and the reserved ε-symbol.
+  // Folding both into one snapshot means a single undo reverses whatever
+  // the last edit touched, and the caller doesn't have to coordinate two
+  // parallel history stacks.
+  const {
+    automaton,
+    epsilonSymbol,
+    setAutomaton,
+    setEpsilonSymbol,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    clearHistory,
+  } = useUndoableAutomaton(initialSnapshot);
   const [automatonUI, setAutomatonUI] = useState<AutomatonUI | null>(null);
   const [inputString, setInputString] = useState('');
   const [menuState, setMenuState] = useState<ToolMenuState>({ mode: 'COLLAPSED' });
-  // The single character that authors an ε-transition in the symbol input.
-  // UI-only state — not part of the engine model. Defaults to 'e'; can be
-  // changed in the Configure tab when in NFA mode.
-  const [epsilonSymbol, setEpsilonSymbol] = useState('e');
 
   const sim = useSimulation(automaton);
   const { highlightedTarget, notify } = useNotifications();
@@ -325,6 +342,10 @@ function App() {
     }));
     creationDispatch({ type: 'reset' });
     sim.reset();
+    // Wholesale nuke: the clear itself isn't undoable. `setAutomaton` above
+    // would have pushed the pre-clear snapshot onto undo; `clearHistory()`
+    // drops it so the cleared state becomes the new origin.
+    clearHistory();
   }
 
   function handleExportJSON() {
@@ -569,6 +590,13 @@ function App() {
       />
 
       <NotificationStack />
+
+      <UndoRedoControls
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={undo}
+        onRedo={redo}
+      />
 
       {stateActions !== null && (
         <StateActionsPopover
