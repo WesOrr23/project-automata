@@ -7,11 +7,15 @@
 /* ─── Canvas Area ─── */
 
 .canvas-area {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-4);
+  position: fixed;
+  inset: 0;
+  display: block;
+  /* The canvas SVG fills this area entirely; zoom + pan happen via an
+   * SVG transform on the content group, not by sizing the SVG to its
+   * content. This way the user always has a usable viewport regardless
+   * of automaton size. */
+  overflow: hidden;
+  z-index: 0;
 }
 
 .canvas-card {
@@ -91,6 +95,63 @@
 .transition-edge-clickable path,
 .transition-edge-clickable text {
   cursor: pointer;
+}
+
+/* ─── Canvas zoom controls ─── */
+/* Vertical stack of 4 small buttons in the bottom-right corner of the
+ * viewport. Always visible (zoom is a canvas-wide concern, not gated on
+ * a mode). Visual language matches undo-redo: pill card, subtle shadow,
+ * hover tint. */
+.canvas-zoom-controls {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(4px);
+}
+
+.canvas-zoom-button {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  color: var(--text-body);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font: inherit;
+}
+
+.canvas-zoom-button-text {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.canvas-zoom-button:hover:not(:disabled) {
+  background: var(--bg-button-hover);
+  color: var(--text-heading);
+}
+
+.canvas-zoom-button:active:not(:disabled) {
+  background: var(--bg-button-active);
+}
+
+.canvas-zoom-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 /* ─── Canvas discoverability hint ─── */

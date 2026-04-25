@@ -6,13 +6,21 @@
  * paths from GraphViz), and renders all child components.
  */
 
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Automaton } from '../engine/types';
 import { AutomatonUI } from '../ui-state/types';
 import { STATE_RADIUS } from '../ui-state/constants';
 import { StateNode } from './StateNode';
 import { TransitionEdge } from './TransitionEdge';
 import { StartStateArrow } from './StartStateArrow';
+import { CanvasZoomControls } from './CanvasZoomControls';
 import type { EdgeOverlay } from '../engine/preview';
+import {
+  useCanvasViewport,
+  VIEWPORT_PAN_STEP,
+  VIEWPORT_PAN_STEP_LARGE,
+} from '../hooks/useCanvasViewport';
+import { useKeyboardScope } from '../hooks/useKeyboardScope';
 
 type AutomatonCanvasProp = {
   /** The automaton data from the engine layer */
@@ -133,19 +141,167 @@ export function AutomatonCanvas({
   creationStateKind,
 }: AutomatonCanvasProp) {
   // The start-state arrow extends LEFT of the start-state circle by ~50px,
-  // which is outside GraphViz's computed bounding box. Extend the SVG
-  // viewBox left so the arrow has room to render. We also widen the SVG
-  // element by the same amount so layout still reserves the space.
+  // which is outside GraphViz's computed bounding box. Extend the natural
+  // content width by the same amount so the arrow has room to render. The
+  // content origin (translate(-START_ARROW_RESERVE, 0)) inside the
+  // transform group reproduces the original "viewBox shifted left" trick.
   const START_ARROW_RESERVE = 70;
-  const viewWidth = automatonUI.boundingBox.width + START_ARROW_RESERVE;
-  const viewHeight = automatonUI.boundingBox.height;
+  const contentWidth = automatonUI.boundingBox.width + START_ARROW_RESERVE;
+  const contentHeight = automatonUI.boundingBox.height;
+
+  // The SVG fills its container; we measure its rendered size so the
+  // viewport hook can compute fit-to-content scaling and zoom-toward-
+  // center anchoring against actual visible pixels (not the natural
+  // content size).
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [viewportSize, setViewportSize] = useState<{ width: number; height: number } | null>(
+    null
+  );
+
+  // ResizeObserver keeps viewportSize in sync with the SVG's CSS box.
+  // useLayoutEffect to read sizes synchronously after paint, avoiding
+  // a one-frame stale read on initial mount.
+  useLayoutEffect(() => {
+    const svg = svgRef.current;
+    if (svg === null) return;
+    const measure = () => {
+      const rect = svg.getBoundingClientRect();
+      setViewportSize((current) => {
+        if (current && current.width === rect.width && current.height === rect.height) {
+          return current;
+        }
+        return { width: rect.width, height: rect.height };
+      });
+    };
+    measure();
+    // ResizeObserver isn't always available (e.g. jsdom in tests). Fall
+    // back to a window-resize listener so we still react to viewport
+    // changes; static initial-measure is enough for unit tests.
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
+    }
+    const observer = new ResizeObserver(measure);
+    observer.observe(svg);
+    return () => observer.disconnect();
+  }, []);
+
+  const {
+    transform,
+    handlers,
+    zoomIn,
+    zoomOut,
+    reset,
+    fitToContent,
+    panBy,
+    atMaxScale,
+    atMinScale,
+  } = useCanvasViewport({
+    contentBoundingBox: { width: contentWidth, height: contentHeight },
+    viewportSize,
+  });
+
+  // Native (non-React) wheel handler — React's onWheel synthetic events
+  // bubble as `passive: true` listeners by default, which means
+  // preventDefault() is silently ignored and the page scrolls behind
+  // the canvas. Attaching the listener directly with passive:false
+  // restores control.
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (svg === null) return;
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      // Re-dispatch into our React handler shape. The handler only
+      // reads a small set of fields, so a thin shim is enough; we
+      // intentionally don't synthesize a full SyntheticEvent.
+      handlers.onWheel({
+        ...event,
+        // currentTarget points at the SVG even when target is a child,
+        // matching React's contract.
+        currentTarget: svg,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        deltaX: event.deltaX,
+        deltaY: event.deltaY,
+        ctrlKey: event.ctrlKey,
+        preventDefault: () => event.preventDefault(),
+      } as unknown as React.WheelEvent<SVGSVGElement>);
+    };
+    svg.addEventListener('wheel', onWheel, { passive: false });
+    return () => svg.removeEventListener('wheel', onWheel);
+  }, [handlers]);
+
+  // Keyboard shortcuts for zoom + pan. Transparent scope so it
+  // coexists with everything else in the stack. The scope manager
+  // already filters out keystrokes inside text inputs.
+  useKeyboardScope({
+    id: 'canvas-zoom',
+    active: true,
+    capture: false,
+    onKey: (event) => {
+      const isModifier = event.metaKey || event.ctrlKey;
+      if (isModifier) {
+        if (event.key === '=' || event.key === '+') {
+          event.preventDefault();
+          zoomIn();
+          return true;
+        }
+        if (event.key === '-' || event.key === '_') {
+          event.preventDefault();
+          zoomOut();
+          return true;
+        }
+        if (event.key === '0') {
+          event.preventDefault();
+          reset();
+          return true;
+        }
+        return false;
+      }
+      if (event.key === 'f' || event.key === 'F') {
+        event.preventDefault();
+        fitToContent();
+        return true;
+      }
+      const step = event.shiftKey ? VIEWPORT_PAN_STEP_LARGE : VIEWPORT_PAN_STEP;
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        panBy(0, step);
+        return true;
+      }
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        panBy(0, -step);
+        return true;
+      }
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        panBy(step, 0);
+        return true;
+      }
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        panBy(-step, 0);
+        return true;
+      }
+      return false;
+    },
+  });
+
   return (
+    <>
     <svg
-      width={viewWidth}
-      height={viewHeight}
-      viewBox={`${-START_ARROW_RESERVE} 0 ${viewWidth} ${viewHeight}`}
-      style={{ display: 'block' }}
+      ref={svgRef}
+      width="100%"
+      height="100%"
+      style={{ display: 'block', touchAction: 'none', cursor: 'grab' }}
+      onPointerDown={handlers.onPointerDown}
+      onPointerMove={handlers.onPointerMove}
+      onPointerUp={handlers.onPointerUp}
+      onPointerCancel={handlers.onPointerUp}
     >
+      <g transform={transform}>
+        <g transform={`translate(${-START_ARROW_RESERVE} 0)`}>
       {/* Layer 1: Transition edges (background) */}
       {automatonUI.transitions.map((transition, index) => {
         // A consolidated edge matches the simulation's "next transition"
@@ -293,6 +449,17 @@ export function AutomatonCanvas({
           />
         );
       })()}
+        </g>
+      </g>
     </svg>
+    <CanvasZoomControls
+      zoomIn={zoomIn}
+      zoomOut={zoomOut}
+      reset={reset}
+      fitToContent={fitToContent}
+      atMaxScale={atMaxScale}
+      atMinScale={atMinScale}
+    />
+    </>
   );
 }
