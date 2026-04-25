@@ -541,6 +541,21 @@ describe('NFA simulation', () => {
     expect(sim.currentStates.has(1)).toBe(false);
   });
 
+  it('does not mark a state as dying if another branch routes back into it', () => {
+    // q0 -a-> {q0, q1}. On 'a', q1 has no outgoing transition (would
+    // die) but q0's self-loop still keeps q0 alive AND another q0
+    // transition reaches q1. So q1 is reborn; it shouldn't be dying.
+    let nfa = createAutomaton('NFA', new Set(['a']));
+    const { automaton: n1, stateId: q1 } = addState(nfa);
+    nfa = addTransition(n1, 0, new Set([0, q1]), 'a');
+
+    let sim = createSimulation(nfa, 'aa');
+    sim = step(sim); // {q0, q1}
+    sim = step(sim);
+    expect(sim.currentStates).toEqual(new Set([0, q1]));
+    expect(sim.steps[2]!.dyingStateIds).toEqual(new Set());
+  });
+
   it('records dying state IDs on the step where a branch died', () => {
     // Construct a tiny NFA where one branch unambiguously dies on the
     // next step. q0 → 'a' → {q1, q2}. q1 has no outgoing transition on

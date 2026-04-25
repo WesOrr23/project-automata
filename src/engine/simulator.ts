@@ -126,6 +126,15 @@ export function step(simulation: Simulation): Simulation {
   // for free via ε-transitions. For DFAs (no ε edges) this is a no-op.
   const nextStates = epsilonClosure(intermediate, automaton.transitions);
 
+  // A state was provisionally "dying" if it had no outgoing transition
+  // on the symbol — but if some OTHER active state's transition (or an
+  // ε-closure) routes back into it, a fresh instance is alive and the
+  // state isn't dying after all. Subtract the next active set from
+  // dyingStateIds to keep the visual honest.
+  for (const state of nextStates) {
+    dyingStateIds.delete(state);
+  }
+
   const newStep: SimulationStep = {
     currentStates: nextStates,
     dyingStateIds,
