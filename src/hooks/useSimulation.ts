@@ -245,16 +245,21 @@ export function useSimulation(automaton: Automaton) {
       ? engineIsAccepted(simulation)
       : null;
 
-  // Compute the next transition (for highlighting the edge that will be taken)
+  // Compute the next transition (for highlighting the edge that will be
+  // taken). DFA-shape only — picks the first active state and looks up
+  // its single transition. Phase 5 of iteration 8 generalizes this to
+  // every possible next transition for NFA mode.
   const nextTransition: { fromStateId: number; toStateId: number; symbol: string } | null =
     (() => {
       if (simulation === null || engineIsFinished(simulation)) return null;
+      if (simulation.currentStates.size === 0) return null;
       const currentState = Array.from(simulation.currentStates)[0]!;
       const nextSymbol = simulation.remainingInput[0]!;
       const transitions = getTransition(automaton, currentState, nextSymbol);
       if (transitions.length === 0) return null;
       const transition = transitions[0]!;
-      const destinationState = Array.from(transition.to)[0]!;
+      const destinationState = Array.from(transition.to)[0];
+      if (destinationState === undefined) return null;
       return {
         fromStateId: currentState,
         toStateId: destinationState,

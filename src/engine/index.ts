@@ -44,6 +44,9 @@ export {
   isAccepted,
   runSimulation,
   accepts,
-  getFinalState,
+  getFinalStates,
   getExecutionTrace,
 } from './simulator';
+
+// Engine utilities
+export { epsilonClosure } from './utils';

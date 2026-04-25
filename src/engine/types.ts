@@ -87,19 +87,23 @@ export type Automaton = {
 
 /**
  * Result of a single simulation step
- * Tracks the current state during execution
+ *
+ * Tracks the active state set after this step. For DFAs the set always
+ * has exactly one element; for NFAs it can have any number, including
+ * zero (every branch died) or many (parallel exploration after an
+ * ε-closure or a multi-destination transition).
  */
 export type SimulationStep = {
-  /** Current state ID after processing this symbol */
-  currentState: number;
+  /** Active state IDs after this step (post-ε-closure for NFAs). */
+  currentStates: Set<number>;
 
   /**
-   * The input symbol that was just processed
-   * null if this is the initial step (before processing any input)
+   * The input symbol that was just processed.
+   * null if this is the initial step (before processing any input).
    */
   symbolProcessed: string | null;
 
-  /** Remaining input string to process */
+  /** Remaining input string to process. */
   remainingInput: string;
 };
 
