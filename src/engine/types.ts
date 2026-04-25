@@ -106,6 +106,18 @@ export type SimulationStep = {
   dyingStateIds: Set<number>;
 
   /**
+   * Every transition that fired during this step — both symbol-driven
+   * and ε-closure-driven. Drives the per-step edge pulse so the user
+   * sees which arrows were just taken. The initial step records the
+   * ε-edges followed from the start state (if any).
+   */
+  firedTransitions: ReadonlyArray<{
+    from: number;
+    to: number;
+    symbol: string | null;
+  }>;
+
+  /**
    * The input symbol that was just processed.
    * null if this is the initial step (before processing any input).
    */

@@ -35,6 +35,14 @@ type TransitionEdgeProp = {
   isHighlighted?: boolean;
 
   /**
+   * Whether this transition fired on the most recent simulation step.
+   * Triggers a one-shot blue pulse animation. The parent should change
+   * the React key when the fire event changes (typically the step
+   * index) so the animation re-runs on each step.
+   */
+  justFired?: boolean;
+
+  /**
    * If this edge is part of the in-progress transition edit preview, the
    * kind of change it represents. Drives color and pulse:
    *   - 'add'    → blue:   a new edge being introduced
@@ -75,6 +83,7 @@ export function TransitionEdge(props: TransitionEdgeProp) {
     labelPosition,
     isNextTransition = false,
     isHighlighted = false,
+    justFired = false,
     previewKind,
     previewOldSymbol,
     onEdgeClick,
@@ -106,6 +115,15 @@ export function TransitionEdge(props: TransitionEdgeProp) {
     edgeColor = PREVIEW_COLOR[previewKind];
     edgeStrokeWidth = 3;
     highlightClass = `pulse-canvas pulse-canvas-${previewKind}`;
+  }
+  // Just-fired pulse for the most recent simulation step. Layered after
+  // previewKind because preview edges only exist in EDIT mode and fired
+  // edges only exist in SIMULATE mode — they shouldn't both apply, but
+  // if they did the simulation visual is more time-sensitive.
+  if (justFired) {
+    edgeColor = '#2563eb'; // blue-600
+    edgeStrokeWidth = 3;
+    highlightClass = 'edge-just-fired';
   }
   if (isHighlighted) {
     edgeColor = '#dc2626'; // --error-stroke

@@ -16,7 +16,7 @@
 
 import type { Automaton, Simulation, SimulationStep } from './types';
 import { isComplete, hasStartState } from './validator';
-import { epsilonClosure } from './utils';
+import { epsilonClosureWithTrace } from './utils';
 
 /**
  * Create a new simulation for the given automaton and input.
@@ -46,14 +46,20 @@ export function createSimulation(
     throw new Error('Automaton is not runnable (DFA is incomplete)');
   }
 
-  const initialStates = epsilonClosure(
-    new Set([automaton.startState]),
-    automaton.transitions
-  );
+  // Initial active set is the ε-closure of {startState}. The traced
+  // closure also records which ε-edges were followed so the canvas can
+  // pulse them on the initial step (otherwise the user wouldn't know
+  // those edges were taken to reach the starting active set).
+  const { closure: initialStates, fired: initialFired } =
+    epsilonClosureWithTrace(
+      new Set([automaton.startState]),
+      automaton.transitions
+    );
 
   const initialStep: SimulationStep = {
     currentStates: initialStates,
     dyingStateIds: new Set(),
+    firedTransitions: initialFired,
     symbolProcessed: null,
     remainingInput: input,
   };
@@ -95,10 +101,11 @@ export function step(simulation: Simulation): Simulation {
   }
 
   // Collect every state reachable from the current set on this symbol,
-  // and track which currently-active states had no outgoing transition
-  // for this symbol — those are the dying branches.
+  // tracking dying branches (no outgoing transition) and recording every
+  // symbol-driven transition that fired (for the canvas's per-step pulse).
   const intermediate = new Set<number>();
   const dyingStateIds = new Set<number>();
+  const firedTransitions: Array<{ from: number; to: number; symbol: string | null }> = [];
   for (const state of currentStates) {
     let hadAny = false;
     for (const transition of automaton.transitions) {
@@ -107,6 +114,7 @@ export function step(simulation: Simulation): Simulation {
       hadAny = true;
       for (const dest of transition.to) {
         intermediate.add(dest);
+        firedTransitions.push({ from: state, to: dest, symbol });
       }
     }
     if (!hadAny) dyingStateIds.add(state);
@@ -124,7 +132,13 @@ export function step(simulation: Simulation): Simulation {
 
   // ε-closure expands the new active set with every state reachable
   // for free via ε-transitions. For DFAs (no ε edges) this is a no-op.
-  const nextStates = epsilonClosure(intermediate, automaton.transitions);
+  // The traced variant also reports which ε-edges were followed so
+  // they can pulse alongside the symbol-driven edges.
+  const { closure: nextStates, fired: epsilonFired } = epsilonClosureWithTrace(
+    intermediate,
+    automaton.transitions
+  );
+  firedTransitions.push(...epsilonFired);
 
   // A state was provisionally "dying" if it had no outgoing transition
   // on the symbol — but if some OTHER active state's transition (or an
@@ -138,6 +152,7 @@ export function step(simulation: Simulation): Simulation {
   const newStep: SimulationStep = {
     currentStates: nextStates,
     dyingStateIds,
+    firedTransitions,
     symbolProcessed: symbol,
     remainingInput: newRemainingInput,
   };

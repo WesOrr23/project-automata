@@ -1540,6 +1540,22 @@ button svg {
  * pulses stroke-opacity, which works equally well for circle and path
  * strokes — no separate state-specific CSS needed. */
 
+/* Per-step edge pulse — fires once on every transition that just
+ * fired this simulation step (symbol-driven and ε-closure). Width
+ * grows, opacity flashes, then settles back to default — the eye
+ * sees the arrow being "taken." Single-shot via animation-iteration-
+ * count: 1; the parent re-keys the element on each step so a repeated
+ * fire restarts the animation. */
+@keyframes pulse-edge-fired {
+  0%   { stroke-width: 2; stroke-opacity: 1; }
+  30%  { stroke-width: 6; stroke-opacity: 1; }
+  100% { stroke-width: 3; stroke-opacity: 1; }
+}
+
+.edge-just-fired {
+  animation: pulse-edge-fired 0.5s ease-out 1 forwards;
+}
+
 /* Branch-death pulse — fires once per dying state when the NFA (or
  * dead-end DFA) loses a branch on a step. Stroke pulses red briefly,
  * then fades back; the eye reads "that branch just died." Single-shot

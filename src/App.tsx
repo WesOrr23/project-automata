@@ -628,6 +628,8 @@ function App() {
             resultStatus={appMode === 'SIMULATING' ? resultStatus : null}
             nextTransitions={appMode === 'SIMULATING' ? sim.nextTransitions : undefined}
             dyingStateIds={appMode === 'SIMULATING' ? sim.dyingStateIds : undefined}
+            firedTransitions={appMode === 'SIMULATING' ? sim.firedTransitions : undefined}
+            simulationStepIndex={appMode === 'SIMULATING' ? sim.stepIndex : undefined}
             highlightedStateId={highlightedStateId}
             highlightedTransition={highlightedTransition}
             pickMode={canvasPickMode}

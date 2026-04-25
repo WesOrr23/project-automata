@@ -62,6 +62,7 @@ describe('createSimulation', () => {
     expect(sim.steps[0]).toEqual({
       currentStates: new Set([q0]),
       dyingStateIds: new Set(),
+      firedTransitions: [],
       symbolProcessed: null,
       remainingInput: '101',
     });
@@ -96,6 +97,7 @@ describe('step', () => {
     expect(sim.steps[1]).toEqual({
       currentStates: new Set([q1]),
       dyingStateIds: new Set(),
+      firedTransitions: [{ from: 0, to: q1, symbol: '0' }],
       symbolProcessed: '0',
       remainingInput: '1',
     });
@@ -231,6 +233,7 @@ describe('runSimulation', () => {
     expect(sim.steps[0]).toEqual({
       currentStates: new Set([q0]),
       dyingStateIds: new Set(),
+      firedTransitions: [],
       symbolProcessed: null,
       remainingInput: '01',
     });
@@ -239,6 +242,7 @@ describe('runSimulation', () => {
     expect(sim.steps[1]).toEqual({
       currentStates: new Set([q1]),
       dyingStateIds: new Set(),
+      firedTransitions: [{ from: q0, to: q1, symbol: '0' }],
       symbolProcessed: '0',
       remainingInput: '1',
     });
@@ -247,6 +251,7 @@ describe('runSimulation', () => {
     expect(sim.steps[2]).toEqual({
       currentStates: new Set([q2]),
       dyingStateIds: new Set(),
+      firedTransitions: [{ from: q1, to: q2, symbol: '1' }],
       symbolProcessed: '1',
       remainingInput: '',
     });

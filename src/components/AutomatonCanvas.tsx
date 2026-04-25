@@ -41,6 +41,23 @@ type AutomatonCanvasProp = {
   /** State IDs whose branches died on the most recent step — pulse red. */
   dyingStateIds?: ReadonlySet<number>;
 
+  /**
+   * Transitions that fired on the most recent step (symbol-driven and
+   * ε-closure). Drives a one-shot per-step pulse on the matching edges.
+   */
+  firedTransitions?: ReadonlyArray<{
+    from: number;
+    to: number;
+    symbol: string | null;
+  }>;
+
+  /**
+   * Current simulation step index. Threaded into edge keys so the
+   * just-fired animation re-runs on every step rather than getting
+   * stuck on the first fire.
+   */
+  simulationStepIndex?: number;
+
   /** State ID currently highlighted by an active notification target */
   highlightedStateId?: number | null;
 
@@ -102,6 +119,8 @@ export function AutomatonCanvas({
   resultStatus,
   nextTransitions,
   dyingStateIds,
+  firedTransitions,
+  simulationStepIndex,
   highlightedStateId,
   highlightedTransition,
   pickMode,
@@ -159,9 +178,26 @@ export function AutomatonCanvas({
             transition.symbols.some((s) => s === preview.symbol)
         ) ?? null;
 
+        // Did any of this consolidated edge's symbols just fire on
+        // the most recent simulation step?
+        const justFired = firedTransitions?.some(
+          (fired) =>
+            fired.from === transition.fromStateId &&
+            fired.to === transition.toStateId &&
+            transition.symbols.some((s) => s === fired.symbol)
+        ) ?? false;
+
+        // When fired, include the step index in the React key so the
+        // element remounts on every step that fires it — that's what
+        // restarts the CSS animation. Non-fired edges keep stable
+        // keys so they don't churn.
+        const edgeKey = justFired
+          ? `transition-${index}-step-${simulationStepIndex ?? 0}`
+          : `transition-${index}`;
+
         return (
           <TransitionEdge
-            key={`transition-${index}`}
+            key={edgeKey}
             pathData={transition.pathData}
             symbols={transition.symbols}
             arrowheadPosition={transition.arrowheadPosition}
@@ -169,6 +205,7 @@ export function AutomatonCanvas({
             labelPosition={transition.labelPosition}
             isNextTransition={isNextTransition}
             isHighlighted={isHighlighted}
+            justFired={justFired}
             previewKind={matchingPreview?.kind}
             previewOldSymbol={matchingPreview?.oldSymbol}
             onEdgeClick={

@@ -281,6 +281,16 @@ export function useSimulation(automaton: Automaton) {
   const dyingStateIds: ReadonlySet<number> =
     simulation?.steps[simulation.steps.length - 1]?.dyingStateIds ?? new Set();
 
+  // Edges that just fired (symbol-driven + ε-closure). Drives the per-
+  // step edge pulse so the user sees which arrows were taken on this
+  // step. Empty for the initial step unless ε-edges were followed to
+  // reach the start active set.
+  const firedTransitions: ReadonlyArray<{
+    from: number;
+    to: number;
+    symbol: string | null;
+  }> = simulation?.steps[simulation.steps.length - 1]?.firedTransitions ?? [];
+
   // Actions
   const initialize = useCallback(
     (input: string) => dispatch({ type: 'initialize', automaton, input }),
@@ -316,6 +326,7 @@ export function useSimulation(automaton: Automaton) {
     accepted,
     nextTransitions,
     dyingStateIds,
+    firedTransitions,
 
     // Actions
     initialize,
