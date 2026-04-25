@@ -121,6 +121,24 @@ function automatonToDot(automaton: Automaton): string {
   lines.push(`  ${START_PHANTOM_NAME} [shape=point, width=0.85, fixedsize=true, style=invis];`);
   lines.push(`  ${START_PHANTOM_NAME} -> ${automaton.startState} [style=invis];`);
 
+  // Without further constraints, isolated states (those with no incoming
+  // transitions and not the start state) are free to land in the
+  // phantom's leftmost rank — exactly where the start arrow is drawn,
+  // causing the arrow to overlap them. Push every such isolated state
+  // rightward via an invisible phantom→state edge so the start arrow's
+  // column is reserved for the start state alone.
+  const statesWithIncoming = new Set<number>();
+  automaton.transitions.forEach((transition) => {
+    transition.to.forEach((destinationStateId) => {
+      statesWithIncoming.add(destinationStateId);
+    });
+  });
+  automaton.states.forEach((stateId) => {
+    if (stateId === automaton.startState) return;
+    if (statesWithIncoming.has(stateId)) return;
+    lines.push(`  ${START_PHANTOM_NAME} -> ${stateId} [style=invis];`);
+  });
+
   lines.push('}');
   return lines.join('\n');
 }

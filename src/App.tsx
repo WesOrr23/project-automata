@@ -274,7 +274,13 @@ function App() {
   }
 
   function handleCollapse() {
-    setMenuState({ mode: 'COLLAPSED' });
+    // Click "collapse" closes the panel back to EXPANDED — a hover-able
+    // intermediate state. From EXPANDED, the existing onMouseLeave path
+    // takes the menu the rest of the way to COLLAPSED naturally if the
+    // user moves their cursor off the menu. This avoids the previous
+    // "click collapse, mouse-back, get stuck with stale active chrome"
+    // flow.
+    setMenuState({ mode: 'EXPANDED' });
   }
 
   // ─── Config handlers ───

@@ -36,6 +36,15 @@
 
 .state-node-pickable circle {
   transition: stroke-width 0.15s ease, filter 0.15s ease;
+  /* Pre-promote to a compositing layer so the hover filter swap
+   * doesn't trigger a layer recalculation mid-hover — without this,
+   * some browsers briefly drop the inherited cursor during the
+   * compositing-layer creation, causing a pointer→default flash. */
+  will-change: filter;
+  /* Explicit cursor on the hit-target child so the cursor lookup
+   * doesn't traverse to the parent <g>; eliminates a small flicker
+   * window on hover. */
+  cursor: pointer;
 }
 
 .state-node-pickable:hover circle {
@@ -56,11 +65,32 @@
   transition:
     stroke-width 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
     filter 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* See note on .state-node-pickable circle above — same flash fix. */
+  will-change: filter;
+  cursor: pointer;
 }
 
 .state-node-selectable:hover circle {
   stroke-width: 3;
   filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.4));
+}
+
+/* Defensive cursor on the inner accept circle and the label text —
+ * they live inside the interactive <g> so technically inherit, but
+ * explicit-on-child eliminates the inheritance lookup window. */
+.state-node-pickable text,
+.state-node-pickable circle ~ circle,
+.state-node-selectable text,
+.state-node-selectable circle ~ circle {
+  cursor: pointer;
+}
+
+/* Transition edges in EDIT mode get the same defensive treatment —
+ * the .transition-edge-clickable hover changes stroke-width and can
+ * trigger the same cursor-recalc on some browsers. */
+.transition-edge-clickable path,
+.transition-edge-clickable text {
+  cursor: pointer;
 }
 
 /* ─── Canvas discoverability hint ─── */

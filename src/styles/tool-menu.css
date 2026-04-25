@@ -79,63 +79,41 @@
     width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* OPEN → COLLAPSED: three-stage close mirroring the three-stage open.
+/* The closing-from-open class is added whenever state has left OPEN
+ * but displayedActiveTab is still held (during the brief active-row
+ * fade-out window). Under the current flow, clicking collapse takes
+ * the menu to EXPANDED (not COLLAPSED), so the rules below apply
+ * mostly to .tool-menu-expanded.tool-menu-closing-from-open — but
+ * they're written without a mode prefix so they also work if the user
+ * mouse-leaves quickly during the close and the state hops onward to
+ * COLLAPSED before the fade timer fires.
  *
- * Stage 1 (0–0.45s): max-height shrinks (concurrent with the panel's
- *   Framer exit: opacity, height, and padding shrink to 0). Width and
- *   border-radius hold; tab-row labels stay visible.
- * Stage 2 (0.45–0.75s): width shrinks 280 → 48. Tab-row labels fade
- *   out (delayed transition rule below). Active row fades to regular
- *   chrome.
- * Stage 3 (0.75–1.05s): border-radius transitions 12 → 24 — the
- *   final "settle into the pill" beat at the COLLAPSED width. */
-.tool-menu-collapsed.tool-menu-closing-from-open {
-  transition:
-    height 0.45s cubic-bezier(0.4, 0.0, 0.2, 1),
-    max-height 0.45s cubic-bezier(0.4, 0.0, 0.2, 1),
-    width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.45s,
-    border-radius 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.75s;
-}
-
-/* During the staged close, hold the label fade until stage 2 (width
- * shrink) so the labels stay visible while the menu compresses
- * vertically, then fade out as the box narrows from EXPANDED-width
- * down to COLLAPSED. This mirrors how labels appear during the open:
- * they're visible only when the box is wide enough to fit them. */
-.tool-menu-collapsed.tool-menu-closing-from-open .tool-menu-row-label {
-  transition:
-    opacity 0.30s cubic-bezier(0.4, 0.0, 0.2, 1) 0.45s,
-    transform 0.30s cubic-bezier(0.4, 0.0, 0.2, 1) 0.45s;
-}
-
-/* Once the panel has exited there's nothing below the active row to
- * "merge with," so the squared bottom corners read as a partial-pill
- * mismatch inside the rounding container. Round all four corners
- * (transitions immediately) AND fade the blue chrome to neutral —
- * the chrome fade is delayed to align with stage 2 (the width
- * shrink), mirroring the label fade. By the time the menu reaches
- * the COLLAPSED pill, the previously-active row blends into the
- * default icon-only look. */
-.tool-menu-collapsed.tool-menu-closing-from-open .tool-menu-row.active {
+ * Three things happen during the fade window:
+ *   1. The active row's blue chrome (background, border-color, color)
+ *      transitions to neutral so it smoothly demotes to a regular row
+ *      before React swaps the element.
+ *   2. The collapse-button chevron fades to opacity 0 with
+ *      pointer-events disabled (no half-clickable phantom).
+ *   3. The active row's squared bottom corners (8 8 0 0, used while
+ *      OPEN to merge with the panel below) round to all-8 since the
+ *      panel is gone. */
+.tool-menu-closing-from-open .tool-menu-row.active {
   background: transparent;
   border-color: transparent;
   border-bottom-color: transparent;
   color: var(--text-body);
   border-radius: var(--radius-sm);
   transition:
-    background     0.30s cubic-bezier(0.4, 0.0, 0.2, 1) 0.45s,
-    border-color   0.30s cubic-bezier(0.4, 0.0, 0.2, 1) 0.45s,
-    color          0.30s cubic-bezier(0.4, 0.0, 0.2, 1) 0.45s,
+    background     0.45s cubic-bezier(0.4, 0.0, 0.2, 1),
+    border-color   0.45s cubic-bezier(0.4, 0.0, 0.2, 1),
+    color          0.45s cubic-bezier(0.4, 0.0, 0.2, 1),
     border-radius  0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* Collapse button (chevron) fades along with the rest of the active
- * chrome during stage 2. pointer-events: none so it's not clickable
- * once it's invisible. */
-.tool-menu-collapsed.tool-menu-closing-from-open .tool-menu-row-collapse {
+.tool-menu-closing-from-open .tool-menu-row-collapse {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.30s cubic-bezier(0.4, 0.0, 0.2, 1) 0.45s;
+  transition: opacity 0.45s cubic-bezier(0.4, 0.0, 0.2, 1);
 }
 
 /* EXPANDED — same height, wider. Reveals the labels by un-clipping the

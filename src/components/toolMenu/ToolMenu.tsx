@@ -65,13 +65,12 @@ export function ToolMenu({
             setDisplayedActiveTab(state.activeTab);
             return;
         }
-        // Outside OPEN: delay clearing displayedActiveTab through the
-        // full staged close (vertical 0.45s + width 0.3s + radius 0.3s
-        // = 1.05s total). Holding the value keeps the
-        // `.tool-menu-closing-from-open` class applied so the
-        // delayed-label-fade CSS rule remains in effect for its
-        // delayed transition window.
-        const timer = setTimeout(() => setDisplayedActiveTab(null), 1100);
+        // Outside OPEN: hold displayedActiveTab long enough for the
+        // active chrome's CSS fade-out (0.45s) to finish, so the
+        // active row's blue styling smoothly transitions to neutral
+        // before the row swaps to its regular variant. 500ms gives a
+        // 50ms cushion past the fade.
+        const timer = setTimeout(() => setDisplayedActiveTab(null), 500);
         return () => clearTimeout(timer);
     }, [state.mode, state.mode === 'OPEN' ? state.activeTab : null]);
 
