@@ -4,7 +4,7 @@
 
 An interactive web-based simulator for deterministic and non-deterministic finite automata (DFA/NFA). This is a learning project built with pair programming approach - no "vibe-coding," everything is intentional and well-structured.
 
-**Current Status**: Iterations 9 + 10 merged — Undo/Redo (snapshot stack capped at 50, floating top-center controls, ⌘/Ctrl+Z shortcuts) and aliveness (eased tool-menu tab swap, idle start-arrow + accept-ring breathing, hover/press/toast polish with a single motion vocabulary). See `ITERATION9_COMPLETE.md` and `ITERATION10_COMPLETE.md`.
+**Current Status**: Iterations 9–12 complete. Iter-9 + 10: undo/redo (snapshot stack capped at 50, ⌘/Ctrl+Z) + aliveness (eased tab swap, breathing, motion vocabulary). Iter-11: Major Change Proposals from the iter-9+10 council debate — `Result<T>` engine error model, `App.tsx` decomposition into three hooks, `useKeyboardScope` stack-based primitive, sim history cap, `useUndoableAutomaton` flags refactor, CSS split into per-feature stylesheets, `exactOptionalPropertyTypes` enabled, RTL coverage backfill. Iter-12: AutomatonLike consolidation (preview moved to `src/engine/preview.ts`, structural-shadow generic + casts deleted), tool-menu Framer Motion rewrite (open/close mirror in three staged phases), canvas zoom + pan (`useCanvasViewport` + `CanvasZoomControls`, trackpad pinch + buttons + keyboard), GraphViz left-most start state, cursor-flicker fix, undo/redo gated to EDIT mode. Plans drafted for iter-13 (audit cleanup), iter-14 (UI polish + viewport clamp), iter-15 (file save/load + recents), iter-16 (NFA→DFA conversion). See `ITERATION{9,10,11,12}_COMPLETE.md` and `ITERATION{13,14,15,16}_PLAN.md`.
 **Development Approach**: Agile iterations with clear deliverables
 **Primary Developer Experience**: Familiar with vanilla HTML/CSS/JS, minimal JavaScript experience, learning React and TypeScript
 
@@ -256,47 +256,46 @@ type UIState = {
 
 ---
 
-### Future Iterations (Backlog - Priority TBD)
+### Iteration 5: Manual Editing ✅ COMPLETE
+Add/remove states + transitions via UI, edit labels, save modified automaton to JSON. See `ITERATION5_*.md`.
 
-**Iteration 5**: Manual Editing
-- Add/remove states via UI
-- Add/remove transitions
-- Edit labels
-- Save modified automaton to JSON
+### Iteration 6: NFA Support ✅ COMPLETE
+NFA validator + simulation (multi-active-state), ε-closure, visual distinction for ε-transitions. See `ITERATION6_COMPLETE.md`.
 
-**Iteration 6**: NFA Support
-- Update validator for NFA rules
-- Implement NFA simulation (multiple active states)
-- ε-closure computation
-- Visual distinction for ε-transitions
+### Iteration 7: Enhanced File Management ✅ COMPLETE
+Sample DFAs/NFAs, JSON export plumbing. See `ITERATION7_COMPLETE.md`. (Real save/load → iter-15.)
 
-**Iteration 7**: Enhanced File Management
-- File upload (.json)
-- Save/download automaton
-- Multiple automaton library
+### Iteration 8: Interactive Positioning + GraphViz Migration ✅ COMPLETE
+Replaced dagre with GraphViz WASM for layout (proper spline routing); state positioning derived from GraphViz output. See `ITERATION8_COMPLETE.md`.
 
-**Iteration 8**: Interactive Positioning
-- Drag-and-drop states
-- Manual override of auto-layout
-- Grid snapping
+### Iteration 9: Undo / Redo ✅ COMPLETE
+Snapshot-based undo/redo (history capped at 50), floating top-center controls, ⌘/Ctrl+Z shortcuts. See `ITERATION9_COMPLETE.md`.
 
-**Iteration 9**: Animation & Polish
-- Smooth transitions between states
-- Animated simulation
-- Better visual design
+### Iteration 10: Aliveness + Smooth Tab Transitions ✅ COMPLETE
+Eased tool-menu tab swaps, idle start-arrow + accept-ring breathing, single motion vocabulary for hover/press/toast. See `ITERATION10_COMPLETE.md`.
 
-**Iteration 10**: Advanced Features
-- NFA → DFA conversion
-- Minimization
-- Equivalence testing
-- Complement/union/intersection operations
+### Iteration 11: Major Change Proposals ✅ COMPLETE
+Engine `Result<T>`, `App.tsx` decomposition, `useKeyboardScope`, sim history cap, `useUndoableAutomaton` flags refactor, CSS split, `exactOptionalPropertyTypes`, RTL backfill. See `ITERATION11_COMPLETE.md`.
 
-**Iteration 11**: Edge Routing & Overlap Prevention
-- Geometric intersection detection between primitives (circles, lines, quadratic curves)
-- Constraint-based edge routing to prevent edge-edge and edge-label overlaps
-- Iterative solver: adjust curves first, reposition nodes if needed
-- Inspired by GraphViz's spline routing phase (which dagre lacks)
-- Potential approaches: visibility graphs, exclusion zones around nodes, polynomial intersection math
+### Iteration 12: UI Polish + Canvas Viewport ✅ COMPLETE
+AutomatonLike consolidation (preview moved to engine), tool-menu Framer Motion rewrite, canvas zoom + pan (`useCanvasViewport`), GraphViz left-most start, cursor-flicker fix, undo/redo EDIT-mode gating. See `ITERATION12_COMPLETE.md`.
+
+---
+
+### Iteration 13: Audit Cleanup (PLANNED)
+Council-memory drift cleanup, CLAUDE.md status sync, reviewer code follow-throughs (wheel-cast comment, parseSymbolInput UX), RTL backfill (StatePickerPopover + the three control components), `useUndoableAutomaton` discriminated-reducer refactor. See `ITERATION13_PLAN.md`.
+
+### Iteration 14: UI Polish + Viewport Clamping (PLANNED)
+Cohesive viewport clamping ("centered slack"), `worldToScreen` helper for popovers + notification highlights at non-1× zoom, tool-menu active-row swap via Framer `layoutId`. See `ITERATION14_PLAN.md`.
+
+### Iteration 15: File Save/Load + Recents (PLANNED)
+Hybrid file adapter (FS Access API + blob download fallback), versioned JSON format, recents store (localStorage + IndexedDB), dirty tracking, ⌘S/⌘O/⌘N. See `ITERATION15_PLAN.md`.
+
+### Iteration 16: NFA → DFA Conversion (PLANNED)
+Eager subset construction over reachable subsets, explicit trap state, undo-as-side-by-side workflow, subset labels. See `ITERATION16_PLAN.md`.
+
+### Future backlog
+See `FUTURE_ITERATIONS.md` for one-page sketches of iter-17 (DFA minimization + equivalence), iter-18 (regex → NFA), iter-19 (shareable URL), iter-20 (algorithm step-through), iter-21 (tape view + image export). See `CUSTOMER_BRAINSTORM.md` for persona-driven feature prioritization.
 
 ---
 
@@ -513,7 +512,7 @@ function addTransition(
 - ✅ Testing framework: Vitest
 - ✅ State IDs: Auto-incremented integers (0, 1, 2...)
 - ✅ Data structures: Sets for states, alphabet, transitions
-- ✅ Error handling: Throw errors (strict validation)
+- ✅ Error handling: Throw errors (strict validation) **— superseded in Iteration 11 by `Result<T>` for the public engine surface; throws now reserved for programmer-fault contracts.**
 
 **Decided in Iteration 2**:
 - ✅ UI type structure: StateUI and AutomatonUI mirror engine architecture
@@ -522,14 +521,22 @@ function addTransition(
 - ✅ UI labeling strategy: Default "q{id}" format via createDefaultLabel() helper
 
 **Decided for Iteration 3**:
-- ✅ Auto-layout algorithm: dagre (hierarchical graph layout library)
-- ✅ Self-loops: Will use curved SVG paths (bezier or arc)
-- ✅ Multiple transitions between same states: Will use curved arrows with offsets
+- ✅ Auto-layout algorithm: dagre **— superseded in Iteration 8 by GraphViz WASM (`@hpcc-js/wasm-graphviz`) for proper spline routing**
+- ✅ Self-loops: curved SVG paths (bezier or arc)
+- ✅ Multiple transitions between same states: curved arrows with offsets
 
-**To be determined in future iterations**:
-- Drag-and-drop interaction details (Iteration 8)
-- Manual override strategy for auto-layout (Iteration 8)
-- Animation timing and easing functions (Iteration 9)
+**Decided in Iteration 11**:
+- ✅ Engine error model: `Result<T>` with typed `EngineError` string-literal union; `errorMessage(error)` total switch at the notification boundary
+- ✅ Keyboard-handler primitive: stack-based `useKeyboardScope` (top wins); replaced three global keydown listeners
+- ✅ App.tsx decomposed into `useAutomatonLayout`, `useUndoRedoShortcuts`, `useAutomatonSimulationGlue`
+- ✅ Strict TS flag: `exactOptionalPropertyTypes` enabled; satisfy via omit-only optional patterns, not `?? undefined` shims
+- ✅ CSS organization: per-feature stylesheets in `src/styles/`, imported in `src/index.css` in tokens → animations → features → globals order
+
+**Decided in Iteration 12**:
+- ✅ Preview architecture: `computePreview` lives in `src/engine/preview.ts`, returns `{ automaton, overlays }`; `EdgeOverlay` is a discriminated union over `kind` ('add' | 'modify' | 'delete'). The `AutomatonLike<T>` shadow generic is gone; UI imports engine types directly.
+- ✅ Animation library: Framer Motion (`motion` package) for staged animations and `<AnimatePresence>` delayed-unmount; CSS keyframes still own breathing/pulse loops
+- ✅ Canvas viewport ownership: `useCanvasViewport` hook owns `{scale, panX, panY}` + handlers; `AutomatonCanvas` consumes via prop. `CanvasViewport` transform applied as inline `style.transform` on the content `<g>` (CSS syntax with units; SVG attribute syntax is silently rejected by the inline-style path).
+- ✅ Cursor-flicker discipline: `user-select: none` is scoped to specific containers, not `body`; pre-promote layers via `will-change: filter` and explicit child-element cursors
 
 ---
 

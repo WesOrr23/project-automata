@@ -75,6 +75,9 @@ function instructionFor(
     return `${verb} will replace ${overwrite.count} transitions (e.g. ${triple}).`;
   }
   if (mode === 'modify') {
+    // We intentionally surface only the first parse error — the
+    // instruction line is single-line, and the user can re-trigger by
+    // fixing the first issue. Showing all errors would overflow.
     if (!parsed.ok) return parsed.errors[0] ?? 'Invalid symbol input.';
     return 'Click Modify to apply your changes (or Cancel to discard).';
   }

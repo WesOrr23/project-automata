@@ -3,8 +3,8 @@ agent: architecture-reviewer
 type: knowledge
 topic: result-type-error-model
 schema-version: 1
-verified-as-of: iteration-11
-last-updated: 2026-04-25
+verified-as-of: 5cba947
+last-updated: 2026-04-26
 confidence: high
 ---
 

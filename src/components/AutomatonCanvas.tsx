@@ -210,15 +210,20 @@ export function AutomatonCanvas({
   useEffect(() => {
     const svg = svgRef.current;
     if (svg === null) return;
+    // Why a native listener instead of React's onWheel: React attaches
+    // wheel listeners as `passive: true` and disallows preventDefault().
+    // We need preventDefault() to suppress the browser's default
+    // pinch-to-zoom (which would zoom the *page*, not our viewport).
+    // The attached listener manufactures a React-shaped event and
+    // forwards into the hook's onWheel handler — useCanvasViewport
+    // only reads a small subset of fields, so a structural shim is
+    // sufficient. The `as unknown as React.WheelEvent<...>` cast is
+    // safe at this boundary because the consumer's contract is
+    // narrower than the React event type.
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
-      // Re-dispatch into our React handler shape. The handler only
-      // reads a small set of fields, so a thin shim is enough; we
-      // intentionally don't synthesize a full SyntheticEvent.
       handlers.onWheel({
         ...event,
-        // currentTarget points at the SVG even when target is a child,
-        // matching React's contract.
         currentTarget: svg,
         clientX: event.clientX,
         clientY: event.clientY,
