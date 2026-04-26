@@ -108,19 +108,17 @@ export function ToolMenu({
                 return (
                     <Fragment key={tab.id}>
                         {isActive ? (
-                            // motion.div + layoutId enables Framer's shared-
-                            // element animation: when the active tab changes,
-                            // the previous row (which had this layoutId)
-                            // unmounts and the new row mounts; Framer detects
-                            // the same layoutId and animates the chrome from
-                            // the old row's position to the new row's position
-                            // instead of an instant swap.
-                            <motion.div
-                                layoutId="tool-menu-active-row-chrome"
-                                className="tool-menu-row active"
-                                aria-label={`${tab.label} (active)`}
-                                transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-                            >
+                            // Plain <div>; the iter-14 attempt at a Framer
+                            // layoutId shared-element morph between active
+                            // rows introduced a hesitation in the
+                            // EXPANDED→OPEN open animation (Framer measures
+                            // the layoutId element's mount and competes with
+                            // the CSS-driven container animation). The
+                            // active-row swap reverts to instant, which is
+                            // visually fine since it happens INSIDE the
+                            // open container — the chrome just appears
+                            // around whichever row was clicked.
+                            <div className="tool-menu-row active" aria-label={`${tab.label} (active)`}>
                                 <Icon size={20} />
                                 <span className="tool-menu-row-label">{tab.label}</span>
                                 <button
@@ -133,7 +131,7 @@ export function ToolMenu({
                                 >
                                     <ChevronLeft size={14} />
                                 </button>
-                            </motion.div>
+                            </div>
                         ) : (
                             <button
                                 type="button"

@@ -101,21 +101,28 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * Clamp viewport ("centered slack" policy): per-axis,
+ * Clamp viewport ("centroid in viewport" policy): the geometric center
+ * of the scaled content's bounding box must stay within the visible
+ * viewport. That gives the user:
  *
- *  - If the scaled content is *smaller than or equal to* the viewport on
- *    that axis, center the content on that axis and lock pan there.
- *    There is nothing to scroll to, so don't let the user drift the
- *    content off into empty space.
- *  - If the scaled content is *larger than* the viewport on that axis,
- *    allow pan but clamp so no content edge can cross past the
- *    corresponding viewport edge — i.e. the content fully covers (or
- *    over-covers) the viewport at all times. The user can pan to see
- *    any corner, but content never recedes past an edge.
+ *  - Generous freedom to pan (range = viewport size on each axis at
+ *    any scale; predictable feel regardless of how zoomed).
+ *  - A guarantee that the FA can't be lost: at minimum, the half of
+ *    the bounding box opposite the pan direction is always visible.
+ *  - Room to inspect corners at high zoom: content edges may extend
+ *    arbitrarily beyond the viewport so long as the centroid stays in.
  *
- * Returns a possibly-new viewport. Caller should check reference
- * equality if it cares about no-op cases (we return `viewport` unchanged
- * when nothing to clamp).
+ * Math: with scaledWidth W and viewport width V, the centroid x-pos
+ * on screen is `panX + W/2`. Constraint `0 ≤ panX + W/2 ≤ V` gives
+ * `panX ∈ [-W/2, V - W/2]`. Symmetric for Y.
+ *
+ * Returns the input unchanged when already in policy (caller can use
+ * reference equality to skip re-renders).
+ *
+ * History: an earlier attempt ("centered slack") locked pan to center
+ * whenever scaled content was smaller than viewport — which broke
+ * drag-pan at default zoom for any small/medium FA. Centroid policy
+ * fixes that while still preventing "where did it go" accidents.
  */
 export function clampViewport(
   viewport: CanvasViewport,
@@ -127,34 +134,16 @@ export function clampViewport(
   if (viewportSize.width <= 0 || viewportSize.height <= 0) return viewport;
 
   const { scale, panX, panY } = viewport;
-  const scaledWidth = contentBoundingBox.width * scale;
-  const scaledHeight = contentBoundingBox.height * scale;
+  const halfScaledWidth = (contentBoundingBox.width * scale) / 2;
+  const halfScaledHeight = (contentBoundingBox.height * scale) / 2;
 
-  // X axis.
-  let nextPanX: number;
-  if (scaledWidth <= viewportSize.width) {
-    nextPanX = (viewportSize.width - scaledWidth) / 2;
-  } else {
-    // panX is the screen-pixel offset of world origin (x=0). Content's
-    // left edge sits at panX; right edge at panX + scaledWidth. To keep
-    // both in [0, viewportSize.width] coverage:
-    //   panX <= 0  (content's left ≤ viewport's left)
-    //   panX + scaledWidth >= viewportSize.width  (right ≥ right)
-    // → panX in [viewportSize.width - scaledWidth, 0]
-    const minPanX = viewportSize.width - scaledWidth;
-    const maxPanX = 0;
-    nextPanX = clamp(panX, minPanX, maxPanX);
-  }
+  const minPanX = -halfScaledWidth;
+  const maxPanX = viewportSize.width - halfScaledWidth;
+  const minPanY = -halfScaledHeight;
+  const maxPanY = viewportSize.height - halfScaledHeight;
 
-  // Y axis.
-  let nextPanY: number;
-  if (scaledHeight <= viewportSize.height) {
-    nextPanY = (viewportSize.height - scaledHeight) / 2;
-  } else {
-    const minPanY = viewportSize.height - scaledHeight;
-    const maxPanY = 0;
-    nextPanY = clamp(panY, minPanY, maxPanY);
-  }
+  const nextPanX = clamp(panX, minPanX, maxPanX);
+  const nextPanY = clamp(panY, minPanY, maxPanY);
 
   if (nextPanX === panX && nextPanY === panY) return viewport;
   return { scale, panX: nextPanX, panY: nextPanY };
