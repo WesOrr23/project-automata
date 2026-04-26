@@ -9,7 +9,6 @@ type ToolMenuProp = {
     onHoverLeave: () => void;
     onTabClick: (tab: ToolTabID) => void;
     onCollapse: () => void;
-    fileContent: ReactNode;
     configContent: ReactNode;
     editContent: ReactNode;
     simulateContent: ReactNode;
@@ -37,14 +36,12 @@ export function ToolMenu({
     onHoverLeave,
     onTabClick,
     onCollapse,
-    fileContent,
     configContent,
     editContent,
     simulateContent
 }: ToolMenuProp) {
     function contentFor(tabId: ToolTabID) : ReactNode {
         switch(tabId) {
-            case 'FILE':    return fileContent;
             case 'CONFIG':  return configContent;
             case 'EDIT':    return editContent;
             case 'SIMULATE':return simulateContent;

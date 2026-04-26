@@ -43,8 +43,7 @@ import { useAutomatonSimulationGlue } from './hooks/useAutomatonSimulationGlue';
 import { useFileSession } from './hooks/useFileSession';
 import { useFileShortcuts } from './hooks/useFileShortcuts';
 import { createFileAdapter } from './files/fileAdapter';
-import { FilePanel } from './components/toolMenu/FilePanel';
-import { UndoRedoControls } from './components/UndoRedoControls';
+import { CommandBar } from './components/CommandBar';
 import { createAutomaton as createBlankAutomaton } from './engine/automaton';
 
 const fileAdapter = createFileAdapter();
@@ -666,8 +665,12 @@ function App() {
     blankFactory
   );
 
+  // File shortcuts are always-on under variant B — file ops are
+  // always-visible in the CommandBar, so the keyboard shortcuts should
+  // mirror that. (Undo/redo shortcuts stay EDIT-gated; see
+  // useUndoRedoShortcuts call above.)
   useFileShortcuts({
-    enabled: appMode === 'EDITING',
+    enabled: true,
     onSave: fileSession.save,
     onSaveAs: fileSession.saveAs,
     onOpen: fileSession.openFile,
@@ -675,20 +678,6 @@ function App() {
   });
 
   // ─── Panel content ───
-
-  const fileContent = (
-    <FilePanel
-      currentName={fileSession.currentName}
-      isDirty={isDirty}
-      recents={fileSession.recents}
-      onNew={fileSession.newFile}
-      onOpen={fileSession.openFile}
-      onSave={fileSession.save}
-      onSaveAs={fileSession.saveAs}
-      onOpenRecent={fileSession.openRecent}
-      onForgetRecent={fileSession.forgetRecent}
-    />
-  );
 
   const configContent = (
     <ConfigPanel
@@ -716,7 +705,6 @@ function App() {
       onRemoveState={handleRemoveState}
       onSetStartState={handleSetStartState}
       onToggleAcceptState={handleToggleAcceptState}
-      onConvertToDfa={handleConvertToDfa}
       onApplyTransitionEdit={handleApplyTransitionEdit}
     />
   );
@@ -759,7 +747,6 @@ function App() {
         onHoverLeave={handleHoverLeave}
         onTabClick={handleTabClick}
         onCollapse={handleCollapse}
-        fileContent={fileContent}
         configContent={configContent}
         editContent={editContent}
         simulateContent={simulateContent}
@@ -767,16 +754,27 @@ function App() {
 
       <NotificationStack />
 
-      {/* Undo/redo only relevant while editing — `visible` drives the
-          AnimatePresence inside the component so it fades + slides
-          in/out instead of snapping. The keyboard shortcut (⌘/Ctrl+Z)
-          is gated to the same condition (see useUndoRedoShortcuts call). */}
-      <UndoRedoControls
-        visible={isEditing}
+      {/* Variant B: every command-tier control lives in a single top-
+          center bar. File segment is always visible; EDIT segment
+          (undo/redo + Convert to DFA) animates in/out via
+          AnimatePresence inside CommandBar based on appMode. */}
+      <CommandBar
+        appMode={appMode}
+        currentName={fileSession.currentName}
+        isDirty={isDirty}
+        recents={fileSession.recents}
+        onNew={fileSession.newFile}
+        onOpen={fileSession.openFile}
+        onSave={fileSession.save}
+        onSaveAs={fileSession.saveAs}
+        onOpenRecent={fileSession.openRecent}
+        onForgetRecent={fileSession.forgetRecent}
         canUndo={canUndo}
         canRedo={canRedo}
         onUndo={undo}
         onRedo={redo}
+        canConvert={automaton.type === 'NFA'}
+        onConvertToDfa={handleConvertToDfa}
       />
 
       {stateActions !== null && (

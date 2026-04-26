@@ -253,27 +253,76 @@ button svg {
   pointer-events: none;
 }
 
-/* ─── Undo / Redo controls ─── */
-/* Two circular icon buttons centered at the top of the viewport, floating
-   above the canvas. Fixed position so they stay put regardless of canvas
-   scroll or tool-menu state. */
-.undo-redo-controls {
+/* ─── Unified Command Bar ─── */
+/* Pinned to the top-center of the viewport — a single horizontal pill
+   that hosts every command-tier widget: file ops (always visible),
+   undo/redo + ops (EDIT only), and a reserved SIMULATE segment.
+   Visual language deliberately matches the previous UndoRedoControls
+   pill (same background, border, shadow, blur) so the bar reads as a
+   familiar floating control rather than a traditional menu bar. */
+.command-bar {
   position: fixed;
-  top: 12px;
+  top: 16px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 30;
   display: flex;
+  align-items: center;
   gap: var(--space-2);
-  padding: 4px;
+  padding: 4px var(--space-2);
   background: var(--bg-sidebar);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-pill);
   box-shadow: var(--shadow-sm);
   backdrop-filter: blur(4px);
+  /* Scoped no-select: the bar's chrome (filename, dividers) shouldn't
+   * grab the cursor on drag — but inputs / popovers inside descendants
+   * can opt back in. */
+  user-select: none;
+  /* `overflow: hidden` would clip the popover; we rely on the
+   * Framer width-collapse for the segment morph instead. */
 }
 
-.undo-redo-button {
+.command-bar-segment {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  /* The segment manages its own width during the AnimatePresence
+   * morph (Framer animates width:auto ↔ 0). Padding is intentionally
+   * inside the segment so it collapses with the segment. */
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.command-bar-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--border-subtle);
+  flex: 0 0 auto;
+}
+
+.command-bar-filename {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-heading);
+  font-family: var(--font-sans);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.command-bar-dirty-dot {
+  color: var(--blue-500);
+  font-size: 1.4em;
+  line-height: 0;
+  margin-left: 2px;
+}
+
+.command-bar-button {
   width: 32px;
   height: 32px;
   display: inline-flex;
@@ -286,18 +335,152 @@ button svg {
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.15s ease;
+  flex: 0 0 auto;
 }
 
-.undo-redo-button:hover:not(:disabled) {
+.command-bar-button:hover:not(:disabled) {
   background: var(--bg-button-hover);
   color: var(--text-heading);
 }
 
-.undo-redo-button:active:not(:disabled) {
+.command-bar-button:active:not(:disabled) {
   background: var(--bg-button-active);
 }
 
-.undo-redo-button:disabled {
+.command-bar-button:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+.command-bar-button.command-bar-button-text {
+  width: auto;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  gap: var(--space-1);
+}
+
+/* Anchored popover for Save As / Recents, opening below the ⋯ button. */
+.command-bar-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 240px;
+  max-width: 320px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-2);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* User can interact with text inside (recent filenames, etc.). */
+  user-select: text;
+}
+
+.command-bar-popover-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.command-bar-popover-label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-weight: var(--weight-bold);
+  padding: 0 var(--space-1);
+}
+
+.command-bar-popover-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font: inherit;
+  color: var(--text-body);
+  text-align: left;
+  width: 100%;
+}
+
+.command-bar-popover-item:hover {
+  background: var(--bg-button-hover);
+  color: var(--text-heading);
+}
+
+.command-bar-popover-recents-empty {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-style: italic;
+  padding: var(--space-1) var(--space-2);
+}
+
+.command-bar-popover-recent {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.command-bar-popover-recent-open {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
+  border-radius: var(--radius-sm);
+  color: var(--text-body);
+  min-width: 0;
+}
+
+.command-bar-popover-recent-open:hover {
+  background: var(--bg-button-hover);
+  color: var(--text-heading);
+}
+
+.command-bar-popover-recent-name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-bar-popover-recent-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.command-bar-popover-recent-forget {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0 var(--space-1);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.command-bar-popover-recent-forget:hover {
+  color: var(--error-text);
+  background: var(--bg-button-hover);
+}
+
+/* The file segment is the popover's positioning context so the
+ * popover hangs from the ⋯ button. */
+.command-bar-segment-file {
+  position: relative;
 }
