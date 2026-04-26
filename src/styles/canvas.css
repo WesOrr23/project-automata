@@ -106,27 +106,44 @@
   cursor: pointer;
 }
 
-/* ─── Canvas zoom controls ─── */
-/* Vertical stack of 4 small buttons in the bottom-right corner of the
- * viewport. Always visible (zoom is a canvas-wide concern, not gated on
- * a mode). Visual language matches undo-redo: pill card, subtle shadow,
- * hover tint. Sits ABOVE the canvas-tip so the tip stays in its
- * historical bottom-right anchor. */
-.canvas-zoom-controls {
+/* ─── Bottom-right widget stack ─── */
+/* Container for everything pinned to the bottom-right of the viewport
+ * (zoom controls, canvas-tip, future EDIT-mode-only widgets). Uses
+ * `flex-direction: column-reverse` so the FIRST DOM child sits at the
+ * bottom and subsequent children stack UPWARD. When a child mounts
+ * (e.g. canvas-tip in EDIT idle), its siblings rise above it
+ * automatically — no JS coordination, no hardcoded `bottom: 54px`. */
+.canvas-bottom-right-stack {
   position: fixed;
-  /* Tip height (~30px) + tip-bottom (16) + gap (8) = 54. Static even
-   * when the tip isn't visible — keeps the zoom controls in a
-   * predictable spot whether the user is in EDIT mode or not. */
-  bottom: 54px;
+  bottom: 16px;
   right: 16px;
   z-index: 30;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: 8px;
+  /* Children own their own pointer-events (some are pointer-none, like
+   * the tip). The stack container itself shouldn't intercept clicks in
+   * its empty gaps. */
+  pointer-events: none;
+}
+.canvas-bottom-right-stack > * {
+  pointer-events: auto;
+}
+
+/* ─── Canvas zoom controls ─── */
+/* Vertical stack of 4 small buttons. Lives inside the bottom-right
+ * stack so it auto-positions above the canvas-tip when present.
+ * Visual language matches the CommandBar pill (same background,
+ * border, shadow, blur, radius). */
+.canvas-zoom-controls {
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 4px;
   background: var(--bg-sidebar);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-pill);
   box-shadow: var(--shadow-sm);
   backdrop-filter: blur(4px);
 }
@@ -168,22 +185,18 @@
 }
 
 /* ─── Canvas discoverability hint ─── */
-/* Subtle floating chip at the bottom-right of the viewport. Only visible
- * in EDIT mode at idle (gated by App.tsx). Pointer-events disabled so it
- * never intercepts clicks on the canvas underneath. Sits BELOW the
- * canvas-zoom-controls; the zoom stack lifts itself above this spot so
- * they don't overlap (see `.canvas-zoom-controls` bottom value). */
+/* Subtle floating chip — child of .canvas-bottom-right-stack. Only
+ * rendered in EDIT mode at idle (gated by App.tsx). When mounted, the
+ * column-reverse stack pushes the zoom controls above it; when
+ * unmounted, the zoom controls drop back to the bottom edge. No
+ * hardcoded offsets needed. */
 .canvas-tip {
-  position: fixed;
-  bottom: 16px;
-  right: 16px;
-  z-index: 5;
   padding: 6px 10px;
   font-size: var(--text-sm);
   color: var(--text-secondary);
   background: rgba(255, 255, 255, 0.85);
   border: 1px solid var(--border-subtle);
-  border-radius: 6px;
+  border-radius: var(--radius-pill);
   box-shadow: var(--shadow-sm);
   pointer-events: none;
   user-select: none;

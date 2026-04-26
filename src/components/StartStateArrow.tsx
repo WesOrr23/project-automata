@@ -27,11 +27,16 @@ export function StartStateArrow({
   targetY,
   stateRadius,
 }: StartStateArrowProp) {
-  // Calculate start and end points
-  // Arrow comes from the left, so it's horizontal
-  const endX = targetX - stateRadius; // Point at left edge of state circle
+  // Calculate start and end points. Arrow comes from the left.
+  //   - tipX  = where the arrowhead's tip sits (touches the circle edge).
+  //   - baseX = where the arrowhead's flat base sits (one ARROWHEAD_SIZE
+  //             back from the tip). The line stops here, NOT at the tip,
+  //             so the line's 2px stroke can't poke past the polygon's
+  //             narrowing-to-a-point silhouette near the tip.
+  const tipX = targetX - stateRadius;
+  const baseX = tipX - ARROWHEAD_SIZE;
   const endY = targetY;
-  const startX = endX - ARROW_LENGTH; // Start point 50px to the left
+  const startX = baseX - ARROW_LENGTH;
   const startY = targetY;
 
   return (
@@ -39,19 +44,19 @@ export function StartStateArrow({
     // (0.85 ↔ 1.0 over 2s) at idle — see index.css. Applied to the group
     // so both the line and arrowhead breathe together as one mark.
     <g className="start-arrow-breath">
-      {/* Arrow line */}
+      {/* Arrow line — stops at the arrowhead's base. */}
       <line
         x1={startX}
         y1={startY}
-        x2={endX}
+        x2={baseX}
         y2={endY}
         stroke="black"
         strokeWidth={2}
       />
 
-      {/* Arrowhead - triangle pointing right */}
+      {/* Arrowhead — triangle pointing right. Tip touches the circle. */}
       <polygon
-        points={`${endX},${endY} ${endX - ARROWHEAD_SIZE},${endY - ARROWHEAD_SIZE / 2} ${endX - ARROWHEAD_SIZE},${endY + ARROWHEAD_SIZE / 2}`}
+        points={`${tipX},${endY} ${baseX},${endY - ARROWHEAD_SIZE / 2} ${baseX},${endY + ARROWHEAD_SIZE / 2}`}
         fill="black"
       />
     </g>

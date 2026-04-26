@@ -30,8 +30,6 @@ function makeProps(overrides: Partial<ComponentProps<typeof CommandBar>> = {}) {
     canRedo: true,
     onUndo: vi.fn(),
     onRedo: vi.fn(),
-    canConvert: true,
-    onConvertToDfa: vi.fn(),
     ...overrides,
   };
 }
@@ -78,37 +76,26 @@ describe('CommandBar — file segment', () => {
 });
 
 describe('CommandBar — EDIT segment', () => {
-  it('hides undo/redo and Convert in IDLE', () => {
-    const { queryByLabelText, queryByText } = render(<CommandBar {...makeProps()} />);
+  it('hides undo/redo in IDLE', () => {
+    const { queryByLabelText } = render(<CommandBar {...makeProps()} />);
     expect(queryByLabelText('Undo')).toBeNull();
     expect(queryByLabelText('Redo')).toBeNull();
-    expect(queryByText('Convert to DFA')).toBeNull();
   });
 
-  it('hides undo/redo and Convert in SIMULATING', () => {
-    const { queryByLabelText, queryByText } = render(
+  it('hides undo/redo in SIMULATING', () => {
+    const { queryByLabelText } = render(
       <CommandBar {...makeProps({ appMode: 'SIMULATING' })} />
     );
     expect(queryByLabelText('Undo')).toBeNull();
     expect(queryByLabelText('Redo')).toBeNull();
-    expect(queryByText('Convert to DFA')).toBeNull();
   });
 
-  it('shows undo/redo + Convert in EDITING when canConvert', () => {
-    const { getByLabelText, getByText } = render(
+  it('shows undo/redo in EDITING', () => {
+    const { getByLabelText } = render(
       <CommandBar {...makeProps({ appMode: 'EDITING' })} />
     );
     expect(getByLabelText('Undo')).toBeTruthy();
     expect(getByLabelText('Redo')).toBeTruthy();
-    expect(getByText('Convert to DFA')).toBeTruthy();
-  });
-
-  it('omits Convert when canConvert is false (DFA)', () => {
-    const { queryByText, getByLabelText } = render(
-      <CommandBar {...makeProps({ appMode: 'EDITING', canConvert: false })} />
-    );
-    expect(getByLabelText('Undo')).toBeTruthy();
-    expect(queryByText('Convert to DFA')).toBeNull();
   });
 
   it('disables undo/redo when their flags are false', () => {
@@ -119,15 +106,13 @@ describe('CommandBar — EDIT segment', () => {
     expect((getByLabelText('Redo') as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('dispatches undo / redo / convert', () => {
+  it('dispatches undo / redo', () => {
     const props = makeProps({ appMode: 'EDITING' });
-    const { getByLabelText, getByText } = render(<CommandBar {...props} />);
+    const { getByLabelText } = render(<CommandBar {...props} />);
     fireEvent.click(getByLabelText('Undo'));
     fireEvent.click(getByLabelText('Redo'));
-    fireEvent.click(getByText('Convert to DFA'));
     expect(props.onUndo).toHaveBeenCalledTimes(1);
     expect(props.onRedo).toHaveBeenCalledTimes(1);
-    expect(props.onConvertToDfa).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -947,3 +947,10 @@
   font-size: inherit;
 }
 
+
+/* ─── EditPanel Operations footer (Convert to DFA, future ops) ─── */
+.edit-panel-operations {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}

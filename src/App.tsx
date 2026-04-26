@@ -705,6 +705,8 @@ function App() {
       onRemoveState={handleRemoveState}
       onSetStartState={handleSetStartState}
       onToggleAcceptState={handleToggleAcceptState}
+      onConvertToDfa={handleConvertToDfa}
+      canConvertToDfa={automaton.type === 'NFA'}
       onApplyTransitionEdit={handleApplyTransitionEdit}
     />
   );
@@ -754,10 +756,10 @@ function App() {
 
       <NotificationStack />
 
-      {/* Variant B: every command-tier control lives in a single top-
-          center bar. File segment is always visible; EDIT segment
-          (undo/redo + Convert to DFA) animates in/out via
-          AnimatePresence inside CommandBar based on appMode. */}
+      {/* Top-center command bar: file segment (always visible) + EDIT
+          segment (undo/redo, animates in/out by appMode). Niche
+          operations like Convert-to-DFA live in the Edit panel itself,
+          not the bar. */}
       <CommandBar
         appMode={appMode}
         currentName={fileSession.currentName}
@@ -773,8 +775,6 @@ function App() {
         canRedo={canRedo}
         onUndo={undo}
         onRedo={redo}
-        canConvert={automaton.type === 'NFA'}
-        onConvertToDfa={handleConvertToDfa}
       />
 
       {stateActions !== null && (
@@ -807,34 +807,6 @@ function App() {
         />
       )}
 
-      {/* Discoverability hint while in EDIT mode and the form is at rest.
-          The educational tool aims for "intuitive, with explanations where
-          it isn't." Surfacing the canvas's primary affordances here means
-          the user doesn't have to guess that nodes and edges are clickable.
-          Hidden as soon as the user starts an edit so it doesn't compete
-          with the in-form instruction text. AnimatePresence so the tip
-          fades + slides in/out instead of snapping when stage-specific
-          conditions toggle. */}
-      <AnimatePresence>
-        {appMode === 'EDITING' &&
-          canvasPickMode === null &&
-          creationState.editingExisting === null &&
-          creationState.source === null &&
-          creationState.destination === null &&
-          creationState.symbol === '' && (
-            <motion.div
-              className="canvas-tip"
-              role="note"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-            >
-              Click any state for actions, or any edge to edit it.
-            </motion.div>
-          )}
-      </AnimatePresence>
-
       <main className="canvas-area">
         {automatonUI === null ? (
           <p className="caption">Loading...</p>
@@ -862,6 +834,46 @@ function App() {
             creationSourceId={appMode === 'EDITING' ? creationState.source : null}
             creationDestinationId={appMode === 'EDITING' ? creationState.destination : null}
             creationStateKind={appMode === 'EDITING' ? creationStateKind(creationState) : null}
+            viewportInset={{
+              // Tool menu sits at left:16, takes ~48 (COLLAPSED) /
+              // ~152 (EXPANDED) / ~280 (OPEN). 16+width+~24 gap so
+              // centering doesn't crowd the menu's right edge.
+              left:
+                16 +
+                (menuState.mode === 'COLLAPSED' ? 48 :
+                 menuState.mode === 'EXPANDED' ? 152 : 280) +
+                24,
+              right: 0,
+              // CommandBar at top:16, ~48px tall + 16 gap.
+              top: 16 + 48 + 8,
+              bottom: 0,
+            }}
+            bottomRightExtras={
+              /* Discoverability hint while in EDIT mode and the form is
+                 at rest. Sits at the bottom of the canvas-bottom-right
+                 stack; when present, the zoom controls rise above it.
+                 Hidden as soon as the user starts an edit so it doesn't
+                 compete with the in-form instruction text. */
+              <AnimatePresence>
+                {appMode === 'EDITING' &&
+                  canvasPickMode === null &&
+                  creationState.editingExisting === null &&
+                  creationState.source === null &&
+                  creationState.destination === null &&
+                  creationState.symbol === '' && (
+                    <motion.div
+                      className="canvas-tip"
+                      role="note"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 8 }}
+                      transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                    >
+                      Click any state for actions, or any edge to edit it.
+                    </motion.div>
+                  )}
+              </AnimatePresence>
+            }
           />
         )}
       </main>

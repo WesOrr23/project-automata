@@ -35,6 +35,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { FilePlus, FolderOpen, Save, MoreHorizontal, Undo2, Redo2, X } from 'lucide-react';
+// Note: Convert-to-DFA was briefly hosted here in the initial Variant B
+// shipping. Pulled back out per Wes's feedback: the bar is for COMMON
+// command-tier actions (file + history). Operation-tier transformations
+// like Convert / Minimize / Equivalence are EDIT-mode-specific tools and
+// belong in the Edit panel (or its own future Operations widget).
 import type { RecentEntry } from '../files/recentsStore';
 
 // Cheap platform detection — same approach the old UndoRedoControls
@@ -67,9 +72,6 @@ type CommandBarProp = {
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
-  /** Whether Convert-to-DFA is available (NFA + ops handler exists). */
-  canConvert: boolean;
-  onConvertToDfa: () => void;
 };
 
 function formatRelative(iso: string): string {
@@ -112,8 +114,6 @@ export function CommandBar({
   canRedo,
   onUndo,
   onRedo,
-  canConvert,
-  onConvertToDfa,
 }: CommandBarProp) {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const popoverContainerRef = useRef<HTMLDivElement | null>(null);
@@ -285,16 +285,6 @@ export function CommandBar({
             >
               <Redo2 size={16} />
             </button>
-            {canConvert && (
-              <button
-                type="button"
-                className="command-bar-button command-bar-button-text"
-                onClick={onConvertToDfa}
-                title="Convert this NFA to an equivalent DFA via subset construction"
-              >
-                Convert to DFA
-              </button>
-            )}
           </motion.div>
         )}
       </AnimatePresence>

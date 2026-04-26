@@ -6,7 +6,7 @@
  * paths from GraphViz), and renders all child components.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Automaton } from '../engine/types';
 import { AutomatonUI } from '../ui-state/types';
 import { STATE_RADIUS } from '../ui-state/constants';
@@ -15,6 +15,7 @@ import { TransitionEdge } from './TransitionEdge';
 import { StartStateArrow } from './StartStateArrow';
 import { CanvasZoomControls } from './CanvasZoomControls';
 import type { EdgeOverlay } from '../engine/preview';
+import type { ViewportInset } from '../hooks/useCanvasViewport';
 import {
   useCanvasViewport,
   VIEWPORT_PAN_STEP,
@@ -88,6 +89,25 @@ type AutomatonCanvasProp = {
   onStateClick?: ((stateId: number, anchorEl: SVGGElement) => void) | undefined;
 
   /**
+   * Optional extra elements to render at the bottom-right of the
+   * viewport, beneath (visually below) the zoom controls. When App
+   * passes the canvas-tip in here, the column-reverse stack puts the
+   * tip at the bottom edge and pushes the zoom controls above it; when
+   * App passes nothing, the zoom controls drop to the bottom edge on
+   * their own. No JS coordination required.
+   */
+  bottomRightExtras?: ReactNode;
+
+  /**
+   * Pixels of overlay chrome (tool menu, command bar) covering the SVG.
+   * Centering operations target the un-occluded region rather than the
+   * geometric center, so "centered" reads as "centered in what the
+   * user can actually see." Pan-clamp / zoom-toward-cursor remain
+   * full-SVG.
+   */
+  viewportInset?: ViewportInset | undefined;
+
+  /**
    * Called when the user clicks an existing transition edge on the canvas.
    * Loads it into the creator form for editing/deletion. For consolidated
    * edges (multiple symbols sharing the same from→to), the entire group
@@ -139,6 +159,8 @@ export function AutomatonCanvas({
   creationSourceId,
   creationDestinationId,
   creationStateKind,
+  bottomRightExtras,
+  viewportInset,
 }: AutomatonCanvasProp) {
   // The start-state arrow extends LEFT of the start-state circle by ~50px,
   // which is outside GraphViz's computed bounding box. Extend the natural
@@ -200,6 +222,7 @@ export function AutomatonCanvas({
   } = useCanvasViewport({
     contentBoundingBox: { width: contentWidth, height: contentHeight },
     viewportSize,
+    viewportInset,
   });
 
   // Native (non-React) wheel handler — React's onWheel synthetic events
@@ -468,14 +491,23 @@ export function AutomatonCanvas({
         </g>
       </g>
     </svg>
-    <CanvasZoomControls
-      zoomIn={zoomIn}
-      zoomOut={zoomOut}
-      reset={reset}
-      fitToContent={fitToContent}
-      atMaxScale={atMaxScale}
-      atMinScale={atMinScale}
-    />
+    {/* Bottom-right widget stack. column-reverse so the FIRST DOM child
+        sits at the bottom edge; siblings stack upward. The extras slot
+        is rendered first → bottommost. Zoom controls are last → topmost.
+        When extras (canvas-tip) mount, the zoom controls naturally rise
+        above; when they unmount, zoom controls settle at the bottom.
+        No JS coordination, no hardcoded `bottom: Npx`. */}
+    <div className="canvas-bottom-right-stack">
+      {bottomRightExtras}
+      <CanvasZoomControls
+        zoomIn={zoomIn}
+        zoomOut={zoomOut}
+        reset={reset}
+        fitToContent={fitToContent}
+        atMaxScale={atMaxScale}
+        atMinScale={atMinScale}
+      />
+    </div>
     </>
   );
 }
