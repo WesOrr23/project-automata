@@ -530,8 +530,37 @@ export function AutomatonCanvas({
           />
         );
       })()}
+          {/* DEBUG: blue ring at the FA's measured center (bbox
+              center in inner-g local coords). Lives inside the
+              transformed content so it pans/scales with the FA.
+              When perfectly centered, the red screen-center dot sits
+              inside this ring. Remove once Wes has verified. */}
+          {contentBBox && (
+            <circle
+              cx={contentBBox.x + contentBBox.width / 2}
+              cy={contentBBox.y + contentBBox.height / 2}
+              r={10}
+              fill="none"
+              stroke="#3b82f6"
+              strokeWidth={2}
+              pointerEvents="none"
+            />
+          )}
         </g>
       </g>
+      {/* DEBUG: red filled dot at the visible region's center (raw
+          SVG coords, outside any transform group, so it pins to
+          screen regardless of pan/zoom). When centered, sits inside
+          the blue ring above. Remove once verified. */}
+      {viewportSize && (
+        <circle
+          cx={(viewportInset?.left ?? 0) + (viewportSize.width - (viewportInset?.left ?? 0) - (viewportInset?.right ?? 0)) / 2}
+          cy={(viewportInset?.top ?? 0) + (viewportSize.height - (viewportInset?.top ?? 0) - (viewportInset?.bottom ?? 0)) / 2}
+          r={4}
+          fill="#ef4444"
+          pointerEvents="none"
+        />
+      )}
     </svg>
     {/* Bottom-right widget stack. column-reverse so the FIRST DOM child
         sits at the bottom edge; siblings stack upward. The extras slot
