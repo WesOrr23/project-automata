@@ -157,6 +157,14 @@ export function useCanvasViewport(
   const viewportSizeRef = useRef(viewportSize);
   viewportSizeRef.current = viewportSize;
 
+  // Track whether we've performed the initial-center pass. Without
+  // this, the very first render ships the user a content-at-top-left
+  // viewport (because DEFAULT_VIEWPORT is panX/Y = 0). The first time
+  // sizes are measurable, we shift to "scale 1, content centered" so
+  // the page lands looking like a `1:1` reset rather than slammed
+  // against the corner.
+  const didInitialCenterRef = useRef(false);
+
   // Mutable timer ref so successive button presses extend (rather than
   // stack) the animation window.
   const animationTimerRef = useRef<number | null>(null);
@@ -179,6 +187,26 @@ export function useCanvasViewport(
       }
     };
   }, []);
+
+  // First time both sizes are measurable, center the content in the
+  // viewport at the default scale. Runs at most once — after the
+  // first center, the user owns the viewport state.
+  useEffect(() => {
+    if (didInitialCenterRef.current) return;
+    if (contentBoundingBox === null || viewportSize === null) return;
+    if (
+      contentBoundingBox.width <= 0 ||
+      contentBoundingBox.height <= 0 ||
+      viewportSize.width <= 0 ||
+      viewportSize.height <= 0
+    ) {
+      return;
+    }
+    didInitialCenterRef.current = true;
+    const panX = (viewportSize.width - contentBoundingBox.width) / 2;
+    const panY = (viewportSize.height - contentBoundingBox.height) / 2;
+    setViewport({ scale: 1, panX, panY });
+  }, [contentBoundingBox, viewportSize]);
 
   const panBy = useCallback((deltaX: number, deltaY: number) => {
     setViewport((current) => {
@@ -244,7 +272,21 @@ export function useCanvasViewport(
 
   const reset = useCallback(() => {
     triggerAnimation();
-    setViewport(DEFAULT_VIEWPORT);
+    // "1:1" semantically means "100% scale, content where it should
+    // be" — not "100% scale, content slammed against the top-left of
+    // the viewport." Center the content in the viewport at scale 1
+    // (same centering as fitToContent, just without the scale-to-fit
+    // step). When sizes aren't yet measured, fall back to the
+    // origin-anchored default.
+    const content = contentBoxRef.current;
+    const view = viewportSizeRef.current;
+    if (content === null || view === null) {
+      setViewport(DEFAULT_VIEWPORT);
+      return;
+    }
+    const panX = (view.width - content.width) / 2;
+    const panY = (view.height - content.height) / 2;
+    setViewport({ scale: 1, panX, panY });
   }, [triggerAnimation]);
 
   /**

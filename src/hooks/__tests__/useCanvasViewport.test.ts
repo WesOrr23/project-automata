@@ -22,19 +22,35 @@ function setupHook(args?: {
   contentBoundingBox?: { width: number; height: number } | null;
   viewportSize?: { width: number; height: number } | null;
 }) {
-  // Use `in` check so an explicit `null` overrides the default,
-  // distinct from the property being absent.
+  // Default sizes to null so tests start at the untouched default
+  // viewport ({ scale: 1, panX: 0, panY: 0 }) — providing sizes from
+  // render 0 triggers the hook's initial-center pass and shifts the
+  // pan to whatever centers the content. Tests that exercise
+  // size-dependent behavior (fitToContent, wheel-toward-cursor,
+  // pan clamping) opt in by passing STANDARD_BOX / STANDARD_VIEWPORT
+  // explicitly.
   const contentBoundingBox =
-    args && 'contentBoundingBox' in args ? args.contentBoundingBox ?? null : STANDARD_BOX;
+    args && 'contentBoundingBox' in args ? args.contentBoundingBox ?? null : null;
   const viewportSize =
-    args && 'viewportSize' in args ? args.viewportSize ?? null : STANDARD_VIEWPORT;
+    args && 'viewportSize' in args ? args.viewportSize ?? null : null;
   return renderHook(() =>
     useCanvasViewport({ contentBoundingBox, viewportSize })
   );
 }
 
 describe('useCanvasViewport', () => {
-  it('starts at scale=1 / pan=0,0', () => {
+  it('with both sizes available from render 0, auto-centers content (1:1 starting state)', () => {
+    // contentBox 800x600 in viewport 1000x800 → centered at (100, 100).
+    const { result } = setupHook({
+      contentBoundingBox: STANDARD_BOX,
+      viewportSize: STANDARD_VIEWPORT,
+    });
+    expect(result.current.viewport.scale).toBe(1);
+    expect(result.current.viewport.panX).toBe(100);
+    expect(result.current.viewport.panY).toBe(100);
+  });
+
+  it('starts at scale=1 / pan=0,0 when sizes are unknown', () => {
     const { result } = setupHook();
     expect(result.current.viewport).toEqual({ scale: 1, panX: 0, panY: 0 });
     expect(result.current.atMaxScale).toBe(false);
@@ -76,7 +92,7 @@ describe('useCanvasViewport', () => {
   });
 
   it('zoomIn keeps the viewport center stable (anchor invariant)', () => {
-    const { result } = setupHook();
+    const { result } = setupHook({ contentBoundingBox: STANDARD_BOX, viewportSize: STANDARD_VIEWPORT });
     const centerX = STANDARD_VIEWPORT.width / 2;
     const centerY = STANDARD_VIEWPORT.height / 2;
 
@@ -227,7 +243,7 @@ describe('useCanvasViewport', () => {
   it('fitToContent scales content to fit viewport with padding and centers it', () => {
     // Content 800x600 in a 1000x800 viewport with 40px padding =>
     // scaleX = 920/800 = 1.15, scaleY = 720/600 = 1.2 → use min = 1.15.
-    const { result } = setupHook();
+    const { result } = setupHook({ contentBoundingBox: STANDARD_BOX, viewportSize: STANDARD_VIEWPORT });
     act(() => result.current.fitToContent());
     expect(result.current.viewport.scale).toBeCloseTo(1.15, 4);
     // Centering: (1000 - 800*1.15)/2 = (1000 - 920)/2 = 40
