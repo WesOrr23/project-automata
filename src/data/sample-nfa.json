@@ -1,0 +1,27 @@
+{
+  "kind": "automata-file",
+  "formatVersion": 1,
+  "metadata": {
+    "name": "NFA: strings ending in '01'",
+    "description": "Textbook NFA recognizing strings over {0,1} ending in '01'. Contains non-determinism on '0' from q0. Converts to a 3-state DFA via subset construction.",
+    "createdAt": "2026-04-26T00:00:00Z",
+    "modifiedAt": "2026-04-26T00:00:00Z"
+  },
+  "automaton": {
+    "type": "NFA",
+    "states": [0, 1, 2],
+    "alphabet": ["0", "1"],
+    "transitions": [
+      { "from": 0, "to": [0, 1], "symbol": "0" },
+      { "from": 0, "to": [0], "symbol": "1" },
+      { "from": 1, "to": [2], "symbol": "1" }
+    ],
+    "startState": 0,
+    "acceptStates": [2],
+    "nextStateId": 3
+  },
+  "testCases": {
+    "accept": ["01", "001", "101", "1101", "11001"],
+    "reject": ["", "0", "1", "10", "100", "1100"]
+  }
+}

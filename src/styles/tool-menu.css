@@ -1066,3 +1066,10 @@
   color: var(--text-heading);
   background: var(--bg-button-active, rgba(0,0,0,0.06));
 }
+
+/* ─── EditPanel Operations section (Convert to DFA, future ops) ─── */
+.edit-panel-operations {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}

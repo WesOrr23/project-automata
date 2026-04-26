@@ -37,6 +37,7 @@ type EditPanelProp = {
   onSetStartState: (stateId: number) => void;
   onToggleAcceptState: (stateId: number) => void;
   /** Apply a batch transition edit (removes + adds in one update). */
+  onConvertToDfa?: () => void;
   onApplyTransitionEdit: (
     removes: ReadonlyArray<{ from: number; to: number; symbol: string | null }>,
     adds: ReadonlyArray<{ from: number; to: number; symbol: string | null }>
@@ -57,6 +58,7 @@ export function EditPanel({
   onRemoveState,
   onSetStartState,
   onToggleAcceptState,
+  onConvertToDfa,
   onApplyTransitionEdit,
 }: EditPanelProp) {
   return (
@@ -92,6 +94,23 @@ export function EditPanel({
         epsilonSymbol={epsilonSymbol}
         onApplyTransitionEdit={onApplyTransitionEdit}
       />
+
+      {automaton.type === 'NFA' && onConvertToDfa && (
+        <>
+          <div className="divider" />
+          <div className="edit-panel-operations">
+            <span className="label">Operations</span>
+            <button
+              type="button"
+              className="btn"
+              onClick={onConvertToDfa}
+              title="Convert this NFA to an equivalent DFA via subset construction"
+            >
+              Convert to DFA
+            </button>
+          </div>
+        </>
+      )}
     </>
   );
 }

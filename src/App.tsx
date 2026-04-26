@@ -35,6 +35,7 @@ import {
   parseSymbolInput,
 } from './components/transitionEditor/creationReducer';
 import { computePreview } from './engine/preview';
+import { convertNfaToDfa } from './engine/converter';
 import { useSimulation } from './hooks/useSimulation';
 import { useUndoableAutomaton } from './hooks/useUndoableAutomaton';
 import { useUndoRedoShortcuts } from './hooks/useUndoRedoShortcuts';
@@ -286,7 +287,37 @@ function App() {
 
   // Display labels are sequential (q0, q1, q2) regardless of underlying IDs.
   // This detaches stable engine identity from user-visible numbering.
-  const displayLabels = computeDisplayLabels(automaton.states);
+  // After NFA→DFA conversion, the labels for the resulting DFA states
+  // are overridden with subset notation ({q0,q2,q5}). The override is
+  // tied to the specific automaton reference, so undoing the conversion
+  // (which restores the prior reference) automatically reverts to qN.
+  const [conversionLabels, setConversionLabels] = useState<{
+    automatonRef: Automaton;
+    subsetMap: ReadonlyMap<number, ReadonlySet<number>>;
+  } | null>(null);
+
+  const displayLabels = useMemo(() => {
+    const base = computeDisplayLabels(automaton.states);
+    if (conversionLabels === null) return base;
+    if (conversionLabels.automatonRef !== automaton) return base;
+    // Build subset labels referencing the ORIGINAL NFA's q-numbering
+    // (the indices the user knew before the conversion). For each
+    // numeric NFA state ID inside a subset, we emit `q<id>` so labels
+    // like {q0,q2} are stable + readable.
+    const out = new Map(base);
+    for (const [dfaStateId, subset] of conversionLabels.subsetMap) {
+      if (subset.size === 0) {
+        out.set(dfaStateId, '∅');
+      } else if (subset.size === 1) {
+        const only = subset.values().next().value as number;
+        out.set(dfaStateId, `q${only}`);
+      } else {
+        const sorted = Array.from(subset).sort((a, b) => a - b);
+        out.set(dfaStateId, `{${sorted.map((s) => `q${s}`).join(',')}}`);
+      }
+    }
+    return out;
+  }, [automaton, conversionLabels]);
 
   // ─── Menu state transitions ───
 
@@ -600,6 +631,27 @@ function App() {
       ? (sim.accepted ? 'accepted' : 'rejected')
       : null;
 
+  // ─── NFA → DFA conversion ───
+  function handleConvertToDfa() {
+    const result = convertNfaToDfa(automaton);
+    if (!result.ok) {
+      notify({ severity: 'error', title: 'Convert failed', detail: errorMessage(result.error) });
+      return;
+    }
+    // Push onto undo via setAutomaton so the user can revert with ⌘Z.
+    // The updater ignores `prev` because the conversion was computed
+    // against the current `automaton` snapshot above (referentially
+    // identical to `prev` at dispatch time, since no other edit can
+    // have raced ahead between the click and this call).
+    setAutomaton(() => result.value.dfa);
+    setConversionLabels({ automatonRef: result.value.dfa, subsetMap: result.value.subsetMap });
+    notify({
+      severity: 'success',
+      title: `Converted NFA to DFA — ${result.value.dfa.states.size} state${result.value.dfa.states.size === 1 ? '' : 's'}`,
+      autoDismissMs: 3_500,
+    });
+  }
+
   // ─── File session ───
   const fileSession = useFileSession(
     {
@@ -664,6 +716,7 @@ function App() {
       onRemoveState={handleRemoveState}
       onSetStartState={handleSetStartState}
       onToggleAcceptState={handleToggleAcceptState}
+      onConvertToDfa={handleConvertToDfa}
       onApplyTransitionEdit={handleApplyTransitionEdit}
     />
   );

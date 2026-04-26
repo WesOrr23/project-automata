@@ -54,7 +54,12 @@ export type EngineError =
   | 'parse-bad-version'
   | 'parse-malformed'
   | 'file-read-failed'
-  | 'file-cancelled';
+  | 'file-cancelled'
+
+  // converter.ts (NFA → DFA)
+  | 'conversion-requires-nfa'
+  | 'conversion-empty-alphabet'
+  | 'conversion-too-large';
 
 /**
  * Discriminated-union result type. Use the `ok` and `err` constructors
@@ -124,5 +129,11 @@ export function errorMessage(error: EngineError): string {
       return 'Could not read the file';
     case 'file-cancelled':
       return 'File operation cancelled';
+    case 'conversion-requires-nfa':
+      return 'Conversion requires an NFA — this automaton is already a DFA';
+    case 'conversion-empty-alphabet':
+      return 'Cannot convert: alphabet is empty';
+    case 'conversion-too-large':
+      return 'Conversion produced more states than the safety cap allows';
   }
 }
