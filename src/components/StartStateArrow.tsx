@@ -21,6 +21,11 @@ type StartStateArrowProp = {
  */
 const ARROW_LENGTH = 50; // Length of the arrow line
 const ARROWHEAD_SIZE = 8; // Size of the arrowhead triangle
+// Visible gap between the line's tail end and the arrowhead's base.
+// Matches the breathing whitespace used by transition-edge arrowheads
+// elsewhere in the canvas — the line should "point at" the head, not
+// kiss it.
+const ARROW_HEAD_GAP = 4;
 
 export function StartStateArrow({
   targetX,
@@ -28,15 +33,17 @@ export function StartStateArrow({
   stateRadius,
 }: StartStateArrowProp) {
   // Calculate start and end points. Arrow comes from the left.
-  //   - tipX  = where the arrowhead's tip sits (touches the circle edge).
-  //   - baseX = where the arrowhead's flat base sits (one ARROWHEAD_SIZE
-  //             back from the tip). The line stops here, NOT at the tip,
-  //             so the line's 2px stroke can't poke past the polygon's
-  //             narrowing-to-a-point silhouette near the tip.
+  //   - tipX     = where the arrowhead's tip sits (touches the circle).
+  //   - baseX    = where the arrowhead's flat base sits.
+  //   - lineEndX = where the line stops (one ARROW_HEAD_GAP back from
+  //                the base). The visible gap reads as breathing room
+  //                between the line and head, matching the transition
+  //                edges' arrowhead spacing.
   const tipX = targetX - stateRadius;
   const baseX = tipX - ARROWHEAD_SIZE;
+  const lineEndX = baseX - ARROW_HEAD_GAP;
   const endY = targetY;
-  const startX = baseX - ARROW_LENGTH;
+  const startX = lineEndX - ARROW_LENGTH;
   const startY = targetY;
 
   return (
@@ -44,11 +51,11 @@ export function StartStateArrow({
     // (0.85 ↔ 1.0 over 2s) at idle — see index.css. Applied to the group
     // so both the line and arrowhead breathe together as one mark.
     <g className="start-arrow-breath">
-      {/* Arrow line — stops at the arrowhead's base. */}
+      {/* Arrow line — stops one ARROW_HEAD_GAP before the arrowhead. */}
       <line
         x1={startX}
         y1={startY}
-        x2={baseX}
+        x2={lineEndX}
         y2={endY}
         stroke="black"
         strokeWidth={2}

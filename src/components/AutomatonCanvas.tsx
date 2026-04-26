@@ -162,23 +162,27 @@ export function AutomatonCanvas({
   bottomRightExtras,
   viewportInset,
 }: AutomatonCanvasProp) {
-  // The start-state arrow extends LEFT of the start-state circle by ~50px,
-  // which is outside GraphViz's computed bounding box. Extend the natural
-  // content width by the same amount so the arrow has room to render. The
-  // content origin (translate(-START_ARROW_RESERVE, 0)) inside the
-  // transform group reproduces the original "viewBox shifted left" trick.
+  // The start-state arrow extends LEFT of the start-state circle, which
+  // is outside GraphViz's computed bounding box. Reserve room via an
+  // inner translate. We *also* measure the actual rendered bbox post-
+  // layout (see contentBBox below) and pass that to the viewport hook,
+  // because GraphViz's bbox doesn't reliably match the rendered SVG
+  // extent (states sometimes lay out at non-zero offsets within the
+  // bbox), and centering needs the true visible rect to be accurate.
   const START_ARROW_RESERVE = 70;
-  const contentWidth = automatonUI.boundingBox.width + START_ARROW_RESERVE;
-  const contentHeight = automatonUI.boundingBox.height;
 
-  // The SVG fills its container; we measure its rendered size so the
-  // viewport hook can compute fit-to-content scaling and zoom-toward-
-  // center anchoring against actual visible pixels (not the natural
-  // content size).
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const innerContentGRef = useRef<SVGGElement | null>(null);
   const [viewportSize, setViewportSize] = useState<{ width: number; height: number } | null>(
     null
   );
+  // Measured bounding box of the content `<g>` (in the inner group's
+  // local coord space, before the START_ARROW_RESERVE inner translate).
+  // Initialized to a falsy fallback derived from automatonUI; replaced
+  // by the real measurement once the SVG has laid out.
+  const [contentBBox, setContentBBox] = useState<{
+    x: number; y: number; width: number; height: number;
+  } | null>(null);
 
   // ResizeObserver keeps viewportSize in sync with the SVG's CSS box.
   // useLayoutEffect to read sizes synchronously after paint, avoiding
@@ -196,9 +200,6 @@ export function AutomatonCanvas({
       });
     };
     measure();
-    // ResizeObserver isn't always available (e.g. jsdom in tests). Fall
-    // back to a window-resize listener so we still react to viewport
-    // changes; static initial-measure is enough for unit tests.
     if (typeof ResizeObserver === 'undefined') {
       window.addEventListener('resize', measure);
       return () => window.removeEventListener('resize', measure);
@@ -207,6 +208,46 @@ export function AutomatonCanvas({
     observer.observe(svg);
     return () => observer.disconnect();
   }, []);
+
+  // Measure the actual rendered bbox of the content group whenever the
+  // automaton (and therefore the SVG content) changes. getBBox returns
+  // the user-coord-space union rect of all descendants including stroked
+  // paths and the start arrow — exactly the visible extent we need for
+  // centering.
+  useLayoutEffect(() => {
+    const g = innerContentGRef.current;
+    if (g === null) return;
+    try {
+      const b = g.getBBox();
+      if (b.width <= 0 || b.height <= 0) return;
+      setContentBBox((current) => {
+        if (
+          current &&
+          current.x === b.x &&
+          current.y === b.y &&
+          current.width === b.width &&
+          current.height === b.height
+        ) {
+          return current;
+        }
+        return { x: b.x, y: b.y, width: b.width, height: b.height };
+      });
+    } catch {
+      // jsdom doesn't implement getBBox. Tests that need it would mock.
+    }
+  }, [automaton, automatonUI]);
+
+  // Effective content size + origin for the viewport hook. The bbox's
+  // local-space origin (b.x, b.y) is shifted by the inner translate
+  // (-START_ARROW_RESERVE, 0) before becoming the visual origin in the
+  // outer-g coordinate space.
+  const measured = contentBBox;
+  const effectiveContent = measured
+    ? { width: measured.width, height: measured.height }
+    : { width: automatonUI.boundingBox.width + START_ARROW_RESERVE, height: automatonUI.boundingBox.height };
+  const effectiveOrigin = measured
+    ? { x: measured.x - START_ARROW_RESERVE, y: measured.y }
+    : { x: -START_ARROW_RESERVE, y: 0 };
 
   const {
     transform,
@@ -220,9 +261,10 @@ export function AutomatonCanvas({
     atMinScale,
     isAnimating,
   } = useCanvasViewport({
-    contentBoundingBox: { width: contentWidth, height: contentHeight },
+    contentBoundingBox: effectiveContent,
     viewportSize,
     viewportInset,
+    contentOrigin: effectiveOrigin,
   });
 
   // Native (non-React) wheel handler — React's onWheel synthetic events
@@ -340,7 +382,7 @@ export function AutomatonCanvas({
         style={{ transform, transformOrigin: '0 0' }}
         className={isAnimating ? 'canvas-content-animating' : undefined}
       >
-        <g transform={`translate(${-START_ARROW_RESERVE} 0)`}>
+        <g ref={innerContentGRef} transform={`translate(${-START_ARROW_RESERVE} 0)`}>
       {/* Layer 1: Transition edges (background) */}
       {automatonUI.transitions.map((transition, index) => {
         // A consolidated edge matches the simulation's "next transition"

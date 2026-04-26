@@ -852,9 +852,14 @@ function App() {
               /* Discoverability hint while in EDIT mode and the form is
                  at rest. Sits at the bottom of the canvas-bottom-right
                  stack; when present, the zoom controls rise above it.
-                 Hidden as soon as the user starts an edit so it doesn't
-                 compete with the in-form instruction text. */
-              <AnimatePresence>
+                 mode="popLayout" tells AnimatePresence to remove the
+                 exiting element from layout immediately while its exit
+                 animation still plays — that way the zoom controls'
+                 `layout` animation sees the layout shrink right away
+                 and slides DOWN as the tip fades, instead of waiting
+                 for the exit to complete (which would cause the zoom
+                 to snap into place with no animation). */
+              <AnimatePresence mode="popLayout">
                 {appMode === 'EDITING' &&
                   canvasPickMode === null &&
                   creationState.editingExisting === null &&

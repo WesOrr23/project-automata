@@ -71,6 +71,16 @@ export type UseCanvasViewportArgs = {
    */
   contentBoundingBox: { width: number; height: number } | null;
   /**
+   * Where the content's TOP-LEFT sits in unscaled coordinates relative
+   * to the transform origin (panX, panY). AutomatonCanvas wraps its
+   * content in `<g transform="translate(-70 0)">` to make room for the
+   * start arrow that extends LEFT of state q0; that means the visible
+   * content's leftmost edge is at world x = -70, not 0. Centering math
+   * needs to know this so 'centered' actually centers the visual
+   * bounding box, not the unshifted origin. Defaults to {x:0, y:0}.
+   */
+  contentOrigin?: { x: number; y: number } | undefined;
+  /**
    * The visible CSS-pixel size of the SVG element. Needed for
    * `fitToContent` and zoom-toward-center math.
    */
@@ -173,8 +183,9 @@ export function clampViewport(
 export function useCanvasViewport(
   args: UseCanvasViewportArgs
 ): UseCanvasViewportResult {
-  const { contentBoundingBox, viewportSize, viewportInset } = args;
+  const { contentBoundingBox, viewportSize, viewportInset, contentOrigin } = args;
   const inset: ViewportInset = viewportInset ?? ZERO_INSET;
+  const origin = contentOrigin ?? { x: 0, y: 0 };
   const [viewport, setViewport] = useState<CanvasViewport>(DEFAULT_VIEWPORT);
   const [isAnimating, setIsAnimating] = useState(false);
 
@@ -194,6 +205,8 @@ export function useCanvasViewport(
   viewportSizeRef.current = viewportSize;
   const insetRef = useRef(inset);
   insetRef.current = inset;
+  const originRef = useRef(origin);
+  originRef.current = origin;
 
   // Track whether we've performed the initial-center pass. Without
   // this, the very first render ships the user a content-at-top-left
@@ -230,10 +243,16 @@ export function useCanvasViewport(
   // overlay chrome inset), not the geometric SVG center. With the menu
   // floating over the left edge, geometric center = "behind the menu";
   // the user expects "centered" to mean centered in what they can see.
+  //
+  // `origin` accounts for an inner SVG transform (e.g.
+  // `translate(-70 0)` for the start-arrow reserve): the visible
+  // content's left edge sits at `panX + origin.x * scale` rather than
+  // at panX, so we subtract that offset before centering.
   function centerInVisibleRegion(
     content: { width: number; height: number },
     view: { width: number; height: number },
     insetArg: ViewportInset,
+    originArg: { x: number; y: number },
     scale: number
   ): { panX: number; panY: number } {
     const visibleW = Math.max(view.width - insetArg.left - insetArg.right, 1);
@@ -241,8 +260,8 @@ export function useCanvasViewport(
     const scaledW = content.width * scale;
     const scaledH = content.height * scale;
     return {
-      panX: insetArg.left + (visibleW - scaledW) / 2,
-      panY: insetArg.top + (visibleH - scaledH) / 2,
+      panX: insetArg.left + (visibleW - scaledW) / 2 - originArg.x * scale,
+      panY: insetArg.top + (visibleH - scaledH) / 2 - originArg.y * scale,
     };
   }
 
@@ -261,9 +280,9 @@ export function useCanvasViewport(
       return;
     }
     didInitialCenterRef.current = true;
-    const { panX, panY } = centerInVisibleRegion(contentBoundingBox, viewportSize, inset, 1);
+    const { panX, panY } = centerInVisibleRegion(contentBoundingBox, viewportSize, inset, origin, 1);
     setViewport({ scale: 1, panX, panY });
-  }, [contentBoundingBox, viewportSize, inset]);
+  }, [contentBoundingBox, viewportSize, inset, origin]);
 
   const panBy = useCallback((deltaX: number, deltaY: number) => {
     setViewport((current) => {
@@ -335,7 +354,7 @@ export function useCanvasViewport(
       setViewport(DEFAULT_VIEWPORT);
       return;
     }
-    const { panX, panY } = centerInVisibleRegion(content, view, insetRef.current, 1);
+    const { panX, panY } = centerInVisibleRegion(content, view, insetRef.current, originRef.current, 1);
     setViewport({ scale: 1, panX, panY });
   }, [triggerAnimation]);
 
@@ -364,7 +383,7 @@ export function useCanvasViewport(
       MIN_SCALE,
       MAX_SCALE
     );
-    const { panX, panY } = centerInVisibleRegion(content, view, insetVal, targetScale);
+    const { panX, panY } = centerInVisibleRegion(content, view, insetVal, originRef.current, targetScale);
     setViewport({ scale: targetScale, panX, panY });
   }, [triggerAnimation]);
 

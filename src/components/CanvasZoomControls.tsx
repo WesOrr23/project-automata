@@ -13,6 +13,7 @@
  */
 
 import { Plus, Minus, Maximize2 } from 'lucide-react';
+import { motion } from 'motion/react';
 
 type CanvasZoomControlsProp = {
   zoomIn: () => void;
@@ -36,7 +37,13 @@ export function CanvasZoomControls({
   atMinScale,
 }: CanvasZoomControlsProp) {
   return (
-    <div
+    // `layout` enables Framer's automatic position-change animation:
+    // when a sibling in the parent stack mounts/unmounts (canvas-tip
+    // appearing/disappearing), this element's CSS-driven position
+    // changes are animated rather than snapping.
+    <motion.div
+      layout="position"
+      transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
       className="canvas-zoom-controls"
       role="toolbar"
       aria-label="Canvas zoom"
@@ -79,6 +86,6 @@ export function CanvasZoomControls({
       >
         1:1
       </button>
-    </div>
+    </motion.div>
   );
 }
