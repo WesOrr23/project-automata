@@ -63,6 +63,20 @@ export type UseUndoableAutomatonResult = {
   canUndo: boolean;
   canRedo: boolean;
   clearHistory: () => void;
+  /**
+   * Replace the entire snapshot (e.g. when loading a file). Resets
+   * history (the loaded automaton becomes the new "saved" baseline,
+   * so neither undo to the previous edits nor dirty-flag is sensible).
+   */
+  replaceSnapshot: (snapshot: Snapshot) => void;
+  /**
+   * Record the current snapshot as the "saved" reference. The hook's
+   * `isDirty` flag becomes true whenever the current snapshot reference
+   * diverges from this. Call after a successful save or a fresh load.
+   */
+  markSaved: () => void;
+  /** True iff the current snapshot reference !== the last markSaved snapshot. */
+  isDirty: boolean;
 };
 
 export function useUndoableAutomaton(
@@ -73,6 +87,11 @@ export function useUndoableAutomaton(
   const redoStackRef = useRef<Snapshot[]>([]);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  // Saved-snapshot reference for dirty tracking. Initialized to the
+  // first current snapshot so a freshly-mounted hook is "clean."
+  // Updated by markSaved() on save and by replaceSnapshot() on load.
+  const savedSnapshotRef = useRef<Snapshot>(current);
+  const [isDirty, setIsDirty] = useState(false);
 
   // Keep a ref to the current snapshot so the imperative setters can read
   // it synchronously. React state alone would show the stale value inside
@@ -95,6 +114,12 @@ export function useUndoableAutomaton(
     setCanRedo(false);
   }, []);
 
+  // Helper: update isDirty based on a new current snapshot reference.
+  // Comparing against savedSnapshotRef.current — if they match, clean.
+  const refreshDirty = useCallback((nextSnapshot: Snapshot) => {
+    setIsDirty(nextSnapshot !== savedSnapshotRef.current);
+  }, []);
+
   const setAutomaton = useCallback(
     (updater: (previous: Automaton) => Automaton) => {
       const previousSnapshot = currentRef.current;
@@ -102,12 +127,14 @@ export function useUndoableAutomaton(
       if (nextAutomaton === previousSnapshot.automaton) return;
       pushCurrentOntoUndo();
       clearRedoStack();
-      setCurrent({
+      const nextSnapshot: Snapshot = {
         automaton: nextAutomaton,
         epsilonSymbol: previousSnapshot.epsilonSymbol,
-      });
+      };
+      setCurrent(nextSnapshot);
+      refreshDirty(nextSnapshot);
     },
-    [pushCurrentOntoUndo, clearRedoStack]
+    [pushCurrentOntoUndo, clearRedoStack, refreshDirty]
   );
 
   const setEpsilonSymbol = useCallback(
@@ -116,12 +143,14 @@ export function useUndoableAutomaton(
       if (next === previousSnapshot.epsilonSymbol) return;
       pushCurrentOntoUndo();
       clearRedoStack();
-      setCurrent({
+      const nextSnapshot: Snapshot = {
         automaton: previousSnapshot.automaton,
         epsilonSymbol: next,
-      });
+      };
+      setCurrent(nextSnapshot);
+      refreshDirty(nextSnapshot);
     },
-    [pushCurrentOntoUndo, clearRedoStack]
+    [pushCurrentOntoUndo, clearRedoStack, refreshDirty]
   );
 
   const undo = useCallback(() => {
@@ -132,7 +161,8 @@ export function useUndoableAutomaton(
     setCanUndo(undoStack.length > 0);
     setCanRedo(true);
     setCurrent(previous);
-  }, []);
+    refreshDirty(previous);
+  }, [refreshDirty]);
 
   const redo = useCallback(() => {
     const redoStack = redoStackRef.current;
@@ -142,16 +172,29 @@ export function useUndoableAutomaton(
     setCanRedo(redoStack.length > 0);
     setCanUndo(true);
     setCurrent(next);
-  }, []);
+    refreshDirty(next);
+  }, [refreshDirty]);
 
   const clearHistory = useCallback(() => {
     undoStackRef.current = [];
     redoStackRef.current = [];
     setCanUndo(false);
     setCanRedo(false);
-    // No fake re-render needed: the flag setters above already trigger one
-    // when either flag actually changes (and a no-op clear is genuinely a
-    // no-op for consumers).
+  }, []);
+
+  const replaceSnapshot = useCallback((snapshot: Snapshot) => {
+    undoStackRef.current = [];
+    redoStackRef.current = [];
+    setCanUndo(false);
+    setCanRedo(false);
+    setCurrent(snapshot);
+    savedSnapshotRef.current = snapshot;
+    setIsDirty(false);
+  }, []);
+
+  const markSaved = useCallback(() => {
+    savedSnapshotRef.current = currentRef.current;
+    setIsDirty(false);
   }, []);
 
   return {
@@ -164,5 +207,8 @@ export function useUndoableAutomaton(
     canUndo,
     canRedo,
     clearHistory,
+    replaceSnapshot,
+    markSaved,
+    isDirty,
   };
 }

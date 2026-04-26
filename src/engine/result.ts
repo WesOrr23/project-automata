@@ -46,7 +46,15 @@ export type EngineError =
   | 'dfa-dead-end'
   | 'automaton-not-runnable-empty-alphabet'
   | 'automaton-not-runnable-no-start-state'
-  | 'automaton-not-runnable-incomplete-dfa';
+  | 'automaton-not-runnable-incomplete-dfa'
+
+  // files/format.ts
+  | 'parse-invalid-json'
+  | 'parse-wrong-kind'
+  | 'parse-bad-version'
+  | 'parse-malformed'
+  | 'file-read-failed'
+  | 'file-cancelled';
 
 /**
  * Discriminated-union result type. Use the `ok` and `err` constructors
@@ -104,5 +112,17 @@ export function errorMessage(error: EngineError): string {
       return 'Automaton has no start state';
     case 'automaton-not-runnable-incomplete-dfa':
       return 'DFA is incomplete — add the missing transitions to simulate';
+    case 'parse-invalid-json':
+      return 'File is not valid JSON';
+    case 'parse-wrong-kind':
+      return 'File is not a Project Automata save file';
+    case 'parse-bad-version':
+      return 'File was saved by a newer version of Project Automata';
+    case 'parse-malformed':
+      return 'File is missing required fields or has invalid values';
+    case 'file-read-failed':
+      return 'Could not read the file';
+    case 'file-cancelled':
+      return 'File operation cancelled';
   }
 }

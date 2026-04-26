@@ -275,4 +275,61 @@ describe('useUndoableAutomaton', () => {
 
     expect(result.current.canRedo).toBe(false);
   });
+
+  describe('dirty tracking + replaceSnapshot + markSaved', () => {
+    it('starts clean (isDirty: false)', () => {
+      const { result } = renderHook(() => useUndoableAutomaton(initialSnapshot()));
+      expect(result.current.isDirty).toBe(false);
+    });
+
+    it('becomes dirty on the first edit', () => {
+      const { result } = renderHook(() => useUndoableAutomaton(initialSnapshot()));
+      act(() => result.current.setAutomaton(withOneMoreState));
+      expect(result.current.isDirty).toBe(true);
+    });
+
+    it('becomes clean again after markSaved', () => {
+      const { result } = renderHook(() => useUndoableAutomaton(initialSnapshot()));
+      act(() => result.current.setAutomaton(withOneMoreState));
+      expect(result.current.isDirty).toBe(true);
+      act(() => result.current.markSaved());
+      expect(result.current.isDirty).toBe(false);
+    });
+
+    it('stays clean when undo returns to a saved snapshot', () => {
+      const { result } = renderHook(() => useUndoableAutomaton(initialSnapshot()));
+      // Initial = saved baseline.
+      act(() => result.current.setAutomaton(withOneMoreState));
+      expect(result.current.isDirty).toBe(true);
+      // Undo back to the (initial = saved) baseline.
+      act(() => result.current.undo());
+      expect(result.current.isDirty).toBe(false);
+    });
+
+    it('becomes dirty again after redoing past the saved snapshot', () => {
+      const { result } = renderHook(() => useUndoableAutomaton(initialSnapshot()));
+      act(() => result.current.setAutomaton(withOneMoreState));
+      act(() => result.current.markSaved());
+      act(() => result.current.undo());           // back to initial; dirty (drifted from saved)
+      expect(result.current.isDirty).toBe(true);
+      act(() => result.current.redo());           // forward to saved snapshot; clean
+      expect(result.current.isDirty).toBe(false);
+    });
+
+    it('replaceSnapshot wipes history and resets dirty', () => {
+      const { result } = renderHook(() => useUndoableAutomaton(initialSnapshot()));
+      act(() => result.current.setAutomaton(withOneMoreState));
+      act(() => result.current.setAutomaton(withOneMoreState));
+      expect(result.current.canUndo).toBe(true);
+      const fresh: Snapshot = {
+        automaton: createAutomaton('NFA', new Set(['a', 'b'])),
+        epsilonSymbol: 'ε',
+      };
+      act(() => result.current.replaceSnapshot(fresh));
+      expect(result.current.automaton.type).toBe('NFA');
+      expect(result.current.canUndo).toBe(false);
+      expect(result.current.canRedo).toBe(false);
+      expect(result.current.isDirty).toBe(false);
+    });
+  });
 });

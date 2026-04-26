@@ -1,6 +1,12 @@
 {
-  "name": "Strings ending in '01'",
-  "description": "DFA that accepts binary strings ending in '01'",
+  "kind": "automata-file",
+  "formatVersion": 1,
+  "metadata": {
+    "name": "Strings ending in '01'",
+    "description": "DFA that accepts binary strings ending in '01'",
+    "createdAt": "2026-04-26T00:00:00Z",
+    "modifiedAt": "2026-04-26T00:00:00Z"
+  },
   "automaton": {
     "type": "DFA",
     "states": [0, 1, 2],

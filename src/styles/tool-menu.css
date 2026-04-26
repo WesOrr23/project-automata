@@ -942,3 +942,127 @@
   font-family: inherit;
   font-size: inherit;
 }
+
+/* ─── File Panel (FILE tab content) ─── */
+
+.file-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 240px;
+}
+
+.file-panel-current {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.file-panel-current-name {
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  color: var(--text-heading);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.file-panel-dirty-dot {
+  color: var(--blue-500, #3b82f6);
+  font-size: 1.4em;
+  line-height: 0;
+}
+
+.file-panel-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.file-panel-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+}
+
+.file-panel-recents {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.file-panel-recents-empty {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-style: italic;
+  padding: var(--space-2) 0;
+}
+
+.file-panel-recents-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.file-panel-recents-item {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  border-radius: 6px;
+}
+
+.file-panel-recents-item:hover {
+  background: var(--bg-button-hover);
+}
+
+.file-panel-recents-open {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-2);
+  font: inherit;
+  border-radius: 6px;
+  color: var(--text-body);
+}
+
+.file-panel-recents-open:hover {
+  color: var(--text-heading);
+}
+
+.file-panel-recents-name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium, 500);
+}
+
+.file-panel-recents-meta {
+  font-size: var(--text-xs, 11px);
+  color: var(--text-secondary);
+}
+
+.file-panel-recents-forget {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0 var(--space-2);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-panel-recents-forget:hover {
+  color: var(--text-heading);
+  background: var(--bg-button-active, rgba(0,0,0,0.06));
+}

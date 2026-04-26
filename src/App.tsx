@@ -39,7 +39,20 @@ import { useSimulation } from './hooks/useSimulation';
 import { useUndoableAutomaton } from './hooks/useUndoableAutomaton';
 import { useUndoRedoShortcuts } from './hooks/useUndoRedoShortcuts';
 import { useAutomatonSimulationGlue } from './hooks/useAutomatonSimulationGlue';
+import { useFileSession } from './hooks/useFileSession';
+import { useFileShortcuts } from './hooks/useFileShortcuts';
+import { createFileAdapter } from './files/fileAdapter';
+import { FilePanel } from './components/toolMenu/FilePanel';
 import { UndoRedoControls } from './components/UndoRedoControls';
+import { createAutomaton as createBlankAutomaton } from './engine/automaton';
+
+const fileAdapter = createFileAdapter();
+function blankFactory() {
+  return {
+    automaton: createBlankAutomaton('DFA', new Set(['0', '1'])),
+    epsilonSymbol: 'ε',
+  };
+}
 
 /**
  * Build the sample DFA that accepts binary strings ending in "01".
@@ -98,6 +111,9 @@ function App() {
     canUndo,
     canRedo,
     clearHistory,
+    replaceSnapshot,
+    markSaved,
+    isDirty,
   } = useUndoableAutomaton(initialSnapshot);
   const [inputString, setInputString] = useState('');
   const [menuState, setMenuState] = useState<ToolMenuState>({ mode: 'COLLAPSED' });
@@ -584,7 +600,43 @@ function App() {
       ? (sim.accepted ? 'accepted' : 'rejected')
       : null;
 
+  // ─── File session ───
+  const fileSession = useFileSession(
+    {
+      automaton,
+      epsilonSymbol,
+      isDirty,
+      markSaved,
+      replaceSnapshot,
+      adapter: fileAdapter,
+      notify,
+    },
+    blankFactory
+  );
+
+  useFileShortcuts({
+    enabled: appMode === 'EDITING',
+    onSave: fileSession.save,
+    onSaveAs: fileSession.saveAs,
+    onOpen: fileSession.openFile,
+    onNew: fileSession.newFile,
+  });
+
   // ─── Panel content ───
+
+  const fileContent = (
+    <FilePanel
+      currentName={fileSession.currentName}
+      isDirty={isDirty}
+      recents={fileSession.recents}
+      onNew={fileSession.newFile}
+      onOpen={fileSession.openFile}
+      onSave={fileSession.save}
+      onSaveAs={fileSession.saveAs}
+      onOpenRecent={fileSession.openRecent}
+      onForgetRecent={fileSession.forgetRecent}
+    />
+  );
 
   const configContent = (
     <ConfigPanel
@@ -654,6 +706,7 @@ function App() {
         onHoverLeave={handleHoverLeave}
         onTabClick={handleTabClick}
         onCollapse={handleCollapse}
+        fileContent={fileContent}
         configContent={configContent}
         editContent={editContent}
         simulateContent={simulateContent}
