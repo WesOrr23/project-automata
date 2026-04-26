@@ -70,7 +70,8 @@
  * the shrink, not snapping at the end. */
 .tool-menu-collapsed {
   width: 48px;
-  max-height: 120px;
+  /* Fits 4 rows: 4×32 + 3×4 (gaps) + 2×8 (padding) = 156, +4 cushion. */
+  max-height: 160px;
   border-radius: 24px;
   transition:
     height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
@@ -132,7 +133,8 @@
  * EXPANDED on its way to COLLAPSED. */
 .tool-menu-expanded {
   width: 152px;
-  max-height: 120px;
+  /* Match COLLAPSED — see note there for the 4-tab math. */
+  max-height: 160px;
   border-radius: var(--radius-md);
   transition:
     height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),

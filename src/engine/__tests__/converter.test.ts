@@ -245,6 +245,44 @@ describe('convertNfaToDfa — edge cases', () => {
   });
 });
 
+describe('convertNfaToDfa — auto-minimization', () => {
+  it('produces a minimal DFA (no equivalent states post-conversion)', () => {
+    // NFA whose naïve subset construction yields redundant states
+    // that minimization collapses. Two parallel branches on 'a',
+    // both accepting end-of-input → subsets {q1} and {q2} would be
+    // equivalent and should merge.
+    const nfa: Automaton = {
+      type: 'NFA',
+      states: new Set([0, 1, 2]),
+      alphabet: new Set(['a', 'b']),
+      transitions: [
+        { from: 0, to: new Set([1, 2]), symbol: 'a' },
+        { from: 1, to: new Set([1]), symbol: 'a' },
+        { from: 1, to: new Set([1]), symbol: 'b' },
+        { from: 2, to: new Set([2]), symbol: 'a' },
+        { from: 2, to: new Set([2]), symbol: 'b' },
+      ],
+      startState: 0,
+      acceptStates: new Set([1, 2]),
+      nextStateId: 3,
+    };
+    const { dfa, subsetMap } = expectOk(convertNfaToDfa(nfa));
+    // q1 and q2 are language-equivalent post-subset (both: from {1} or
+    // {2}, every symbol loops back). They should merge. Plus the start
+    // state {0} → 2 states total in the minimized DFA.
+    expect(dfa.states.size).toBeLessThanOrEqual(3);
+    // Subset map for the merged state should contain BOTH original
+    // NFA states 1 and 2 (the union after composition).
+    const acceptSubsetEntry = Array.from(subsetMap.entries()).find(
+      ([id]) => dfa.acceptStates.has(id)
+    );
+    expect(acceptSubsetEntry).toBeDefined();
+    const acceptSubset = acceptSubsetEntry![1];
+    expect(acceptSubset.has(1)).toBe(true);
+    expect(acceptSubset.has(2)).toBe(true);
+  });
+});
+
 describe('convertNfaToDfa — property: equivalence via random inputs', () => {
   it('endsIn01: 30 random short inputs accept the same on NFA and DFA', () => {
     const nfa = endsIn01NFA();

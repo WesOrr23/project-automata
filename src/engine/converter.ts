@@ -21,6 +21,7 @@
 import { Automaton, Transition } from './types';
 import { Result, ok, err } from './result';
 import { epsilonClosure } from './utils';
+import { minimizeDfa } from './minimizer';
 
 const MAX_SUBSETS = 1000;
 
@@ -152,7 +153,7 @@ export function convertNfaToDfa(nfa: Automaton): Result<ConversionOutcome> {
   const states = new Set<number>();
   for (let i = 0; i < nextId; i++) states.add(i);
 
-  const dfa: Automaton = {
+  const rawDfa: Automaton = {
     type: 'DFA',
     states,
     alphabet: new Set(alphabet),
@@ -162,7 +163,29 @@ export function convertNfaToDfa(nfa: Automaton): Result<ConversionOutcome> {
     nextStateId: nextId,
   };
 
-  return ok({ dfa, subsetMap: idToSubset });
+  // Auto-apply Hopcroft minimization. The pre-minimization DFA is what
+  // a textbook subset construction produces; the user shouldn't have
+  // to run a second button to get the minimal form. If/when we add a
+  // step-through mode (showing each step of subset construction +
+  // minimization separately), this auto-call moves into the UI layer.
+  const minimized = minimizeDfa(rawDfa);
+  if (!minimized.ok) return minimized;
+
+  // Compose: each minimized state collapses one or more raw-DFA state
+  // IDs (mergeMap), each of which represents an NFA subset (idToSubset).
+  // Final subsetMap maps minimized state ID → union of underlying NFA
+  // states across every collapsed raw state.
+  const composedSubsetMap = new Map<number, ReadonlySet<number>>();
+  for (const [newId, mergedRawIds] of minimized.value.mergeMap) {
+    const union = new Set<number>();
+    for (const rawId of mergedRawIds) {
+      const subset = idToSubset.get(rawId);
+      if (subset) for (const nfaId of subset) union.add(nfaId);
+    }
+    composedSubsetMap.set(newId, union);
+  }
+
+  return ok({ dfa: minimized.value.dfa, subsetMap: composedSubsetMap });
 }
 
 /** Exposed for tests + UI label generation. */
