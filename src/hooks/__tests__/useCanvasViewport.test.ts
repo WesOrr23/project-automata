@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import {
   useCanvasViewport,
+  clampViewport,
   MIN_SCALE,
   MAX_SCALE,
 } from '../useCanvasViewport';
@@ -256,5 +257,69 @@ describe('useCanvasViewport', () => {
     const { result } = setupHook({ contentBoundingBox: null });
     act(() => result.current.fitToContent());
     expect(result.current.viewport).toEqual({ scale: 1, panX: 0, panY: 0 });
+  });
+});
+
+describe('clampViewport (centered slack policy)', () => {
+  const SMALL_BOX = { width: 400, height: 300 };
+  const BIG_BOX = { width: 2000, height: 1500 };
+  const VIEW = { width: 1000, height: 800 };
+
+  it('returns the viewport unchanged when content or viewport is null', () => {
+    const v = { scale: 1, panX: 50, panY: 50 };
+    expect(clampViewport(v, null, VIEW)).toBe(v);
+    expect(clampViewport(v, SMALL_BOX, null)).toBe(v);
+  });
+
+  it('returns the viewport unchanged when content has zero size', () => {
+    const v = { scale: 1, panX: 50, panY: 50 };
+    expect(clampViewport(v, { width: 0, height: 0 }, VIEW)).toBe(v);
+  });
+
+  it('centers and pan-locks small content (smaller than viewport on both axes)', () => {
+    // 400x300 content in 1000x800 viewport at scale 1 → centered at (300,250).
+    const v = { scale: 1, panX: 999, panY: -500 };
+    const out = clampViewport(v, SMALL_BOX, VIEW);
+    expect(out.scale).toBe(1);
+    expect(out.panX).toBe(300);
+    expect(out.panY).toBe(250);
+  });
+
+  it('clamps pan on large content so content always covers the viewport', () => {
+    // 2000x1500 content in 1000x800 viewport at scale 1.
+    // panX must be in [1000-2000, 0] = [-1000, 0]
+    // panY must be in [800-1500, 0]  = [-700, 0]
+    expect(clampViewport({ scale: 1, panX: 500, panY: 500 }, BIG_BOX, VIEW)).toEqual({
+      scale: 1, panX: 0, panY: 0,
+    });
+    expect(clampViewport({ scale: 1, panX: -2000, panY: -2000 }, BIG_BOX, VIEW)).toEqual({
+      scale: 1, panX: -1000, panY: -700,
+    });
+    // In-range stays put.
+    expect(clampViewport({ scale: 1, panX: -300, panY: -200 }, BIG_BOX, VIEW)).toEqual({
+      scale: 1, panX: -300, panY: -200,
+    });
+  });
+
+  it('handles mixed axes: large in X, small in Y', () => {
+    // 2000x300 content in 1000x800: X is large (clamp), Y is small (center).
+    const out = clampViewport({ scale: 1, panX: -1500, panY: 999 }, { width: 2000, height: 300 }, VIEW);
+    expect(out.panX).toBe(-1000);
+    expect(out.panY).toBe(250); // (800 - 300) / 2
+  });
+
+  it('returns the same reference when no change is needed (no-op short-circuit)', () => {
+    const v = { scale: 1, panX: -300, panY: -200 };
+    const out = clampViewport(v, BIG_BOX, VIEW);
+    expect(out).toBe(v);
+  });
+
+  it('respects the active scale when computing scaled extents', () => {
+    // 400x300 content at scale 4 → 1600x1200 (now larger than 1000x800).
+    // Both axes clamp to large-content rules.
+    const out = clampViewport({ scale: 4, panX: 100, panY: 100 }, SMALL_BOX, VIEW);
+    expect(out.scale).toBe(4);
+    expect(out.panX).toBe(0);
+    expect(out.panY).toBe(0);
   });
 });

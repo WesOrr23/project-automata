@@ -105,7 +105,19 @@ export function ToolMenu({
                 return (
                     <Fragment key={tab.id}>
                         {isActive ? (
-                            <div className="tool-menu-row active" aria-label={`${tab.label} (active)`}>
+                            // motion.div + layoutId enables Framer's shared-
+                            // element animation: when the active tab changes,
+                            // the previous row (which had this layoutId)
+                            // unmounts and the new row mounts; Framer detects
+                            // the same layoutId and animates the chrome from
+                            // the old row's position to the new row's position
+                            // instead of an instant swap.
+                            <motion.div
+                                layoutId="tool-menu-active-row-chrome"
+                                className="tool-menu-row active"
+                                aria-label={`${tab.label} (active)`}
+                                transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                            >
                                 <Icon size={20} />
                                 <span className="tool-menu-row-label">{tab.label}</span>
                                 <button
@@ -118,7 +130,7 @@ export function ToolMenu({
                                 >
                                     <ChevronLeft size={14} />
                                 </button>
-                            </div>
+                            </motion.div>
                         ) : (
                             <button
                                 type="button"

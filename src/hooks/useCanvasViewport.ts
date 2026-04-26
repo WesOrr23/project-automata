@@ -21,9 +21,12 @@
  * derivable from the wheel/pointer input stream. No imperative SVG
  * matrix manipulation; React owns the values, the SVG just renders them.
  *
- * Scale is clamped to [0.25, 4.0]. Pan is clamped so at least a portion
- * of the content stays inside the viewport (so the user can park the
- * canvas off-center but can't lose it entirely).
+ * Scale is clamped to [0.25, 4.0]. Pan is clamped via the
+ * "centered slack" policy: when the scaled content is smaller than the
+ * viewport on an axis, it's centered and pan-locked on that axis; when
+ * larger, the content always covers the viewport (no edge can recede
+ * past the corresponding viewport edge). See `clampViewport` for the
+ * full policy.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -98,41 +101,63 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * Clamp pan so the scaled content can be parked partly off-screen but
- * not lost. The content is allowed to slide until only a thin margin
- * remains visible inside the viewport — generous enough to support
- * deliberate off-center parking while still preventing "where did my
- * graph go?" accidents.
+ * Clamp viewport ("centered slack" policy): per-axis,
+ *
+ *  - If the scaled content is *smaller than or equal to* the viewport on
+ *    that axis, center the content on that axis and lock pan there.
+ *    There is nothing to scroll to, so don't let the user drift the
+ *    content off into empty space.
+ *  - If the scaled content is *larger than* the viewport on that axis,
+ *    allow pan but clamp so no content edge can cross past the
+ *    corresponding viewport edge — i.e. the content fully covers (or
+ *    over-covers) the viewport at all times. The user can pan to see
+ *    any corner, but content never recedes past an edge.
+ *
+ * Returns a possibly-new viewport. Caller should check reference
+ * equality if it cares about no-op cases (we return `viewport` unchanged
+ * when nothing to clamp).
  */
-function clampPan(
-  panX: number,
-  panY: number,
-  scale: number,
+export function clampViewport(
+  viewport: CanvasViewport,
   contentBoundingBox: { width: number; height: number } | null,
   viewportSize: { width: number; height: number } | null
-): { panX: number; panY: number } {
-  if (contentBoundingBox === null || viewportSize === null) {
-    return { panX, panY };
-  }
+): CanvasViewport {
+  if (contentBoundingBox === null || viewportSize === null) return viewport;
+  if (contentBoundingBox.width <= 0 || contentBoundingBox.height <= 0) return viewport;
+  if (viewportSize.width <= 0 || viewportSize.height <= 0) return viewport;
+
+  const { scale, panX, panY } = viewport;
   const scaledWidth = contentBoundingBox.width * scale;
   const scaledHeight = contentBoundingBox.height * scale;
-  // Allow the content to slide until only ~80px remains in view (or
-  // half its size, whichever is smaller — for tiny content keep at
-  // least half visible).
-  const minVisible = 80;
-  const marginX = Math.min(scaledWidth - minVisible, scaledWidth / 2);
-  const marginY = Math.min(scaledHeight - minVisible, scaledHeight / 2);
-  // panX range: [viewportWidth - scaledWidth - marginX, marginX]
-  // (panX is the world-origin's x in viewport pixels; high panX pushes
-  // content right.)
-  const minPanX = viewportSize.width - scaledWidth - marginX;
-  const maxPanX = marginX;
-  const minPanY = viewportSize.height - scaledHeight - marginY;
-  const maxPanY = marginY;
-  return {
-    panX: clamp(panX, Math.min(minPanX, maxPanX), Math.max(minPanX, maxPanX)),
-    panY: clamp(panY, Math.min(minPanY, maxPanY), Math.max(minPanY, maxPanY)),
-  };
+
+  // X axis.
+  let nextPanX: number;
+  if (scaledWidth <= viewportSize.width) {
+    nextPanX = (viewportSize.width - scaledWidth) / 2;
+  } else {
+    // panX is the screen-pixel offset of world origin (x=0). Content's
+    // left edge sits at panX; right edge at panX + scaledWidth. To keep
+    // both in [0, viewportSize.width] coverage:
+    //   panX <= 0  (content's left ≤ viewport's left)
+    //   panX + scaledWidth >= viewportSize.width  (right ≥ right)
+    // → panX in [viewportSize.width - scaledWidth, 0]
+    const minPanX = viewportSize.width - scaledWidth;
+    const maxPanX = 0;
+    nextPanX = clamp(panX, minPanX, maxPanX);
+  }
+
+  // Y axis.
+  let nextPanY: number;
+  if (scaledHeight <= viewportSize.height) {
+    nextPanY = (viewportSize.height - scaledHeight) / 2;
+  } else {
+    const minPanY = viewportSize.height - scaledHeight;
+    const maxPanY = 0;
+    nextPanY = clamp(panY, minPanY, maxPanY);
+  }
+
+  if (nextPanX === panX && nextPanY === panY) return viewport;
+  return { scale, panX: nextPanX, panY: nextPanY };
 }
 
 export function useCanvasViewport(
@@ -210,17 +235,20 @@ export function useCanvasViewport(
 
   const panBy = useCallback((deltaX: number, deltaY: number) => {
     setViewport((current) => {
-      const clamped = clampPan(
-        current.panX + deltaX,
-        current.panY + deltaY,
-        current.scale,
+      const requested: CanvasViewport = {
+        scale: current.scale,
+        panX: current.panX + deltaX,
+        panY: current.panY + deltaY,
+      };
+      const clamped = clampViewport(
+        requested,
         contentBoxRef.current,
         viewportSizeRef.current
       );
       if (clamped.panX === current.panX && clamped.panY === current.panY) {
         return current;
       }
-      return { ...current, panX: clamped.panX, panY: clamped.panY };
+      return clamped;
     });
   }, []);
 
@@ -236,14 +264,11 @@ export function useCanvasViewport(
       const worldY = (anchorY - current.panY) / current.scale;
       const newPanX = anchorX - worldX * newScale;
       const newPanY = anchorY - worldY * newScale;
-      const clamped = clampPan(
-        newPanX,
-        newPanY,
-        newScale,
+      return clampViewport(
+        { scale: newScale, panX: newPanX, panY: newPanY },
         contentBoxRef.current,
         viewportSizeRef.current
       );
-      return { scale: newScale, panX: clamped.panX, panY: clamped.panY };
     });
   }, [triggerAnimation]);
 
@@ -259,14 +284,11 @@ export function useCanvasViewport(
       const worldY = (anchorY - current.panY) / current.scale;
       const newPanX = anchorX - worldX * newScale;
       const newPanY = anchorY - worldY * newScale;
-      const clamped = clampPan(
-        newPanX,
-        newPanY,
-        newScale,
+      return clampViewport(
+        { scale: newScale, panX: newPanX, panY: newPanY },
         contentBoxRef.current,
         viewportSizeRef.current
       );
-      return { scale: newScale, panX: clamped.panX, panY: clamped.panY };
     });
   }, [triggerAnimation]);
 
@@ -344,14 +366,11 @@ export function useCanvasViewport(
           const worldY = (cursorY - current.panY) / current.scale;
           const newPanX = cursorX - worldX * newScale;
           const newPanY = cursorY - worldY * newScale;
-          const clamped = clampPan(
-            newPanX,
-            newPanY,
-            newScale,
+          return clampViewport(
+            { scale: newScale, panX: newPanX, panY: newPanY },
             contentBoxRef.current,
             viewportSizeRef.current
           );
-          return { scale: newScale, panX: clamped.panX, panY: clamped.panY };
         });
       } else {
         // Two-finger scroll = pan. Negate so the content moves with
