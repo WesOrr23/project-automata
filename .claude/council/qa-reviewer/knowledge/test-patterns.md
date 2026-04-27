@@ -3,8 +3,8 @@ agent: qa-reviewer
 type: knowledge
 topic: test-patterns
 schema-version: 1
-verified-as-of: 52bdb8e
-last-updated: 2026-04-25
+verified-as-of: 369cd14
+last-updated: 2026-04-27
 confidence: high
 ---
 
@@ -39,6 +39,13 @@ This codebase uses Vitest for unit and hook testing. RTL (React Testing Library)
 - Use `@testing-library/react`'s `renderHook` for hook tests.
 - Drive transitions via `act()` and the hook's returned dispatchers.
 - Assert on the hook's returned state object.
+
+### Canonical templates for queued backfills
+
+Two patterns already in the suite are the right starting points for the iter-17 untested-surface backfills:
+
+- **Fake-timers pattern** — `src/notifications/__tests__/NotificationContext.test.tsx`. Use `vi.useFakeTimers()` + `vi.advanceTimersByTime(ms)` to drive setTimeout-based behavior synchronously. This is the right template for `pauseDismiss` / `resumeDismiss` (verify the residual-time math: pause at T, resume after Δ, dismiss should fire at `original + Δ`, not `original`). Same pattern handles auto-dismiss, hover-pause, and any future timer-bookkeeping in hooks.
+- **Injected-adapter pattern** — `src/files/__tests__/fileAdapter.test.ts`. The test file constructs a fake adapter implementing the same shape as the real one and asserts on what gets called. This is the right template for `useFileSession` — pass a stub adapter that records save/open calls, mock `notify` with `vi.fn()`, drive the hook's returned save/open/saveAs functions via `act()`, assert on adapter calls + notification calls + recents-store interactions.
 
 ### What good looks like
 
