@@ -10,13 +10,19 @@
  * supposed to do (show me the whole thing optimally).
  */
 
-import { Plus, Minus, Maximize2 } from 'lucide-react';
+import { Plus, Minus, Maximize2, LocateFixed } from 'lucide-react';
 import { motion } from 'motion/react';
 
 type CanvasZoomControlsProp = {
   zoomIn: () => void;
   zoomOut: () => void;
   fitToContent: () => void;
+  /** Translate the FA to the visible-region center at current scale. */
+  centerToContent: () => void;
+  /** True when the FA's bbox center matches the visible center at the
+   *  current scale. Drives the middle button's two-stage behavior:
+   *  off-center → click recenters; centered → click fits. */
+  isCentered: boolean;
   atMaxScale: boolean;
   atMinScale: boolean;
   /** Current raw viewport scale. */
@@ -38,6 +44,8 @@ export function CanvasZoomControls({
   zoomIn,
   zoomOut,
   fitToContent,
+  centerToContent,
+  isCentered,
   atMaxScale,
   atMinScale,
   scale,
@@ -72,20 +80,35 @@ export function CanvasZoomControls({
       >
         <Plus size={16} strokeWidth={2.25} />
       </button>
-      {/* Middle button: shows the current zoom percentage at rest;
-          on hover, swaps to the Fit-to-view icon (smooth crossfade)
-          to signal the click action. Both children are absolutely
-          positioned so they overlap and the button doesn't resize. */}
+      {/* Middle button: two-stage. At rest shows current zoom %.
+          On hover, swaps (CSS crossfade) to the action icon for the
+          NEXT click:
+            - FA off-center → "recenter" icon; click translates the
+              FA to the visible-region center (no scale change).
+            - FA already centered → "fit" icon; click does the
+              full fit-to-view (scale + center).
+          Letting the user re-center without losing zoom level is the
+          common case when they've panned to inspect a corner; the
+          fit-to-view stage is then one extra click away once the
+          recenter is done. */}
       <button
         type="button"
         className="canvas-zoom-button canvas-zoom-fit"
-        onClick={fitToContent}
-        title="Fit to view (F)"
-        aria-label={`Fit to view (current: ${percent}%)`}
+        onClick={isCentered ? fitToContent : centerToContent}
+        title={isCentered ? 'Fit to view (F)' : 'Recenter'}
+        aria-label={
+          isCentered
+            ? `Fit to view (current: ${percent}%)`
+            : `Recenter (current: ${percent}%)`
+        }
       >
         <span className="canvas-zoom-fit-percent">{percent}%</span>
         <span className="canvas-zoom-fit-icon">
-          <Maximize2 size={15} strokeWidth={2.25} />
+          {isCentered ? (
+            <Maximize2 size={15} strokeWidth={2.25} />
+          ) : (
+            <LocateFixed size={15} strokeWidth={2.25} />
+          )}
         </span>
       </button>
       <button

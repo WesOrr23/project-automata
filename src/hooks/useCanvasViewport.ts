@@ -119,6 +119,22 @@ export type UseCanvasViewportResult = {
   zoomOut: () => void;
   reset: () => void;
   fitToContent: () => void;
+  /**
+   * Translate the FA so its bbox center aligns with the visible
+   * region's center, WITHOUT changing scale. Drives the first stage
+   * of the two-stage middle zoom button: when the FA is off-center,
+   * one click recenters it; the next click (when isCentered becomes
+   * true) fits to view.
+   */
+  centerToContent: () => void;
+  /**
+   * True when the current pan places the FA's bbox center at the
+   * visible region's center (at the current scale). Used by the
+   * middle zoom button to swap between the "recenter" and "fit"
+   * affordances. Half-pixel tolerance — sub-pixel drift from
+   * floating-point math shouldn't toggle the button.
+   */
+  isCentered: boolean;
   panBy: (deltaX: number, deltaY: number) => void;
   /** True when zoomIn is a no-op (already at MAX_SCALE). */
   atMaxScale: boolean;
@@ -495,6 +511,20 @@ export function useCanvasViewport(
    * content is visible (no cropping). Then centers the result in the
    * visible region (excluding inset chrome).
    */
+  const centerToContent = useCallback(() => {
+    triggerAnimation();
+    const content = contentBoxRef.current;
+    const view = viewportSizeRef.current;
+    if (content === null || view === null) return;
+    setViewport((current) => {
+      const { panX, panY } = centerInVisibleRegion(
+        content, view, insetRef.current, originRef.current, current.scale
+      );
+      if (panX === current.panX && panY === current.panY) return current;
+      return { scale: current.scale, panX, panY };
+    });
+  }, [triggerAnimation]);
+
   const fitToContent = useCallback(() => {
     triggerAnimation();
     const content = contentBoxRef.current;
@@ -660,6 +690,21 @@ export function useCanvasViewport(
     );
   }
 
+  // Compare current pan against the centered pan at current scale.
+  // If they match within half a pixel, we treat the FA as centered.
+  let isCentered = false;
+  if (
+    contentBoundingBox && viewportSize &&
+    contentBoundingBox.width > 0 && contentBoundingBox.height > 0
+  ) {
+    const target = centerInVisibleRegion(
+      contentBoundingBox, viewportSize, inset, origin, viewport.scale
+    );
+    isCentered =
+      Math.abs(target.panX - viewport.panX) < 0.5 &&
+      Math.abs(target.panY - viewport.panY) < 0.5;
+  }
+
   return {
     viewport,
     transform,
@@ -668,6 +713,8 @@ export function useCanvasViewport(
     zoomOut,
     reset,
     fitToContent,
+    centerToContent,
+    isCentered,
     panBy,
     atMaxScale: viewport.scale >= MAX_SCALE,
     atMinScale: viewport.scale <= MIN_SCALE,

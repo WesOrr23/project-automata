@@ -279,6 +279,8 @@ export function AutomatonCanvas({
     zoomIn,
     zoomOut,
     fitToContent,
+    centerToContent,
+    isCentered,
     panBy,
     atMaxScale,
     atMinScale,
@@ -607,6 +609,8 @@ export function AutomatonCanvas({
         zoomIn={zoomIn}
         zoomOut={zoomOut}
         fitToContent={fitToContent}
+        centerToContent={centerToContent}
+        isCentered={isCentered}
         scale={viewport.scale}
         fitScale={fitScale}
         atMaxScale={atMaxScale}
