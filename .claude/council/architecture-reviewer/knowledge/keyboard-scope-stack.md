@@ -3,8 +3,8 @@ agent: architecture-reviewer
 type: knowledge
 topic: keyboard-scope-stack
 schema-version: 1
-verified-as-of: 5cba947
-last-updated: 2026-04-26
+verified-as-of: 369cd14
+last-updated: 2026-04-27
 confidence: high
 ---
 
@@ -53,7 +53,15 @@ The listener filters out keys when focus is inside `<input>`, `<textarea>`, or `
 
 ## Migration history
 
-The four global `keydown` listeners that existed pre-iter-11 (App's undo/redo, TransitionCreator's Enter and type-to-modify, StateActionsPopover's Esc/Space/Del, StatePickerPopover's Escape) were all migrated to `useKeyboardScope` during iter-11 — three in commit `e666a06` and the fourth (StatePickerPopover) in cleanup commit `632ac70`. As of HEAD, no raw `document.addEventListener('keydown', ...)` remains in `src/components/`.
+The four global `keydown` listeners that existed pre-iter-11 (App's undo/redo, TransitionCreator's Enter and type-to-modify, StateActionsPopover's Esc/Space/Del, StatePickerPopover's Escape) were all migrated to `useKeyboardScope` during iter-11 — three in commit `e666a06` and the fourth (StatePickerPopover) in cleanup commit `632ac70`.
+
+**Iter-12 regression:** four new components introduced raw `document.addEventListener('keydown', ...)` instead of going through the scope stack:
+- `useDebugOverlay` — ⌘⇧D toggle (would clobber any modal that wanted Cmd+Shift+D for itself; should be a transparent scope).
+- `Onboarding` — Esc to dismiss. Worst offender: this is modal-flavored, should register a `capture: true` scope so Esc doesn't leak to whatever sits behind the dim overlay.
+- `CommandBar` — Esc to close active popover.
+- `ComparePicker` — Esc to close.
+
+These should be migrated to `useKeyboardScope`. Recorded in `journal/2026-04-27-iter12-closeout.md`. Until cleaned up, the "no raw `document.addEventListener('keydown')` remains" claim from iter-11 is no longer true.
 
 ## Provenance
 

@@ -3,8 +3,8 @@ agent: architecture-reviewer
 type: knowledge
 topic: engine-ui-separation
 schema-version: 1
-verified-as-of: 5d496ee
-last-updated: 2026-04-26
+verified-as-of: 369cd14
+last-updated: 2026-04-27
 confidence: high
 ---
 
