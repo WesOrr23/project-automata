@@ -528,6 +528,28 @@ button svg {
   margin: 4px 0;
 }
 
+/* Inline checkbox row inside a popover — used by the export
+ * popover's "Transparent background" toggle. Same horizontal
+ * rhythm as the popover items above so it visually belongs in the
+ * same surface, but lighter (no hover bg) since it's a setting, not
+ * an action. */
+.command-bar-popover-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-body);
+  cursor: pointer;
+  user-select: none;
+}
+
+.command-bar-popover-toggle input[type='checkbox'] {
+  flex: 0 0 auto;
+  margin: 0;
+  cursor: pointer;
+}
+
 /* Operations items override the row layout: stack the icon+label row
  * over the hint so a long hint can wrap cleanly under the label
  * rather than overflowing the popover. */

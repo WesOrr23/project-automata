@@ -103,13 +103,15 @@ type CommandBarProp = {
   onSave: () => Promise<void>;
   onSaveAs: () => Promise<void>;
   /** Save the current canvas as a .png file (rendered at 2× pixel
-   *  density). Async so the bar can show a loading state while the
-   *  SVG → canvas → PNG pipeline runs. Optional so older test
-   *  fixtures and tools that don't expose a canvas can omit it. */
-  onExportPNG?: () => Promise<void>;
-  /** Save the current canvas as a self-contained .svg file. Optional
-   *  for the same reason as onExportPNG. */
-  onExportSVG?: () => void;
+   *  density). The boolean arg controls whether the export gets a
+   *  white background (false) or stays transparent (true). Async so
+   *  the bar can show a loading state while the SVG → canvas → PNG
+   *  pipeline runs. Optional so older test fixtures and tools that
+   *  don't expose a canvas can omit it. */
+  onExportPNG?: (transparent: boolean) => Promise<void>;
+  /** Save the current canvas as a self-contained .svg file. Same
+   *  transparent-background contract as onExportPNG. */
+  onExportSVG?: (transparent: boolean) => void;
   onOpenRecent: (id: string) => void;
   onForgetRecent: (id: string) => void;
   /** Called when the user commits an inline filename rename. The empty
@@ -180,6 +182,10 @@ export function CommandBar({
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveAsLoading, setSaveAsLoading] = useState(false);
   const [exportPNGLoading, setExportPNGLoading] = useState(false);
+  // Transparent-background toggle, shared between PNG and SVG export.
+  // Persists across popover open/close in this session (component
+  // stays mounted) so the user doesn't have to re-tick every time.
+  const [exportTransparent, setExportTransparent] = useState(false);
 
   // Inline rename state
   const [renaming, setRenaming] = useState(false);
@@ -573,7 +579,7 @@ export function CommandBar({
                     className={`command-bar-popover-item${exportPNGLoading ? ' command-bar-popover-item-loading' : ''}`}
                     onClick={() => {
                       setActivePopover(null);
-                      void withLoading(setExportPNGLoading, onExportPNG);
+                      void withLoading(setExportPNGLoading, () => onExportPNG(exportTransparent));
                     }}
                     disabled={exportPNGLoading}
                     aria-busy={exportPNGLoading}
@@ -590,7 +596,7 @@ export function CommandBar({
                     className="command-bar-popover-item"
                     onClick={() => {
                       setActivePopover(null);
-                      onExportSVG();
+                      onExportSVG(exportTransparent);
                     }}
                     title="Save the current canvas as an SVG file"
                   >
@@ -598,6 +604,25 @@ export function CommandBar({
                     <span className="command-bar-popover-item-label-inline">SVG image</span>
                   </button>
                 )}
+
+                <div className="command-bar-popover-divider" role="separator" />
+
+                {/* Transparent-background toggle. Shared between PNG
+                    and SVG. Defaults off (white background) since
+                    that's what most pasted-into-slides use cases
+                    want; off-by-default also matches the SVG that
+                    has historically been delivered. */}
+                <label
+                  className="command-bar-popover-toggle"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <input
+                    type="checkbox"
+                    checked={exportTransparent}
+                    onChange={(e) => setExportTransparent(e.target.checked)}
+                  />
+                  <span>Transparent background</span>
+                </label>
               </div>
             )}
           </motion.div>

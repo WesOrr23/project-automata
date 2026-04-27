@@ -134,21 +134,16 @@ function App() {
   // watch the value via useEffect and focus the input when it changes,
   // so the user lands in Define ready to type.
   const [alphabetFocusSignal, setAlphabetFocusSignal] = useState(0);
-  // Lifted from AutomatonCanvas via callbacks. Image-export action
-  // needs the live SVG element + the cluster bbox to frame the
-  // export at the FA's natural size. Kept in refs so the export
-  // handler reads fresh values without re-binding on every render.
+  // Lifted from AutomatonCanvas via callback. Image-export action
+  // needs the live SVG element to serialize. The export framing now
+  // measures content bbox live (via getBBox on the inner content
+  // group), so we no longer mirror contentBBox up — only the svg
+  // ref. Kept in a ref so the export handler reads the fresh value
+  // without re-binding on every render.
   const exportSvgRef = useRef<SVGSVGElement | null>(null);
-  const exportBBoxRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const handleSvgRefChange = useCallback((svg: SVGSVGElement | null) => {
     exportSvgRef.current = svg;
   }, []);
-  const handleContentBBoxChange = useCallback(
-    (bbox: { x: number; y: number; width: number; height: number } | null) => {
-      exportBBoxRef.current = bbox;
-    },
-    []
-  );
 
   const sim = useSimulation(automaton);
   const { highlightedTarget, notify } = useNotifications();
@@ -496,10 +491,9 @@ function App() {
     return base.length > 0 ? base : 'automaton';
   }
 
-  function handleExportSVG() {
+  function handleExportSVG(transparent: boolean) {
     const svg = exportSvgRef.current;
-    const bbox = exportBBoxRef.current;
-    if (!svg || !bbox) {
+    if (!svg) {
       notify({
         severity: 'error',
         title: 'Export failed',
@@ -508,7 +502,7 @@ function App() {
       return;
     }
     try {
-      exportCanvasAsSVG(svg, bbox, `${exportFilenameStem()}.svg`);
+      exportCanvasAsSVG(svg, `${exportFilenameStem()}.svg`, { transparent });
       notify({ severity: 'success', title: 'Exported as SVG', autoDismissMs: 2200 });
     } catch (err) {
       notify({
@@ -519,10 +513,9 @@ function App() {
     }
   }
 
-  async function handleExportPNG() {
+  async function handleExportPNG(transparent: boolean) {
     const svg = exportSvgRef.current;
-    const bbox = exportBBoxRef.current;
-    if (!svg || !bbox) {
+    if (!svg) {
       notify({
         severity: 'error',
         title: 'Export failed',
@@ -531,7 +524,7 @@ function App() {
       return;
     }
     try {
-      await exportCanvasAsPNG(svg, bbox, `${exportFilenameStem()}.png`);
+      await exportCanvasAsPNG(svg, `${exportFilenameStem()}.png`, { transparent });
       notify({ severity: 'success', title: 'Exported as PNG', autoDismissMs: 2200 });
     } catch (err) {
       notify({
@@ -1102,7 +1095,6 @@ function App() {
             onShowTour={onboarding.show}
             debugOverlay={debugOverlay.enabled}
             onSvgRefChange={handleSvgRefChange}
-            onContentBBoxChange={handleContentBBoxChange}
             bottomRightExtras={
               /* Discoverability hint while in EDIT mode and the form is
                  at rest. Sits at the bottom of the canvas-bottom-right

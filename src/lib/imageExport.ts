@@ -37,42 +37,55 @@ const STYLE_PROPS_TO_INLINE = [
   'paint-order',
 ] as const;
 
-/** Padding (in user-space units) added around the cluster bbox so
- *  exported content isn't flush against the canvas edge. */
+/** Padding (in user-space units) added around the visible content
+ *  bbox so exported content isn't flush against the canvas edge. */
 const EXPORT_PADDING = 32;
 
-/** Reserve on the LEFT of the cluster bbox for the start arrow.
- *  Matches AutomatonCanvas's START_ARROW_RESERVE. */
-const START_ARROW_RESERVE = 70;
-
-type ClusterBBox = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+export type ExportOptions = {
+  /** When true, omit the white background rect — the file (PNG or
+   *  SVG) renders with transparent areas wherever the FA isn't
+   *  drawn. Default: false (white background). */
+  transparent?: boolean;
 };
 
 /**
  * Build a self-contained SVG string ready for either direct download
- * or rendering into a canvas for PNG conversion. Caller provides the
- * live source SVG and the cluster bbox in inner-group coordinates
- * (same one AutomatonCanvas measures and passes to the viewport hook).
+ * or rendering into a canvas for PNG conversion. Frames around the
+ * inner content group's actual bounding box (which includes states,
+ * edges, edge labels, and the start arrow) so self-loops or labels
+ * that protrude beyond the cluster bbox don't clip and don't make
+ * the FA look off-center in the export.
  */
 export function buildExportSVGString(
   liveSvg: SVGSVGElement,
-  cluster: ClusterBBox
+  options: ExportOptions = {}
 ): { svgString: string; widthPx: number; heightPx: number } {
+  // Measure FIRST on the live SVG (clone's getBBox is unreliable
+  // until the clone is in the document). The inner content group is
+  // the first <g> child that contains the FA — its getBBox returns
+  // the union of every visible descendant. We measure on the
+  // OUTERMOST transformed group ancestor of the FA so the bbox is
+  // already in the SVG's outer coordinate space (no need to add
+  // back the inner translate).
+  const liveContentGroup = findContentGroup(liveSvg);
+  if (!liveContentGroup) {
+    throw new Error('Could not locate canvas content group for export');
+  }
+  // We need a bbox in the coordinate space the export viewBox uses —
+  // i.e. the outer-group coords AFTER the pan/zoom transform is
+  // stripped. Trick: temporarily clear the transform on the live
+  // group, measure, restore. This only works because we're measuring
+  // synchronously on the live DOM and the user can't perceive a
+  // single-frame transform flicker (we restore before any paint).
+  const savedTransform = liveContentGroup.getAttribute('transform');
+  if (savedTransform !== null) liveContentGroup.removeAttribute('transform');
+  const liveBBox = (liveContentGroup as SVGGraphicsElement).getBBox();
+  if (savedTransform !== null) liveContentGroup.setAttribute('transform', savedTransform);
+
   const clone = liveSvg.cloneNode(true) as SVGSVGElement;
 
   // Reset the content group's transform so the export is at 1:1
-  // scale, regardless of current pan/zoom. The transform attribute
-  // is set imperatively per render by useCanvasViewport; the cloned
-  // node still carries the most recent value.
-  // The transform owner is the FIRST <g> child of the SVG that has a
-  // `transform` attribute set as a string like "translate(...) scale(...)"
-  // — that's the canvas-content group. Resetting it to identity (no
-  // attribute) keeps the inner-g translate(-START_ARROW_RESERVE 0)
-  // intact, which is what we want.
+  // scale, regardless of current pan/zoom.
   const outerGroups = clone.querySelectorAll(':scope > g[transform]');
   outerGroups.forEach((g) => g.removeAttribute('transform'));
 
@@ -83,22 +96,16 @@ export function buildExportSVGString(
   );
   debugCircles.forEach((el) => el.remove());
 
-  // Inline computed styles. Walk the LIVE element tree in parallel
-  // with the clone and copy the subset of properties that affect
-  // visual rendering.
+  // Inline computed styles so the standalone file doesn't depend on
+  // the document's stylesheets for fill/stroke/font.
   inlineComputedStyles(liveSvg, clone);
 
-  // Frame: cluster bbox in inner-group coordinates is at
-  // (cluster.x, cluster.y) sized cluster.width x cluster.height.
-  // The inner-g translates by (-START_ARROW_RESERVE, 0), so the
-  // visible content's left edge in outer-group coords is
-  // (cluster.x - START_ARROW_RESERVE).
-  // Add EXPORT_PADDING on every side; reserve extra room on the
-  // left for the start arrow.
-  const minX = cluster.x - START_ARROW_RESERVE - EXPORT_PADDING;
-  const minY = cluster.y - EXPORT_PADDING;
-  const width = cluster.width + START_ARROW_RESERVE + EXPORT_PADDING * 2;
-  const height = cluster.height + EXPORT_PADDING * 2;
+  // Frame: live bbox of the content group + symmetric padding on
+  // every side. Result: visible content is geometrically centered.
+  const minX = liveBBox.x - EXPORT_PADDING;
+  const minY = liveBBox.y - EXPORT_PADDING;
+  const width = liveBBox.width + EXPORT_PADDING * 2;
+  const height = liveBBox.height + EXPORT_PADDING * 2;
 
   clone.setAttribute('viewBox', `${minX} ${minY} ${width} ${height}`);
   clone.setAttribute('width', String(width));
@@ -108,18 +115,27 @@ export function buildExportSVGString(
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
   clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
 
-  // White background rect inserted as the first child so it sits
-  // behind everything else.
-  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  bg.setAttribute('x', String(minX));
-  bg.setAttribute('y', String(minY));
-  bg.setAttribute('width', String(width));
-  bg.setAttribute('height', String(height));
-  bg.setAttribute('fill', '#ffffff');
-  clone.insertBefore(bg, clone.firstChild);
+  // Background rect (only when not transparent). Inserted as the
+  // first child so it sits behind everything else.
+  if (!options.transparent) {
+    const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bg.setAttribute('x', String(minX));
+    bg.setAttribute('y', String(minY));
+    bg.setAttribute('width', String(width));
+    bg.setAttribute('height', String(height));
+    bg.setAttribute('fill', '#ffffff');
+    clone.insertBefore(bg, clone.firstChild);
+  }
 
   const svgString = new XMLSerializer().serializeToString(clone);
   return { svgString, widthPx: width, heightPx: height };
+}
+
+/** Find the FIRST <g> child of the SVG — the canvas-content group
+ *  that wraps every visible FA element. */
+function findContentGroup(svg: SVGSVGElement): SVGGElement | null {
+  const child = svg.querySelector(':scope > g');
+  return child as SVGGElement | null;
 }
 
 /** Walk live + clone trees in parallel; copy live computed styles to
@@ -165,10 +181,10 @@ function downloadBlob(blob: Blob, filename: string): void {
  */
 export function exportCanvasAsSVG(
   liveSvg: SVGSVGElement,
-  cluster: ClusterBBox,
-  filename: string
+  filename: string,
+  options: ExportOptions = {}
 ): void {
-  const { svgString } = buildExportSVGString(liveSvg, cluster);
+  const { svgString } = buildExportSVGString(liveSvg, options);
   const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
   downloadBlob(blob, filename);
 }
@@ -184,12 +200,12 @@ export function exportCanvasAsSVG(
  */
 export function exportCanvasAsPNG(
   liveSvg: SVGSVGElement,
-  cluster: ClusterBBox,
   filename: string,
+  options: ExportOptions = {},
   pixelScale: number = 2
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const { svgString, widthPx, heightPx } = buildExportSVGString(liveSvg, cluster);
+    const { svgString, widthPx, heightPx } = buildExportSVGString(liveSvg, options);
     // Encode as a UTF-8 data URL. data: URLs avoid cross-origin
     // taint on the canvas (which would block toBlob()).
     const dataUrl =
