@@ -38,6 +38,7 @@ import { computePreview } from './engine/preview';
 import { convertNfaToDfa } from './engine/converter';
 import { minimizeDfa } from './engine/minimizer';
 import { complementDfa } from './engine/operations';
+import { areEquivalent } from './engine/equivalence';
 import { isComplete } from './engine/validator';
 import { useSimulation } from './hooks/useSimulation';
 import { useUndoableAutomaton } from './hooks/useUndoableAutomaton';
@@ -48,6 +49,7 @@ import { useFileShortcuts } from './hooks/useFileShortcuts';
 import { createFileAdapter } from './files/fileAdapter';
 import { CommandBar } from './components/CommandBar';
 import { OperationsWidget } from './components/OperationsWidget';
+import { ComparePicker } from './components/ComparePicker';
 import { createAutomaton as createBlankAutomaton } from './engine/automaton';
 
 const fileAdapter = createFileAdapter();
@@ -688,6 +690,41 @@ function App() {
     });
   }
 
+  // Equivalence check: opens a picker to choose the comparison
+  // automaton; once picked, runs areEquivalent and reports the result
+  // via notification (with the counterexample when not equivalent).
+  const [comparePickerOpen, setComparePickerOpen] = useState(false);
+  function handleCompareAgainst() {
+    setComparePickerOpen(true);
+  }
+  function runEquivalence(other: Automaton, otherName: string) {
+    setComparePickerOpen(false);
+    const result = areEquivalent(automaton, other);
+    if (!result.ok) {
+      notify({ severity: 'error', title: 'Equivalence check failed', detail: errorMessage(result.error) });
+      return;
+    }
+    if (result.value.equivalent) {
+      notify({
+        severity: 'success',
+        title: `Equivalent ✓`,
+        detail: `These automatons accept the same language as "${otherName}".`,
+        autoDismissMs: 6_000,
+      });
+    } else {
+      const ce = result.value.counterexample;
+      const ceLabel = ce === '' ? 'ε (empty string)' : `"${ce}"`;
+      const side = result.value.acceptingSide === 'a' ? 'this DFA' : `"${otherName}"`;
+      const otherSide = result.value.acceptingSide === 'a' ? `"${otherName}"` : 'this DFA';
+      notify({
+        severity: 'error',
+        title: 'Not equivalent ✗',
+        detail: `Counterexample: ${ceLabel} — accepted by ${side} but rejected by ${otherSide}.`,
+        autoDismissMs: 10_000,
+      });
+    }
+  }
+
   const isCurrentDfaComplete = automaton.type === 'DFA' && isComplete(automaton);
   const requiresCompleteDfaTitle =
     automaton.type !== 'DFA' ? 'Requires a DFA' : 'Requires a complete DFA';
@@ -725,6 +762,14 @@ function App() {
           enabled: isCurrentDfaComplete,
           ...(isCurrentDfaComplete ? {} : { title: requiresCompleteDfaTitle }),
           onClick: handleMinimize,
+        },
+        {
+          id: 'compare-against',
+          label: 'Compare against…',
+          hint: 'Check equivalence with another DFA',
+          enabled: isCurrentDfaComplete,
+          ...(isCurrentDfaComplete ? {} : { title: requiresCompleteDfaTitle }),
+          onClick: handleCompareAgainst,
         },
       ],
     },
@@ -855,11 +900,25 @@ function App() {
       />
 
       {/* Operations widget — sibling of CommandBar, EDIT-only.
-          Houses niche transformations (convert / minimize / complement)
-          so they don't crowd the common bar. */}
+          Houses niche transformations (convert / minimize / complement
+          / compare) so they don't crowd the common bar. */}
       <OperationsWidget
         visible={appMode === 'EDITING'}
         categories={operationsCategories}
+      />
+
+      {/* Comparison picker — opened by the Operations widget's
+          "Compare against…" item, dispatches the chosen automaton
+          back into runEquivalence. EDIT-mode-only by virtue of the
+          state being only set from inside an EDIT-mode handler. */}
+      <ComparePicker
+        visible={comparePickerOpen && appMode === 'EDITING'}
+        current={automaton}
+        recents={fileSession.recents}
+        adapter={fileAdapter}
+        onPicked={runEquivalence}
+        onClose={() => setComparePickerOpen(false)}
+        notify={notify}
       />
 
       {stateActions !== null && (

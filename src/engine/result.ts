@@ -67,7 +67,12 @@ export type EngineError =
 
   // operations.ts (complement)
   | 'complement-requires-dfa'
-  | 'complement-requires-complete-dfa';
+  | 'complement-requires-complete-dfa'
+
+  // equivalence.ts
+  | 'equivalence-requires-dfa'
+  | 'equivalence-requires-complete-dfa'
+  | 'equivalence-alphabet-mismatch';
 
 /**
  * Discriminated-union result type. Use the `ok` and `err` constructors
@@ -147,6 +152,12 @@ export function errorMessage(error: EngineError): string {
       return 'Complement requires a DFA';
     case 'complement-requires-complete-dfa':
       return 'Complement requires a complete DFA — add the missing transitions first';
+    case 'equivalence-requires-dfa':
+      return 'Equivalence checking requires both automatons to be DFAs';
+    case 'equivalence-requires-complete-dfa':
+      return 'Equivalence checking requires both DFAs to be complete';
+    case 'equivalence-alphabet-mismatch':
+      return 'The two DFAs must share the same alphabet';
     case 'minimize-requires-dfa':
       return 'Minimization requires a DFA';
     case 'minimize-incomplete-dfa':

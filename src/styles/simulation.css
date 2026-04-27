@@ -610,3 +610,147 @@ button svg {
   color: var(--text-secondary);
   font-style: italic;
 }
+
+/* ─── Compare picker (equivalence-check picker dialog) ─── */
+.compare-picker {
+  position: fixed;
+  top: 16px;
+  /* Anchor to the right of where the OperationsWidget sits, similar
+   * positioning to its own popover. Slight overlap risk on narrow
+   * viewports — same trade-off as operations-widget. */
+  left: calc(50% + 110px + 12px + 40px + 12px);
+  z-index: 40;
+  min-width: 260px;
+  max-width: 340px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.compare-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px var(--space-2) 4px;
+}
+
+.compare-picker-title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-heading);
+}
+
+.compare-picker-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.compare-picker-close:hover {
+  background: var(--bg-button-hover);
+  color: var(--text-heading);
+}
+
+.compare-picker-open-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: var(--space-2);
+  cursor: pointer;
+  font: inherit;
+  color: var(--text-body);
+  transition: all 0.15s ease;
+}
+
+.compare-picker-open-button:hover {
+  background: var(--bg-button-hover);
+  color: var(--text-heading);
+}
+
+.compare-picker-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.compare-picker-section-label {
+  font-size: var(--text-xs, 11px);
+  font-weight: var(--weight-bold);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px var(--space-2);
+}
+
+.compare-picker-empty {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-style: italic;
+  padding: var(--space-2);
+}
+
+.compare-picker-recents {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.compare-picker-recent {
+  display: flex;
+}
+
+.compare-picker-recent-button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-2);
+  font: inherit;
+  border-radius: 6px;
+  color: var(--text-body);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.compare-picker-recent-button:hover:not(:disabled) {
+  background: var(--bg-button-hover);
+  color: var(--text-heading);
+}
+
+.compare-picker-recent-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.compare-picker-recent-name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium, 500);
+}
+
+.compare-picker-recent-reason {
+  font-size: var(--text-xs, 11px);
+  color: var(--text-secondary);
+  font-style: italic;
+}
