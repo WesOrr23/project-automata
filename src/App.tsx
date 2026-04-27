@@ -18,6 +18,7 @@ import { type Result, errorMessage } from './engine/result';
 import { computeDisplayLabels } from './ui-state/types';
 import { AutomatonCanvas } from './components/AutomatonCanvas';
 import { InputPanel } from './components/InputPanel';
+import { BatchTestModal } from './components/BatchTestModal';
 import { SimulationControls } from './components/SimulationControls';
 import { ToolMenu } from './components/toolMenu/ToolMenu';
 import { ConfigPanel } from './components/toolMenu/ConfigPanel';
@@ -134,6 +135,7 @@ function App() {
   // watch the value via useEffect and focus the input when it changes,
   // so the user lands in Define ready to type.
   const [alphabetFocusSignal, setAlphabetFocusSignal] = useState(0);
+  const [batchTestOpen, setBatchTestOpen] = useState(false);
   // Lifted from AutomatonCanvas via callback. Image-export action
   // needs the live SVG element to serialize. The export framing now
   // measures content bbox live (via getBBox on the inner content
@@ -936,6 +938,7 @@ function App() {
         alphabet={automaton.alphabet}
         input={inputString}
         onInputChange={handleInputChange}
+        onOpenBatchTest={() => setBatchTestOpen(true)}
       />
       <SimulationControls
         status={sim.status}
@@ -999,6 +1002,11 @@ function App() {
       />
 
       <Onboarding visible={onboarding.visible} onDismiss={onboarding.dismiss} />
+      <BatchTestModal
+        open={batchTestOpen}
+        onClose={() => setBatchTestOpen(false)}
+        automaton={automaton}
+      />
 
       {/* Comparison picker — opened by the Operations widget's
           "Compare against…" item, dispatches the chosen automaton
