@@ -3,8 +3,8 @@ agent: security-reviewer
 type: knowledge
 topic: input-boundaries
 schema-version: 1
-verified-as-of: 52bdb8e
-last-updated: 2026-04-25
+verified-as-of: dd6420b
+last-updated: 2026-04-27
 confidence: high
 ---
 
@@ -23,10 +23,16 @@ Every place user input enters the system is a boundary. Track them all. Each new
 3. **`StateEditor`** / state label editing — accepts a display label string. Written into `UIState.labels`. Rendered as SVG text content (escaped by React).
 4. **Transition symbol entry** (`TransitionCreator`) — accepts a comma-separated symbol list. Parsed into individual symbols; each must be in the alphabet.
 
+### Iter-15+ input boundaries
+
+5. **File-load JSON content** (`src/files/fileAdapter.ts` → `src/files/format.ts parseAutomataFile`) — untrusted JSON from disk via `<input type="file">` + `FileReader.readAsText`. Strict parse-then-validate (`kind` discriminator, explicit per-field reads, no merge/spread). **No size cap currently** — a 100 MB JSON would crash the tab via `JSON.parse`, low realistic risk for an educational static app. If iter-N+ adds drag-drop or share-link import, add `MAX_FILE_BYTES` at the parser entry.
+6. **Recents snapshot reopen** (`src/files/recentsStore.ts` → `useFileSession.openRecent`) — snapshot stored in localStorage is re-validated through `parseAutomataFile` on reopen, **not trusted blindly**. Defense-in-depth: even hand-edited localStorage content can't bypass the validator.
+7. **Description textarea** (`src/components/toolMenu/ConfigPanel.tsx` `description` state) — free-form text, no length cap. Persists to file metadata and to localStorage recents snapshot. Rendered only as `<textarea value={...}>` (controlled-input prop, React-escaped) and as JSX text children. **Privacy**: see attack-surface.md note on shared-machine recents persistence.
+8. **CSV import for batch testing** (`src/components/BatchTestModal.tsx handleFileChange`) — `FileReader.readAsText` + naive split on `\r?\n` and comma. Flows into the simulator as input strings, which are filtered against the alphabet before reaching the engine. Safe — never rendered as anything but a textarea value.
+
 ### Indirect input boundaries
 
-- **Sample automaton loading** (`src/data/sample-dfa.json`) — currently a static asset, not user-loaded. *If* a future iteration adds user-supplied JSON loading, that becomes a fresh input boundary.
-- **GraphViz output** (`src/ui-state/utils.ts` parsers) — output of an internal tool, not user input. Trust as far as the tool's known behavior allows.
+- **GraphViz output** (`src/ui-state/utils.ts` / `src/ui-state/graphvizParse.ts` parsers) — output of an internal tool, not user input. Trust as far as the tool's known behavior allows.
 
 ## What to look for in diffs
 

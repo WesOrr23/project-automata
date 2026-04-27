@@ -3,8 +3,8 @@ agent: architecture-reviewer
 type: knowledge
 topic: external-dependency-boundary
 schema-version: 1
-verified-as-of: 5cba947
-last-updated: 2026-04-25
+verified-as-of: dd6420b
+last-updated: 2026-04-27
 confidence: high
 ---
 
@@ -46,4 +46,8 @@ No other UI module imports `@hpcc-js/wasm-graphviz`; no other module sees DOT or
 
 ## Provenance
 
-`src/ui-state/utils.ts` at commit `2cf5e42`. Pivot history: dagre adoption at `3fd2faa`, replacement at `2cf5e42` demonstrated that this boundary makes dependency-swaps cheap.
+Origin: `src/ui-state/utils.ts` at commit `2cf5e42` (iter-3). Iter-11 (`5cba947` and after) extracted `parseEdgePos`, `controlPointsToSvgPath`, `flipY`, `parseEdgeLabel`, `automatonToDot`, `parseGraphvizJson`, `transformPoint`, `buildTransformedPath`, `computeArrowheadAngle` for direct testing — boundary invariant preserved (the WASM call still happens inside one module). Re-verified at HEAD `dd6420b`: `src/ui-state/utils.ts` is 496 lines; the funnel still has one mouth (`computeLayout`); no other UI module imports `@hpcc-js/wasm-graphviz`.
+
+Pivot history: dagre adoption at `3fd2faa`, replacement at `2cf5e42` demonstrated that this boundary makes dependency-swaps cheap.
+
+A second instance of the pattern landed in iter-17: `src/lib/imageExport.ts` is the funnel for SVG-clone → XMLSerializer-string → Image → canvas → PNG-blob (or direct SVG-blob). One module imports XMLSerializer/canvas/Image; one module exits as a downloadable blob. The pattern holds; the directory location (`src/lib/` vs `src/ui-state/`) is flagged separately as drift in the iter-12 close-out journal.

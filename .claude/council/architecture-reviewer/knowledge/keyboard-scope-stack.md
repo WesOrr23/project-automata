@@ -3,7 +3,7 @@ agent: architecture-reviewer
 type: knowledge
 topic: keyboard-scope-stack
 schema-version: 1
-verified-as-of: 369cd14
+verified-as-of: dd6420b
 last-updated: 2026-04-27
 confidence: high
 ---
@@ -55,13 +55,14 @@ The listener filters out keys when focus is inside `<input>`, `<textarea>`, or `
 
 The four global `keydown` listeners that existed pre-iter-11 (App's undo/redo, TransitionCreator's Enter and type-to-modify, StateActionsPopover's Esc/Space/Del, StatePickerPopover's Escape) were all migrated to `useKeyboardScope` during iter-11 — three in commit `e666a06` and the fourth (StatePickerPopover) in cleanup commit `632ac70`.
 
-**Iter-12 regression:** four new components introduced raw `document.addEventListener('keydown', ...)` instead of going through the scope stack:
+**Iter-12 regression:** five new components introduced raw `document.addEventListener('keydown', ...)` instead of going through the scope stack:
 - `useDebugOverlay` — ⌘⇧D toggle (would clobber any modal that wanted Cmd+Shift+D for itself; should be a transparent scope).
 - `Onboarding` — Esc to dismiss. Worst offender: this is modal-flavored, should register a `capture: true` scope so Esc doesn't leak to whatever sits behind the dim overlay.
 - `CommandBar` — Esc to close active popover.
 - `ComparePicker` — Esc to close.
+- `BatchTestModal` — Esc to dismiss. Modal-flavored, same issue as `Onboarding` — should be a `capture: true` scope. (Added in commit `7a0832b`, after the architect's iter-12 close-out diff snapshot at `369cd14`; not visible in the close-out journal but caught by audit-003 F3.)
 
-These should be migrated to `useKeyboardScope`. Recorded in `journal/2026-04-27-iter12-closeout.md`. Until cleaned up, the "no raw `document.addEventListener('keydown')` remains" claim from iter-11 is no longer true.
+All five should be migrated to `useKeyboardScope`. Recorded in `journal/2026-04-27-iter12-closeout.md` and `auditor/journal/audits/2026-04-27-audit-003.md` (F3). Until cleaned up, the "no raw `document.addEventListener('keydown')` remains" claim from iter-11 is no longer true.
 
 ## Provenance
 
