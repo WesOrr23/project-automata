@@ -5,7 +5,9 @@
  *
  *   FILE segment (always visible)
  *     ▸ filename (click to rename inline) + dirty dot
- *     ▸ [+ New]  [📂 Open]  [💾 Save]  [🕐 Recents]  [⋯ Save As]
+ *     ▸ [📂 File ▾]  — single dropdown with: New, Open, Save,
+ *       Save As, divider, Recents, divider, Show tour. Keyboard
+ *       shortcuts hit the actions directly without opening the menu.
  *
  *   EDIT segment (visible only when appMode === 'EDITING')
  *     ▸ [↶ Undo]  [↷ Redo]  [🪄 Operations]
@@ -36,7 +38,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
-  FilePlus, FolderOpen, Save, MoreHorizontal, Undo2, Redo2, X,
+  FilePlus, FolderOpen, Save, Undo2, Redo2, X,
   History, Wand2, HelpCircle,
 } from 'lucide-react';
 import type { RecentEntry } from '../files/recentsStore';
@@ -127,7 +129,7 @@ const segmentMotion = {
   transition: { duration: 0.25, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] },
 };
 
-type ActivePopover = 'recents' | 'more' | 'operations' | null;
+type ActivePopover = 'file' | 'operations' | null;
 
 export function CommandBar({
   appMode,
@@ -294,63 +296,90 @@ export function CommandBar({
           </button>
         )}
 
+        {/* Single File button collapses New / Open / Save / Save As /
+            Recents / Show tour into one popover. Keyboard shortcuts
+            (⌘N/O/S/⇧S) still hit the actions directly without going
+            through the menu, so power users don't pay the extra
+            click; the bar just stops being a row of mystery icons. */}
         <button
           type="button"
-          className="command-bar-button"
-          onClick={onNew}
-          aria-label="New"
-          title={`New (${modGlyph}N)`}
-        >
-          <FilePlus size={16} />
-        </button>
-        <button
-          type="button"
-          className={`command-bar-button${openLoading ? ' command-bar-button-loading' : ''}`}
-          onClick={() => { void withLoading(setOpenLoading, onOpen); }}
-          disabled={openLoading}
-          aria-label="Open"
-          aria-busy={openLoading}
-          title={`Open (${modGlyph}O)`}
-        >
-          <FolderOpen size={16} />
-        </button>
-        <button
-          type="button"
-          className={`command-bar-button${saveLoading ? ' command-bar-button-loading' : ''}`}
-          onClick={() => { void withLoading(setSaveLoading, onSave); }}
-          disabled={saveLoading}
-          aria-label="Save"
-          aria-busy={saveLoading}
-          title={`Save (${modGlyph}S)`}
-        >
-          <Save size={16} />
-        </button>
-        <button
-          type="button"
-          className={`command-bar-button${activePopover === 'recents' ? ' command-bar-button-active' : ''}`}
-          onClick={() => togglePopover('recents')}
-          aria-label="Recents"
+          className={`command-bar-button command-bar-button-text${activePopover === 'file' ? ' command-bar-button-active' : ''}${(openLoading || saveLoading || saveAsLoading) ? ' command-bar-button-loading' : ''}`}
+          onClick={() => togglePopover('file')}
+          aria-label="File menu"
           aria-haspopup="menu"
-          aria-expanded={activePopover === 'recents'}
-          title="Recent files"
+          aria-expanded={activePopover === 'file'}
+          title="File"
         >
-          <History size={16} />
-        </button>
-        <button
-          type="button"
-          className={`command-bar-button${activePopover === 'more' ? ' command-bar-button-active' : ''}${saveAsLoading ? ' command-bar-button-loading' : ''}`}
-          onClick={() => togglePopover('more')}
-          aria-label="More file actions"
-          aria-haspopup="menu"
-          aria-expanded={activePopover === 'more'}
-          title="More file actions"
-        >
-          <MoreHorizontal size={16} />
+          <FolderOpen size={14} />
+          <span>File</span>
         </button>
 
-        {activePopover === 'recents' && (
-          <div className="command-bar-popover command-bar-popover-recents-anchor" role="menu">
-            <span className="command-bar-popover-label">Recents</span>
+        {activePopover === 'file' && (
+          <div className="command-bar-popover command-bar-popover-file-anchor" role="menu">
+            <button
+              type="button"
+              className="command-bar-popover-item"
+              onClick={() => {
+                setActivePopover(null);
+                onNew();
+              }}
+              title={`New (${modGlyph}N)`}
+            >
+              <FilePlus size={14} />
+              <span className="command-bar-popover-item-label-inline">New</span>
+              <span className="command-bar-popover-item-shortcut">{modGlyph}N</span>
+            </button>
+            <button
+              type="button"
+              className={`command-bar-popover-item${openLoading ? ' command-bar-popover-item-loading' : ''}`}
+              onClick={() => {
+                setActivePopover(null);
+                void withLoading(setOpenLoading, onOpen);
+              }}
+              disabled={openLoading}
+              aria-busy={openLoading}
+              title={`Open (${modGlyph}O)`}
+            >
+              <FolderOpen size={14} />
+              <span className="command-bar-popover-item-label-inline">Open…</span>
+              <span className="command-bar-popover-item-shortcut">{modGlyph}O</span>
+            </button>
+            <button
+              type="button"
+              className={`command-bar-popover-item${saveLoading ? ' command-bar-popover-item-loading' : ''}`}
+              onClick={() => {
+                setActivePopover(null);
+                void withLoading(setSaveLoading, onSave);
+              }}
+              disabled={saveLoading}
+              aria-busy={saveLoading}
+              title={`Save (${modGlyph}S)`}
+            >
+              <Save size={14} />
+              <span className="command-bar-popover-item-label-inline">Save</span>
+              <span className="command-bar-popover-item-shortcut">{modGlyph}S</span>
+            </button>
+            <button
+              type="button"
+              className={`command-bar-popover-item${saveAsLoading ? ' command-bar-popover-item-loading' : ''}`}
+              onClick={() => {
+                setActivePopover(null);
+                void withLoading(setSaveAsLoading, onSaveAs);
+              }}
+              disabled={saveAsLoading}
+              aria-busy={saveAsLoading}
+              title={`Save As (${modGlyph}${shiftGlyph}S)`}
+            >
+              <Save size={14} />
+              <span className="command-bar-popover-item-label-inline">Save As…</span>
+              <span className="command-bar-popover-item-shortcut">{modGlyph}{shiftGlyph}S</span>
+            </button>
+
+            <div className="command-bar-popover-divider" role="separator" />
+
+            <span className="command-bar-popover-label">
+              <History size={12} aria-hidden="true" /> Recents
+            </span>
             {recents.length === 0 ? (
               <div className="command-bar-popover-recents-empty">No recent files</div>
             ) : (
@@ -382,37 +411,23 @@ export function CommandBar({
                 </div>
               ))
             )}
-          </div>
-        )}
 
-        {activePopover === 'more' && (
-          <div className="command-bar-popover command-bar-popover-more-anchor" role="menu">
-            <button
-              type="button"
-              className={`command-bar-popover-item${saveAsLoading ? ' command-bar-popover-item-loading' : ''}`}
-              onClick={() => {
-                setActivePopover(null);
-                void withLoading(setSaveAsLoading, onSaveAs);
-              }}
-              disabled={saveAsLoading}
-              title={`Save As (${modGlyph}${shiftGlyph}S)`}
-            >
-              <Save size={14} />
-              <span>Save As…</span>
-            </button>
             {onShowTour && (
-              <button
-                type="button"
-                className="command-bar-popover-item"
-                onClick={() => {
-                  setActivePopover(null);
-                  onShowTour();
-                }}
-                title="Show the first-launch tour"
-              >
-                <HelpCircle size={14} />
-                <span>Show tour</span>
-              </button>
+              <>
+                <div className="command-bar-popover-divider" role="separator" />
+                <button
+                  type="button"
+                  className="command-bar-popover-item"
+                  onClick={() => {
+                    setActivePopover(null);
+                    onShowTour();
+                  }}
+                  title="Show the first-launch tour"
+                >
+                  <HelpCircle size={14} />
+                  <span className="command-bar-popover-item-label-inline">Show tour</span>
+                </button>
+              </>
             )}
           </div>
         )}

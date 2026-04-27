@@ -464,12 +464,15 @@ button svg {
   color: var(--text-secondary);
   font-weight: var(--weight-bold);
   padding: 0 var(--space-1);
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .command-bar-popover-item {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
   padding: var(--space-1) var(--space-2);
   background: transparent;
   border: none;
@@ -484,6 +487,33 @@ button svg {
 .command-bar-popover-item:hover {
   background: var(--bg-button-hover);
   color: var(--text-heading);
+}
+
+/* Inline label for File-menu items — sits between the leading icon
+ * and the trailing keyboard-shortcut hint. flex:1 so the shortcut
+ * pushes to the right edge. */
+.command-bar-popover-item-label-inline {
+  flex: 1 1 auto;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium, 500);
+}
+
+/* Keyboard shortcut hint at the right edge of a File-menu item. Tabular
+ * digits so different shortcuts line up vertically. */
+.command-bar-popover-item-shortcut {
+  flex: 0 0 auto;
+  font-size: var(--text-xs, 11px);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* Section separator inside popovers (between the action items, the
+ * Recents block, and the Show-tour entry). */
+.command-bar-popover-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 4px 0;
 }
 
 /* Operations items override the row layout: stack the icon+label row
