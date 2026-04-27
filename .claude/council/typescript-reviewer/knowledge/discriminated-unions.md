@@ -3,8 +3,8 @@ agent: typescript-reviewer
 type: knowledge
 topic: discriminated-unions
 schema-version: 1
-verified-as-of: 52bdb8e
-last-updated: 2026-04-25
+verified-as-of: 369cd14
+last-updated: 2026-04-27
 confidence: high
 ---
 
@@ -22,17 +22,19 @@ Discriminated unions on string literals are preferred over enums in this codebas
 - Notification target shape: `{ kind: 'state'; ... } | { kind: 'transition'; ... }` (verified in `src/notifications/types.ts`).
 - Reducer action types use `type: '...'` discriminants throughout (`creationReducer.ts`, `useSimulation.ts`).
 
-### Engine errors (planned)
+### Engine errors (shipped iter-11)
 
-The "Engine returns Result types" Major Change in the iteration-1 backlog will introduce a discriminated error type:
+Engine functions that can fail return a discriminated `Result<T>`:
 
 ```typescript
 type Result<T> =
   | { ok: true; value: T }
-  | { ok: false; error: 'duplicate' | 'invalid-state' | 'not-found' | ... };
+  | { ok: false; error: EngineError };
 ```
 
-The error variants will themselves be a string-literal union — typed errors, not stringly-typed errors. This is an active project decision (architecture-reviewer's territory), and the typescript-reviewer's role is to verify the implementation matches.
+`EngineError` is a typed string-literal union (29 variants at HEAD `369cd14`, defined in `src/engine/result.ts`). `errorMessage(error)` is a total switch over `EngineError`; adding a new variant without adding a `case` arm is a compile error (combination of `noFallthroughCasesInSwitch` + the discriminated-union exhaustiveness the switch gets for free).
+
+Verified clean at HEAD: every engine function that can fail returns `Result<T>`; every UI consumer either checks `result.ok` (most cases) or deliberately drops on failure with a comment (the `useSimulation` `jumpTo` step-loop early-break, called out in audit-002 F9).
 
 ## What to look for in diffs
 

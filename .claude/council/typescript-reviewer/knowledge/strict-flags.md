@@ -3,8 +3,8 @@ agent: typescript-reviewer
 type: knowledge
 topic: strict-flags
 schema-version: 1
-verified-as-of: 52bdb8e
-last-updated: 2026-04-25
+verified-as-of: 369cd14
+last-updated: 2026-04-27
 confidence: high
 ---
 
@@ -21,10 +21,13 @@ The active `tsconfig.json` enables:
 - `strict: true` — turns on all the canonical strict-mode flags (`noImplicitAny`, `strictNullChecks`, `strictFunctionTypes`, `strictBindCallApply`, `strictPropertyInitialization`, `noImplicitThis`, `alwaysStrict`).
 - `noUncheckedIndexedAccess: true` — array/object index access returns `T | undefined`. This catches the classic "I assumed this index was populated" bug.
 - `noImplicitOverride: true` — added in iteration-1 review. Free for now (no classes), locks in the requirement if classes ever appear.
-
-Not yet enabled but recorded as "Major Change Proposed" in the iteration-1 backlog:
-
-- `exactOptionalPropertyTypes` — would force a small audit of every `field?: T` to decide whether `T | undefined` (assignable from `undefined` literal) or omit-only is intended.
+- `exactOptionalPropertyTypes: true` — enabled in iter-11 (commit
+  `3607000`). Distinguishes `field?: T` (omit-only, undefined NOT
+  assignable) from `field?: T | undefined` (omit OR undefined). The
+  audit pass the flag was meant to force did happen — see
+  `optional-prop-policy.md` for the per-site rule the codebase settled
+  on (widen for ternary-producing callsites, omit-only otherwise,
+  spread-conditional for serialization boundaries).
 
 ## What to look for in diffs
 
