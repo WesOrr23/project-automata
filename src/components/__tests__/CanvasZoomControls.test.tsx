@@ -13,7 +13,6 @@ function defaultProps() {
   return {
     zoomIn: vi.fn(),
     zoomOut: vi.fn(),
-    reset: vi.fn(),
     fitToContent: vi.fn(),
     atMaxScale: false,
     atMinScale: false,
@@ -21,12 +20,14 @@ function defaultProps() {
 }
 
 describe('CanvasZoomControls', () => {
-  it('renders four labeled buttons', () => {
-    const { getByLabelText } = render(<CanvasZoomControls {...defaultProps()} />);
+  it('renders three labeled buttons (no 1:1)', () => {
+    const { getByLabelText, queryByLabelText } = render(
+      <CanvasZoomControls {...defaultProps()} />
+    );
     expect(getByLabelText('Zoom in')).toBeTruthy();
     expect(getByLabelText('Zoom out')).toBeTruthy();
     expect(getByLabelText('Fit to view')).toBeTruthy();
-    expect(getByLabelText('Reset zoom')).toBeTruthy();
+    expect(queryByLabelText('Reset zoom')).toBeNull();
   });
 
   it('Zoom in click invokes zoomIn', () => {
@@ -50,13 +51,6 @@ describe('CanvasZoomControls', () => {
     expect(props.fitToContent).toHaveBeenCalledTimes(1);
   });
 
-  it('Reset click invokes reset', () => {
-    const props = defaultProps();
-    const { getByLabelText } = render(<CanvasZoomControls {...props} />);
-    fireEvent.click(getByLabelText('Reset zoom'));
-    expect(props.reset).toHaveBeenCalledTimes(1);
-  });
-
   it('Zoom in is disabled at max scale', () => {
     const props = { ...defaultProps(), atMaxScale: true };
     const { getByLabelText } = render(<CanvasZoomControls {...props} />);
@@ -75,10 +69,9 @@ describe('CanvasZoomControls', () => {
     expect(props.zoomOut).not.toHaveBeenCalled();
   });
 
-  it('Fit and Reset stay enabled at scale extremes', () => {
+  it('Fit stays enabled at scale extremes', () => {
     const props = { ...defaultProps(), atMaxScale: true, atMinScale: true };
     const { getByLabelText } = render(<CanvasZoomControls {...props} />);
     expect((getByLabelText('Fit to view') as HTMLButtonElement).disabled).toBe(false);
-    expect((getByLabelText('Reset zoom') as HTMLButtonElement).disabled).toBe(false);
   });
 });

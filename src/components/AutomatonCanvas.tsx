@@ -172,7 +172,6 @@ export function AutomatonCanvas({
   const START_ARROW_RESERVE = 70;
 
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const innerContentGRef = useRef<SVGGElement | null>(null);
   const [viewportSize, setViewportSize] = useState<{ width: number; height: number } | null>(
     null
   );
@@ -209,32 +208,43 @@ export function AutomatonCanvas({
     return () => observer.disconnect();
   }, []);
 
-  // Measure the actual rendered bbox of the content group whenever the
-  // automaton (and therefore the SVG content) changes. getBBox returns
-  // the user-coord-space union rect of all descendants including stroked
-  // paths and the start arrow — exactly the visible extent we need for
-  // centering.
+  // Compute a STATE-CENTRIC bounding box for centering: union of state
+  // circles + the start arrow's leftmost extent. Deliberately ignores
+  // transition labels and self-loop bumps (which getBBox would include
+  // and pull the visual center off the states themselves). The user's
+  // perception of "the FA's center" is the states-and-arrow center,
+  // not the labels-included pixel-bbox center.
   useLayoutEffect(() => {
-    const g = innerContentGRef.current;
-    if (g === null) return;
-    try {
-      const b = g.getBBox();
-      if (b.width <= 0 || b.height <= 0) return;
-      setContentBBox((current) => {
-        if (
-          current &&
-          current.x === b.x &&
-          current.y === b.y &&
-          current.width === b.width &&
-          current.height === b.height
-        ) {
-          return current;
-        }
-        return { x: b.x, y: b.y, width: b.width, height: b.height };
-      });
-    } catch {
-      // jsdom doesn't implement getBBox. Tests that need it would mock.
+    const positions = Array.from(automatonUI.states.values()).map((s) => s.position);
+    if (positions.length === 0) return;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of positions) {
+      if (p.x - STATE_RADIUS < minX) minX = p.x - STATE_RADIUS;
+      if (p.x + STATE_RADIUS > maxX) maxX = p.x + STATE_RADIUS;
+      if (p.y - STATE_RADIUS < minY) minY = p.y - STATE_RADIUS;
+      if (p.y + STATE_RADIUS > maxY) maxY = p.y + STATE_RADIUS;
     }
+    // Account for the start arrow extending LEFT of the start state.
+    // Arrow length + arrowhead + gap ≈ 62 pixels; the start state's
+    // edge at minX is the rightmost point of that arrow.
+    const startState = automatonUI.states.get(automaton.startState);
+    if (startState) {
+      const arrowLeft = startState.position.x - STATE_RADIUS - 62;
+      if (arrowLeft < minX) minX = arrowLeft;
+    }
+    const next = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    setContentBBox((current) => {
+      if (
+        current &&
+        current.x === next.x &&
+        current.y === next.y &&
+        current.width === next.width &&
+        current.height === next.height
+      ) {
+        return current;
+      }
+      return next;
+    });
   }, [automaton, automatonUI]);
 
   // Effective content size + origin for the viewport hook. The bbox's
@@ -254,7 +264,6 @@ export function AutomatonCanvas({
     handlers,
     zoomIn,
     zoomOut,
-    reset,
     fitToContent,
     panBy,
     atMaxScale,
@@ -322,9 +331,11 @@ export function AutomatonCanvas({
           zoomOut();
           return true;
         }
+        // Cmd+0 used to reset zoom (the now-removed 1:1 button).
+        // Reuse it for Fit since that's the closest user intent.
         if (event.key === '0') {
           event.preventDefault();
-          reset();
+          fitToContent();
           return true;
         }
         return false;
@@ -382,7 +393,7 @@ export function AutomatonCanvas({
         style={{ transform, transformOrigin: '0 0' }}
         className={isAnimating ? 'canvas-content-animating' : undefined}
       >
-        <g ref={innerContentGRef} transform={`translate(${-START_ARROW_RESERVE} 0)`}>
+        <g transform={`translate(${-START_ARROW_RESERVE} 0)`}>
       {/* Layer 1: Transition edges (background) */}
       {automatonUI.transitions.map((transition, index) => {
         // A consolidated edge matches the simulation's "next transition"
@@ -530,37 +541,8 @@ export function AutomatonCanvas({
           />
         );
       })()}
-          {/* DEBUG: blue ring at the FA's measured center (bbox
-              center in inner-g local coords). Lives inside the
-              transformed content so it pans/scales with the FA.
-              When perfectly centered, the red screen-center dot sits
-              inside this ring. Remove once Wes has verified. */}
-          {contentBBox && (
-            <circle
-              cx={contentBBox.x + contentBBox.width / 2}
-              cy={contentBBox.y + contentBBox.height / 2}
-              r={10}
-              fill="none"
-              stroke="#3b82f6"
-              strokeWidth={2}
-              pointerEvents="none"
-            />
-          )}
         </g>
       </g>
-      {/* DEBUG: red filled dot at the visible region's center (raw
-          SVG coords, outside any transform group, so it pins to
-          screen regardless of pan/zoom). When centered, sits inside
-          the blue ring above. Remove once verified. */}
-      {viewportSize && (
-        <circle
-          cx={(viewportInset?.left ?? 0) + (viewportSize.width - (viewportInset?.left ?? 0) - (viewportInset?.right ?? 0)) / 2}
-          cy={(viewportInset?.top ?? 0) + (viewportSize.height - (viewportInset?.top ?? 0) - (viewportInset?.bottom ?? 0)) / 2}
-          r={4}
-          fill="#ef4444"
-          pointerEvents="none"
-        />
-      )}
     </svg>
     {/* Bottom-right widget stack. column-reverse so the FIRST DOM child
         sits at the bottom edge; siblings stack upward. The extras slot
@@ -573,7 +555,6 @@ export function AutomatonCanvas({
       <CanvasZoomControls
         zoomIn={zoomIn}
         zoomOut={zoomOut}
-        reset={reset}
         fitToContent={fitToContent}
         atMaxScale={atMaxScale}
         atMinScale={atMinScale}

@@ -36,10 +36,6 @@ type EditPanelProp = {
   onRemoveState: (stateId: number) => void;
   onSetStartState: (stateId: number) => void;
   onToggleAcceptState: (stateId: number) => void;
-  /** Niche operations live in this panel rather than the top CommandBar
-   *  — keeps common controls (file, undo/redo) clean and discoverable. */
-  onConvertToDfa?: () => void;
-  canConvertToDfa?: boolean;
   /** Apply a batch transition edit (removes + adds in one update). */
   onApplyTransitionEdit: (
     removes: ReadonlyArray<{ from: number; to: number; symbol: string | null }>,
@@ -61,8 +57,6 @@ export function EditPanel({
   onRemoveState,
   onSetStartState,
   onToggleAcceptState,
-  onConvertToDfa,
-  canConvertToDfa,
   onApplyTransitionEdit,
 }: EditPanelProp) {
   return (
@@ -98,23 +92,6 @@ export function EditPanel({
         epsilonSymbol={epsilonSymbol}
         onApplyTransitionEdit={onApplyTransitionEdit}
       />
-
-      {canConvertToDfa && onConvertToDfa && (
-        <>
-          <div className="divider" />
-          <div className="edit-panel-operations">
-            <span className="label">Operations</span>
-            <button
-              type="button"
-              className="btn"
-              onClick={onConvertToDfa}
-              title="Convert this NFA to an equivalent DFA via subset construction (auto-minimized)"
-            >
-              Convert to DFA
-            </button>
-          </div>
-        </>
-      )}
     </>
   );
 }

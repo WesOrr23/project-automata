@@ -484,3 +484,129 @@ button svg {
 .command-bar-segment-file {
   position: relative;
 }
+
+/* ─── Operations widget ─── */
+/* Floating sibling of CommandBar at top-center (left:50% +
+ * translateX(half_bar_width + gap) keeps it adjacent without
+ * disturbing the bar's centered transform). Single icon button →
+ * categorized popover. Visible only in EDIT mode. */
+.operations-widget {
+  position: fixed;
+  top: 16px;
+  /* Anchor: 50% of viewport, then push right by half a typical
+   * CommandBar width (~110) plus a comfortable gap (12). When the
+   * bar grows (EDIT segment mounts), this widget stays put — small
+   * overlap risk on very narrow viewports, acceptable trade-off vs.
+   * fragile measurement coupling. */
+  left: calc(50% + 110px + 12px);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(4px);
+  user-select: none;
+}
+
+.operations-widget-button {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  color: var(--text-body);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.operations-widget-button:hover {
+  background: var(--bg-button-hover);
+  color: var(--text-heading);
+}
+
+.operations-widget-button[aria-expanded="true"] {
+  background: var(--bg-button-active, rgba(0,0,0,0.06));
+  color: var(--text-heading);
+}
+
+.operations-widget-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 220px;
+  max-width: 300px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-2);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.operations-widget-empty {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-style: italic;
+  padding: var(--space-2);
+}
+
+.operations-widget-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.operations-widget-section-label {
+  font-size: var(--text-xs, 11px);
+  font-weight: var(--weight-bold);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px var(--space-2) 4px;
+}
+
+.operations-widget-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-2);
+  font: inherit;
+  border-radius: 6px;
+  color: var(--text-body);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.operations-widget-item:hover:not(:disabled) {
+  background: var(--bg-button-hover);
+  color: var(--text-heading);
+}
+
+.operations-widget-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.operations-widget-item-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium, 500);
+}
+
+.operations-widget-item-hint {
+  font-size: var(--text-xs, 11px);
+  color: var(--text-secondary);
+  font-style: italic;
+}

@@ -36,6 +36,9 @@ import {
 } from './components/transitionEditor/creationReducer';
 import { computePreview } from './engine/preview';
 import { convertNfaToDfa } from './engine/converter';
+import { minimizeDfa } from './engine/minimizer';
+import { complementDfa } from './engine/operations';
+import { isComplete } from './engine/validator';
 import { useSimulation } from './hooks/useSimulation';
 import { useUndoableAutomaton } from './hooks/useUndoableAutomaton';
 import { useUndoRedoShortcuts } from './hooks/useUndoRedoShortcuts';
@@ -44,6 +47,7 @@ import { useFileSession } from './hooks/useFileSession';
 import { useFileShortcuts } from './hooks/useFileShortcuts';
 import { createFileAdapter } from './files/fileAdapter';
 import { CommandBar } from './components/CommandBar';
+import { OperationsWidget } from './components/OperationsWidget';
 import { createAutomaton as createBlankAutomaton } from './engine/automaton';
 
 const fileAdapter = createFileAdapter();
@@ -630,18 +634,13 @@ function App() {
       ? (sim.accepted ? 'accepted' : 'rejected')
       : null;
 
-  // ─── NFA → DFA conversion ───
+  // ─── Operations: Convert / Minimize / Complement ───
   function handleConvertToDfa() {
     const result = convertNfaToDfa(automaton);
     if (!result.ok) {
       notify({ severity: 'error', title: 'Convert failed', detail: errorMessage(result.error) });
       return;
     }
-    // Push onto undo via setAutomaton so the user can revert with ⌘Z.
-    // The updater ignores `prev` because the conversion was computed
-    // against the current `automaton` snapshot above (referentially
-    // identical to `prev` at dispatch time, since no other edit can
-    // have raced ahead between the click and this call).
     setAutomaton(() => result.value.dfa);
     setConversionLabels({ automatonRef: result.value.dfa, subsetMap: result.value.subsetMap });
     notify({
@@ -650,6 +649,86 @@ function App() {
       autoDismissMs: 3_500,
     });
   }
+
+  function handleMinimize() {
+    const result = minimizeDfa(automaton);
+    if (!result.ok) {
+      notify({ severity: 'error', title: 'Minimize failed', detail: errorMessage(result.error) });
+      return;
+    }
+    const before = automaton.states.size;
+    const after = result.value.dfa.states.size;
+    if (before === after) {
+      notify({ severity: 'info', title: 'Already minimal', detail: 'No states could be merged.', autoDismissMs: 3_000 });
+      return;
+    }
+    setAutomaton(() => result.value.dfa);
+    // Drop conversion labels — minimization renumbers states; the old
+    // subset map's keys no longer line up.
+    setConversionLabels(null);
+    notify({
+      severity: 'success',
+      title: `Minimized DFA — ${before} states → ${after}`,
+      autoDismissMs: 3_500,
+    });
+  }
+
+  function handleComplement() {
+    const result = complementDfa(automaton);
+    if (!result.ok) {
+      notify({ severity: 'error', title: 'Complement failed', detail: errorMessage(result.error) });
+      return;
+    }
+    setAutomaton(() => result.value);
+    notify({
+      severity: 'success',
+      title: 'Complemented DFA',
+      detail: 'Accept and non-accept states swapped.',
+      autoDismissMs: 3_000,
+    });
+  }
+
+  const isCurrentDfaComplete = automaton.type === 'DFA' && isComplete(automaton);
+  const requiresCompleteDfaTitle =
+    automaton.type !== 'DFA' ? 'Requires a DFA' : 'Requires a complete DFA';
+  const operationsCategories = [
+    {
+      id: 'conversions',
+      label: 'Conversions',
+      items: [
+        {
+          id: 'nfa-to-dfa',
+          label: 'Convert NFA to DFA',
+          hint: 'Subset construction (auto-minimized)',
+          enabled: automaton.type === 'NFA',
+          ...(automaton.type !== 'NFA' ? { title: 'Already a DFA' } : {}),
+          onClick: handleConvertToDfa,
+        },
+        {
+          id: 'complement',
+          label: 'Complement',
+          hint: 'Swap accept and non-accept',
+          enabled: isCurrentDfaComplete,
+          ...(isCurrentDfaComplete ? {} : { title: requiresCompleteDfaTitle }),
+          onClick: handleComplement,
+        },
+      ],
+    },
+    {
+      id: 'analysis',
+      label: 'Analysis',
+      items: [
+        {
+          id: 'minimize',
+          label: 'Minimize DFA',
+          hint: 'Hopcroft partition refinement',
+          enabled: isCurrentDfaComplete,
+          ...(isCurrentDfaComplete ? {} : { title: requiresCompleteDfaTitle }),
+          onClick: handleMinimize,
+        },
+      ],
+    },
+  ];
 
   // ─── File session ───
   const fileSession = useFileSession(
@@ -705,8 +784,6 @@ function App() {
       onRemoveState={handleRemoveState}
       onSetStartState={handleSetStartState}
       onToggleAcceptState={handleToggleAcceptState}
-      onConvertToDfa={handleConvertToDfa}
-      canConvertToDfa={automaton.type === 'NFA'}
       onApplyTransitionEdit={handleApplyTransitionEdit}
     />
   );
@@ -775,6 +852,14 @@ function App() {
         canRedo={canRedo}
         onUndo={undo}
         onRedo={redo}
+      />
+
+      {/* Operations widget — sibling of CommandBar, EDIT-only.
+          Houses niche transformations (convert / minimize / complement)
+          so they don't crowd the common bar. */}
+      <OperationsWidget
+        visible={appMode === 'EDITING'}
+        categories={operationsCategories}
       />
 
       {stateActions !== null && (

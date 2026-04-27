@@ -63,7 +63,11 @@ export type EngineError =
 
   // minimizer.ts (Hopcroft)
   | 'minimize-requires-dfa'
-  | 'minimize-incomplete-dfa';
+  | 'minimize-incomplete-dfa'
+
+  // operations.ts (complement)
+  | 'complement-requires-dfa'
+  | 'complement-requires-complete-dfa';
 
 /**
  * Discriminated-union result type. Use the `ok` and `err` constructors
@@ -139,6 +143,10 @@ export function errorMessage(error: EngineError): string {
       return 'Cannot convert: alphabet is empty';
     case 'conversion-too-large':
       return 'Conversion produced more states than the safety cap allows';
+    case 'complement-requires-dfa':
+      return 'Complement requires a DFA';
+    case 'complement-requires-complete-dfa':
+      return 'Complement requires a complete DFA — add the missing transitions first';
     case 'minimize-requires-dfa':
       return 'Minimization requires a DFA';
     case 'minimize-incomplete-dfa':
