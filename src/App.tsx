@@ -48,7 +48,6 @@ import { useFileSession } from './hooks/useFileSession';
 import { useFileShortcuts } from './hooks/useFileShortcuts';
 import { createFileAdapter } from './files/fileAdapter';
 import { CommandBar } from './components/CommandBar';
-import { OperationsWidget } from './components/OperationsWidget';
 import { ComparePicker } from './components/ComparePicker';
 import { createAutomaton as createBlankAutomaton } from './engine/automaton';
 
@@ -893,18 +892,12 @@ function App() {
         onSaveAs={fileSession.saveAs}
         onOpenRecent={fileSession.openRecent}
         onForgetRecent={fileSession.forgetRecent}
+        onRenameCurrent={fileSession.renameCurrent}
         canUndo={canUndo}
         canRedo={canRedo}
         onUndo={undo}
         onRedo={redo}
-      />
-
-      {/* Operations widget — sibling of CommandBar, EDIT-only.
-          Houses niche transformations (convert / minimize / complement
-          / compare) so they don't crowd the common bar. */}
-      <OperationsWidget
-        visible={appMode === 'EDITING'}
-        categories={operationsCategories}
+        operationsCategories={operationsCategories}
       />
 
       {/* Comparison picker — opened by the Operations widget's

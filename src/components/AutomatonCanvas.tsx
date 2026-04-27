@@ -209,11 +209,13 @@ export function AutomatonCanvas({
   }, []);
 
   // Compute a STATE-CENTRIC bounding box for centering: union of state
-  // circles + the start arrow's leftmost extent. Deliberately ignores
-  // transition labels and self-loop bumps (which getBBox would include
-  // and pull the visual center off the states themselves). The user's
-  // perception of "the FA's center" is the states-and-arrow center,
-  // not the labels-included pixel-bbox center.
+  // circles only. Deliberately excludes:
+  //  - transition labels and self-loop bumps (which getBBox would
+  //    include, pulling the visual center off the states),
+  //  - the start arrow's leftward extension (which is structurally
+  //    part of the FA but biases the centroid LEFT of where the
+  //    user perceives the FA's body to sit).
+  // The user's "center of the FA" is the cluster of state circles.
   useLayoutEffect(() => {
     const positions = Array.from(automatonUI.states.values()).map((s) => s.position);
     if (positions.length === 0) return;
@@ -223,14 +225,6 @@ export function AutomatonCanvas({
       if (p.x + STATE_RADIUS > maxX) maxX = p.x + STATE_RADIUS;
       if (p.y - STATE_RADIUS < minY) minY = p.y - STATE_RADIUS;
       if (p.y + STATE_RADIUS > maxY) maxY = p.y + STATE_RADIUS;
-    }
-    // Account for the start arrow extending LEFT of the start state.
-    // Arrow length + arrowhead + gap ≈ 62 pixels; the start state's
-    // edge at minX is the rightmost point of that arrow.
-    const startState = automatonUI.states.get(automaton.startState);
-    if (startState) {
-      const arrowLeft = startState.position.x - STATE_RADIUS - 62;
-      if (arrowLeft < minX) minX = arrowLeft;
     }
     const next = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
     setContentBBox((current) => {
@@ -541,8 +535,34 @@ export function AutomatonCanvas({
           />
         );
       })()}
+          {/* DEBUG: blue ring at the FA's center (state-cluster
+              centroid in inner-g local coords). Lives inside the
+              transformed content so it pans/scales with the FA. */}
+          {contentBBox && (
+            <circle
+              cx={contentBBox.x + contentBBox.width / 2}
+              cy={contentBBox.y + contentBBox.height / 2}
+              r={10}
+              fill="none"
+              stroke="#3b82f6"
+              strokeWidth={2}
+              pointerEvents="none"
+            />
+          )}
         </g>
       </g>
+      {/* DEBUG: red filled dot at the visible region's center
+          (raw SVG coords, pinned to screen regardless of pan/zoom).
+          When perfectly centered, sits inside the blue ring above. */}
+      {viewportSize && (
+        <circle
+          cx={(viewportInset?.left ?? 0) + (viewportSize.width - (viewportInset?.left ?? 0) - (viewportInset?.right ?? 0)) / 2}
+          cy={(viewportInset?.top ?? 0) + (viewportSize.height - (viewportInset?.top ?? 0) - (viewportInset?.bottom ?? 0)) / 2}
+          r={4}
+          fill="#ef4444"
+          pointerEvents="none"
+        />
+      )}
     </svg>
     {/* Bottom-right widget stack. column-reverse so the FIRST DOM child
         sits at the bottom edge; siblings stack upward. The extras slot

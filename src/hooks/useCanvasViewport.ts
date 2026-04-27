@@ -216,6 +216,13 @@ export function useCanvasViewport(
   // against the corner.
   const didInitialCenterRef = useRef(false);
 
+  // Track the inset value from the previous render so we can detect
+  // when overlay chrome (menu, command bar) has shifted, and slide the
+  // pan to preserve the FA's RELATIVE position in the visible region.
+  // Initialized below in the effect so the very first render doesn't
+  // see a phantom "delta" against an empty default.
+  const prevInsetRef = useRef<ViewportInset | null>(null);
+
   // Mutable timer ref so successive button presses extend (rather than
   // stack) the animation window.
   const animationTimerRef = useRef<number | null>(null);
@@ -282,7 +289,58 @@ export function useCanvasViewport(
     didInitialCenterRef.current = true;
     const { panX, panY } = centerInVisibleRegion(contentBoundingBox, viewportSize, inset, origin, 1);
     setViewport({ scale: 1, panX, panY });
-  }, [contentBoundingBox, viewportSize, inset, origin]);
+    prevInsetRef.current = inset;
+  // Initial-center should only depend on FIRST availability of sizes.
+  // Inset changes after initial-center are handled by the inset-shift
+  // effect below (which preserves the FA's relative position rather
+  // than re-centering it from scratch).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentBoundingBox, viewportSize]);
+
+  // Whenever the visible region shifts (overlay chrome resizes — menu
+  // expanded/collapsed/opened, command bar grew, etc.), slide the pan
+  // by the same delta so the FA's RELATIVE position inside the visible
+  // region stays fixed. If the user had the FA centered at the visible
+  // mid-line, it stays at the mid-line of the new visible region; if
+  // they had panned it to a corner, it stays at the same corner of
+  // the new visible region.
+  //
+  // The pan shift is instant (state set), but the canvas-content-
+  // animating CSS class is triggered for the same window so the
+  // visible transform interpolates over 300ms — staying roughly in
+  // sync with the menu's own animation.
+  useEffect(() => {
+    if (prevInsetRef.current === null) {
+      prevInsetRef.current = inset;
+      return;
+    }
+    const prev = prevInsetRef.current;
+    const dx = inset.left - prev.left;
+    const dy = inset.top - prev.top;
+    // Right/bottom inset changes also affect the visible center; we
+    // shift by half the delta on those axes since the visible region's
+    // CENTER is what we're tracking, not its left/top corner. (Left/
+    // top deltas already shift the corner directly.)
+    const dxRight = inset.right - prev.right;
+    const dyBottom = inset.bottom - prev.bottom;
+    if (dx === 0 && dy === 0 && dxRight === 0 && dyBottom === 0) return;
+    prevInsetRef.current = inset;
+    triggerAnimation();
+    setViewport((current) => {
+      // Visible-region center x = inset.left + (W - inset.left - inset.right) / 2
+      //                         = (inset.left - inset.right) / 2 + W/2
+      // So Δcenter_x = (Δleft - Δright) / 2. To keep the FA visually
+      // anchored to the visible center, panX must grow by Δcenter_x.
+      const centerShiftX = (dx - dxRight) / 2;
+      const centerShiftY = (dy - dyBottom) / 2;
+      const next: CanvasViewport = {
+        scale: current.scale,
+        panX: current.panX + centerShiftX,
+        panY: current.panY + centerShiftY,
+      };
+      return clampViewport(next, contentBoxRef.current, viewportSizeRef.current);
+    });
+  }, [inset, triggerAnimation]);
 
   const panBy = useCallback((deltaX: number, deltaY: number) => {
     setViewport((current) => {

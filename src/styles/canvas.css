@@ -158,7 +158,10 @@
   background: transparent;
   color: var(--text-body);
   border: none;
-  border-radius: 6px;
+  /* Round (not square) hover/active background to match the pill
+   * container's vocabulary. The buttons are 32×32 so 999px gives a
+   * full circle. */
+  border-radius: 999px;
   cursor: pointer;
   transition: all 0.15s ease;
   font: inherit;

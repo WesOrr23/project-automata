@@ -1,50 +1,46 @@
 /**
  * CommandBar — unified top-center pill for all command-tier UI.
  *
- * Variant B of the menu-architecture brainstorm: rather than scattering
- * file ops, undo/redo, and operations as separate floating widgets, we
- * collapse them into a single horizontal bar pinned at top-center. The
- * bar has three logical segments:
+ * Layout (left → right):
  *
- *   ┌─────────────────────────────────────────────────────────────────┐
- *   │  Untitled •  📄 📂 💾 ⋯  │  ↶ ↷  Convert to DFA  │  (sim slot) │
- *   │      file (always)        │       EDIT only       │  SIM only   │
- *   └─────────────────────────────────────────────────────────────────┘
+ *   FILE segment (always visible)
+ *     ▸ filename (click to rename inline) + dirty dot
+ *     ▸ [+ New]  [📂 Open]  [💾 Save]  [🕐 Recents]  [⋯ Save As]
  *
- * Mode-specific segments mount/unmount via AnimatePresence, animating
- * width:auto ↔ 0 plus opacity so the bar morphs smoothly between modes
- * rather than snapping. Vertical 1px dividers separate segments using
- * --border-subtle.
+ *   EDIT segment (visible only when appMode === 'EDITING')
+ *     ▸ [↶ Undo]  [↷ Redo]  [🪄 Operations]
  *
- * Visual language matches the prior UndoRedoControls pill (background,
- * border, shadow, blur) so users who knew the old pill recognize the
- * new bar as the same kind of floating affordance — just bigger and
- * smarter.
+ *   SIMULATE segment (reserved; nothing renders yet)
  *
- * The ⋯ button opens an anchored popover hanging directly below the
- * bar with Save As + Recents. Closes on outside click and on Escape.
+ * Mode-specific segments mount/unmount via AnimatePresence so the
+ * bar morphs smoothly between modes.
  *
- * Trade-off vs scattered satellites (Scheme C in the brainstorm):
- *   + Single discoverable location for all command-tier controls.
- *   + Mode morphs feel like one bar adapting, not many widgets popping.
- *   - More chrome at the top edge across all modes.
- *   - Less lateral breathing room for future mode-specific controls; if
- *     a mode grows many commands, the bar will need to grow wider.
+ * Several design choices worth noting:
+ *
+ *  - **Operations live in the bar** (not as a sibling widget). Wes's
+ *    feedback was that one floating sibling widget is one too many;
+ *    keeping all command-tier UI in a single chip is cleaner.
+ *  - **Recents got promoted out of the ⋯ overflow** into a top-level
+ *    button — easier to reach for the most-common file action after
+ *    Save.
+ *  - **Filename is inline-editable**: click to swap to an input, Enter
+ *    to commit, Escape to discard. The bar grows naturally because
+ *    the input auto-sizes via the hidden-span sizing trick.
+ *  - **Open and Save show a loading state** (button background pulses
+ *    + cursor change) while their promises are unresolved — the file
+ *    dialog is async and a click with no feedback feels broken.
+ *  - All popovers (Recents, ⋯, Operations) share an "exclusive open"
+ *    state so opening one closes the others.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { FilePlus, FolderOpen, Save, MoreHorizontal, Undo2, Redo2, X } from 'lucide-react';
-// Note: Convert-to-DFA was briefly hosted here in the initial Variant B
-// shipping. Pulled back out per Wes's feedback: the bar is for COMMON
-// command-tier actions (file + history). Operation-tier transformations
-// like Convert / Minimize / Equivalence are EDIT-mode-specific tools and
-// belong in the Edit panel (or its own future Operations widget).
+import {
+  FilePlus, FolderOpen, Save, MoreHorizontal, Undo2, Redo2, X,
+  History, Wand2,
+} from 'lucide-react';
 import type { RecentEntry } from '../files/recentsStore';
 
-// Cheap platform detection — same approach the old UndoRedoControls
-// used. The result only drives tooltip glyphs, so a wrong guess is
-// purely cosmetic.
 const isMac =
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
 const modGlyph = isMac ? '\u2318' : 'Ctrl';
@@ -52,26 +48,52 @@ const shiftGlyph = isMac ? '\u21e7' : 'Shift+';
 
 export type CommandBarAppMode = 'IDLE' | 'EDITING' | 'SIMULATING';
 
+export type OperationsItem = {
+  id: string;
+  label: string;
+  hint?: string;
+  enabled: boolean;
+  /** Tooltip text — typically the reason an item is disabled. */
+  title?: string;
+  onClick: () => void;
+};
+
+export type OperationsCategory = {
+  id: string;
+  label: string;
+  items: ReadonlyArray<OperationsItem>;
+};
+
 type CommandBarProp = {
-  // ─── App mode (drives segment visibility) ───
   appMode: CommandBarAppMode;
 
-  // ─── File segment (always visible) ───
+  // ─── File segment ───
   currentName: string | null;
   isDirty: boolean;
   recents: ReadonlyArray<RecentEntry>;
   onNew: () => void;
-  onOpen: () => void;
-  onSave: () => void;
-  onSaveAs: () => void;
+  /** Async so the bar can show a loading state while the file picker
+   *  is up. The promise resolves on file pick OR cancellation. */
+  onOpen: () => Promise<void>;
+  onSave: () => Promise<void>;
+  onSaveAs: () => Promise<void>;
   onOpenRecent: (id: string) => void;
   onForgetRecent: (id: string) => void;
+  /** Called when the user commits an inline filename rename. The empty
+   *  string means "back to Untitled" (the field can't actually go
+   *  empty — we discard those edits and stay on the prior name). */
+  onRenameCurrent: (nextName: string) => void;
 
-  // ─── Edit segment (EDIT only) ───
+  // ─── Edit segment ───
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
+  /** Operations menu. Items are categorized; empty categories are
+   *  filtered out at render time. Pass [] to hide the wand button
+   *  entirely (useful while we're still in CONFIG/SIMULATE — caller
+   *  should also gate visibility on appMode). */
+  operationsCategories: ReadonlyArray<OperationsCategory>;
 };
 
 function formatRelative(iso: string): string {
@@ -89,15 +111,14 @@ function formatRelative(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
-// Shared motion config for segment morph: width animates from 0 to
-// natural-content alongside opacity. 0.25s matches the prior
-// UndoRedoControls duration so the visual cadence carries over.
 const segmentMotion = {
   initial: { opacity: 0, width: 0 },
   animate: { opacity: 1, width: 'auto' as const },
   exit: { opacity: 0, width: 0 },
   transition: { duration: 0.25, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] },
 };
+
+type ActivePopover = 'recents' | 'more' | 'operations' | null;
 
 export function CommandBar({
   appMode,
@@ -110,31 +131,40 @@ export function CommandBar({
   onSaveAs,
   onOpenRecent,
   onForgetRecent,
+  onRenameCurrent,
   canUndo,
   canRedo,
   onUndo,
   onRedo,
+  operationsCategories,
 }: CommandBarProp) {
-  const [popoverOpen, setPopoverOpen] = useState(false);
-  const popoverContainerRef = useRef<HTMLDivElement | null>(null);
+  const [activePopover, setActivePopover] = useState<ActivePopover>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Close the popover on outside click and on Escape. The container
-  // ref scopes the "is this click inside?" check to the file segment,
-  // so clicking elsewhere on the bar (e.g. an undo button) also
-  // dismisses — that's the right behavior; a user reaching for a
-  // different command shouldn't be blocked by the popover.
+  const [openLoading, setOpenLoading] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveAsLoading, setSaveAsLoading] = useState(false);
+
+  // Inline rename state
+  const [renaming, setRenaming] = useState(false);
+  const [renameDraft, setRenameDraft] = useState('');
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+  const renameSizerRef = useRef<HTMLSpanElement | null>(null);
+  const [renameWidth, setRenameWidth] = useState<number>(120);
+
+  // Outside-click + Escape close popovers. Filename rename has its own
+  // Escape handler (below) that runs first because the input owns the
+  // event. Outside-click during rename also commits (via blur).
   useEffect(() => {
-    if (!popoverOpen) return;
+    if (activePopover === null) return;
     function handlePointerDown(event: MouseEvent) {
-      const node = popoverContainerRef.current;
+      const node = containerRef.current;
       if (node && event.target instanceof Node && !node.contains(event.target)) {
-        setPopoverOpen(false);
+        setActivePopover(null);
       }
     }
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setPopoverOpen(false);
-      }
+      if (event.key === 'Escape') setActivePopover(null);
     }
     document.addEventListener('mousedown', handlePointerDown);
     document.addEventListener('keydown', handleKeyDown);
@@ -142,23 +172,118 @@ export function CommandBar({
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [popoverOpen]);
+  }, [activePopover]);
+
+  // Auto-focus + select-all when entering rename mode so the user can
+  // start typing immediately.
+  useEffect(() => {
+    if (renaming && renameInputRef.current) {
+      renameInputRef.current.focus();
+      renameInputRef.current.select();
+    }
+  }, [renaming]);
+
+  // Sync the input width to its content so the bar grows/shrinks as
+  // the user types. We mirror the draft into a hidden span and read
+  // its rendered width.
+  useLayoutEffect(() => {
+    if (!renaming) return;
+    const sizer = renameSizerRef.current;
+    if (!sizer) return;
+    const w = sizer.getBoundingClientRect().width;
+    // Add a few px buffer for the cursor + caret.
+    setRenameWidth(Math.max(60, Math.ceil(w) + 12));
+  }, [renaming, renameDraft]);
+
+  function startRename() {
+    setActivePopover(null);
+    setRenameDraft(currentName ?? '');
+    setRenaming(true);
+  }
+
+  function commitRename() {
+    const trimmed = renameDraft.trim();
+    if (trimmed.length > 0 && trimmed !== currentName) {
+      onRenameCurrent(trimmed);
+    }
+    setRenaming(false);
+  }
+
+  function cancelRename() {
+    setRenaming(false);
+  }
+
+  async function withLoading(
+    setter: (loading: boolean) => void,
+    fn: () => Promise<void>
+  ): Promise<void> {
+    setter(true);
+    try {
+      await fn();
+    } finally {
+      setter(false);
+    }
+  }
+
+  function togglePopover(target: Exclude<ActivePopover, null>) {
+    setActivePopover((current) => (current === target ? null : target));
+  }
+
+  // Filter out empty operations categories so the popover never shows
+  // a header with no items below it.
+  const populatedOps = operationsCategories.filter((c) => c.items.length > 0);
 
   return (
-    <div className="command-bar" role="toolbar" aria-label="Command bar">
+    <div className="command-bar" role="toolbar" aria-label="Command bar" ref={containerRef}>
       {/* ─── File segment — always visible ─── */}
-      <div
-        className="command-bar-segment command-bar-segment-file"
-        ref={popoverContainerRef}
-      >
-        <span className="command-bar-filename" title={currentName ?? 'Untitled'}>
-          {currentName ?? 'Untitled'}
-          {isDirty && (
-            <span className="command-bar-dirty-dot" aria-label="Unsaved changes" title="Unsaved changes">
-              •
+      <div className="command-bar-segment command-bar-segment-file">
+        {renaming ? (
+          <span className="command-bar-rename" style={{ width: renameWidth }}>
+            <input
+              ref={renameInputRef}
+              type="text"
+              className="command-bar-rename-input"
+              value={renameDraft}
+              onChange={(e) => setRenameDraft(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  commitRename();
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  cancelRename();
+                }
+              }}
+              aria-label="Rename file"
+            />
+            {/* Hidden sizer mirrors the draft text so we can read its
+                rendered width and grow the input to match. */}
+            <span ref={renameSizerRef} className="command-bar-rename-sizer" aria-hidden="true">
+              {renameDraft || ' '}
             </span>
-          )}
-        </span>
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="command-bar-filename"
+            onClick={startRename}
+            title={`${currentName ?? 'Untitled'} — click to rename`}
+            aria-label="Rename file"
+          >
+            {currentName ?? 'Untitled'}
+            {isDirty && (
+              <span
+                className="command-bar-dirty-dot"
+                aria-label="Unsaved changes"
+                title="Unsaved changes"
+              >
+                •
+              </span>
+            )}
+          </button>
+        )}
+
         <button
           type="button"
           className="command-bar-button"
@@ -170,100 +295,109 @@ export function CommandBar({
         </button>
         <button
           type="button"
-          className="command-bar-button"
-          onClick={onOpen}
+          className={`command-bar-button${openLoading ? ' command-bar-button-loading' : ''}`}
+          onClick={() => { void withLoading(setOpenLoading, onOpen); }}
+          disabled={openLoading}
           aria-label="Open"
+          aria-busy={openLoading}
           title={`Open (${modGlyph}O)`}
         >
           <FolderOpen size={16} />
         </button>
         <button
           type="button"
-          className="command-bar-button"
-          onClick={onSave}
+          className={`command-bar-button${saveLoading ? ' command-bar-button-loading' : ''}`}
+          onClick={() => { void withLoading(setSaveLoading, onSave); }}
+          disabled={saveLoading}
           aria-label="Save"
+          aria-busy={saveLoading}
           title={`Save (${modGlyph}S)`}
         >
           <Save size={16} />
         </button>
         <button
           type="button"
-          className="command-bar-button"
-          onClick={() => setPopoverOpen((v) => !v)}
+          className={`command-bar-button${activePopover === 'recents' ? ' command-bar-button-active' : ''}`}
+          onClick={() => togglePopover('recents')}
+          aria-label="Recents"
+          aria-haspopup="menu"
+          aria-expanded={activePopover === 'recents'}
+          title="Recent files"
+        >
+          <History size={16} />
+        </button>
+        <button
+          type="button"
+          className={`command-bar-button${activePopover === 'more' ? ' command-bar-button-active' : ''}${saveAsLoading ? ' command-bar-button-loading' : ''}`}
+          onClick={() => togglePopover('more')}
           aria-label="More file actions"
           aria-haspopup="menu"
-          aria-expanded={popoverOpen}
+          aria-expanded={activePopover === 'more'}
           title="More file actions"
         >
           <MoreHorizontal size={16} />
         </button>
 
-        {popoverOpen && (
-          <div className="command-bar-popover" role="menu">
-            <div className="command-bar-popover-section">
-              <button
-                type="button"
-                className="command-bar-popover-item"
-                onClick={() => {
-                  setPopoverOpen(false);
-                  onSaveAs();
-                }}
-                title={`Save As (${modGlyph}${shiftGlyph}S)`}
-              >
-                <Save size={14} />
-                <span>Save As…</span>
-              </button>
-            </div>
-            <div className="command-bar-popover-section">
-              <span className="command-bar-popover-label">Recents</span>
-              {recents.length === 0 ? (
-                <div className="command-bar-popover-recents-empty">No recent files</div>
-              ) : (
-                recents.map((entry) => (
-                  <div key={entry.id} className="command-bar-popover-recent">
-                    <button
-                      type="button"
-                      className="command-bar-popover-recent-open"
-                      onClick={() => {
-                        setPopoverOpen(false);
-                        onOpenRecent(entry.id);
-                      }}
-                      title={`Open ${entry.name}`}
-                    >
-                      <span className="command-bar-popover-recent-name">{entry.name}</span>
-                      <span className="command-bar-popover-recent-meta">
-                        {formatRelative(entry.openedAt)}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className="command-bar-popover-recent-forget"
-                      onClick={() => onForgetRecent(entry.id)}
-                      aria-label={`Forget ${entry.name}`}
-                      title="Remove from recents"
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
+        {activePopover === 'recents' && (
+          <div className="command-bar-popover command-bar-popover-recents-anchor" role="menu">
+            <span className="command-bar-popover-label">Recents</span>
+            {recents.length === 0 ? (
+              <div className="command-bar-popover-recents-empty">No recent files</div>
+            ) : (
+              recents.map((entry) => (
+                <div key={entry.id} className="command-bar-popover-recent">
+                  <button
+                    type="button"
+                    className="command-bar-popover-recent-open"
+                    onClick={() => {
+                      setActivePopover(null);
+                      onOpenRecent(entry.id);
+                    }}
+                    title={`Open ${entry.name}`}
+                  >
+                    <span className="command-bar-popover-recent-name">{entry.name}</span>
+                    <span className="command-bar-popover-recent-meta">
+                      {formatRelative(entry.openedAt)}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="command-bar-popover-recent-forget"
+                    onClick={() => onForgetRecent(entry.id)}
+                    aria-label={`Forget ${entry.name}`}
+                    title="Remove from recents"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {activePopover === 'more' && (
+          <div className="command-bar-popover command-bar-popover-more-anchor" role="menu">
+            <button
+              type="button"
+              className={`command-bar-popover-item${saveAsLoading ? ' command-bar-popover-item-loading' : ''}`}
+              onClick={() => {
+                setActivePopover(null);
+                void withLoading(setSaveAsLoading, onSaveAs);
+              }}
+              disabled={saveAsLoading}
+              title={`Save As (${modGlyph}${shiftGlyph}S)`}
+            >
+              <Save size={14} />
+              <span>Save As…</span>
+            </button>
           </div>
         )}
       </div>
 
-      {/* ─── EDIT segment — undo/redo + ops ─── */}
+      {/* ─── EDIT segment — undo / redo / operations ─── */}
       <AnimatePresence initial={false}>
         {appMode === 'EDITING' && (
-          <motion.div
-            key="edit-segment"
-            className="command-bar-segment"
-            // Wrapper used to host the divider + content; both fade in
-            // together. Using `motion.div` with width:auto requires
-            // overflow:hidden (set on .command-bar-segment) so content
-            // doesn't poke out during the collapse.
-            {...segmentMotion}
-          >
+          <motion.div key="edit-segment" className="command-bar-segment" {...segmentMotion}>
             <div className="command-bar-divider" aria-hidden="true" />
             <button
               type="button"
@@ -285,15 +419,55 @@ export function CommandBar({
             >
               <Redo2 size={16} />
             </button>
+            <button
+              type="button"
+              className={`command-bar-button${activePopover === 'operations' ? ' command-bar-button-active' : ''}`}
+              onClick={() => togglePopover('operations')}
+              aria-label="Operations"
+              aria-haspopup="menu"
+              aria-expanded={activePopover === 'operations'}
+              title="Operations (convert, minimize, complement…)"
+            >
+              <Wand2 size={16} />
+            </button>
+
+            {activePopover === 'operations' && (
+              <div className="command-bar-popover command-bar-popover-operations-anchor" role="menu">
+                {populatedOps.length === 0 ? (
+                  <div className="command-bar-popover-recents-empty">
+                    No operations available for the current automaton.
+                  </div>
+                ) : (
+                  populatedOps.map((cat) => (
+                    <div key={cat.id} className="command-bar-popover-section">
+                      <span className="command-bar-popover-label">{cat.label}</span>
+                      {cat.items.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          role="menuitem"
+                          className="command-bar-popover-item command-bar-popover-item-op"
+                          disabled={!item.enabled}
+                          title={item.title}
+                          onClick={() => {
+                            setActivePopover(null);
+                            item.onClick();
+                          }}
+                        >
+                          <span className="command-bar-popover-item-label">{item.label}</span>
+                          {item.hint && (
+                            <span className="command-bar-popover-item-hint">{item.hint}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* ─── SIMULATE segment — reserved, currently empty ───
-          Intentionally not rendered when nothing populates it. When
-          future SIMULATE-tier commands land (replay scrubber, jump-to,
-          etc.) they slot in here behind their own AnimatePresence so
-          the bar morphs the same way it does for EDIT. */}
     </div>
   );
 }

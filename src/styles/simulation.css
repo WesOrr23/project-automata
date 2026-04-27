@@ -305,14 +305,60 @@ button svg {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 0 var(--space-1);
+  padding: 4px var(--space-2);
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
   color: var(--text-heading);
   font-family: var(--font-sans);
-  max-width: 220px;
+  max-width: 280px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: text;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  flex: 0 0 auto;
+}
+
+.command-bar-filename:hover {
+  background: var(--bg-button-hover);
+  border-color: var(--border-subtle);
+}
+
+/* ─── Inline filename rename ─── */
+.command-bar-rename {
+  display: inline-block;
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.command-bar-rename-input {
+  width: 100%;
+  padding: 4px var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-heading);
+  font-family: var(--font-sans);
+  background: var(--bg-input, #fff);
+  border: 1px solid var(--blue-400, #60a5fa);
+  border-radius: 6px;
+  outline: none;
+  user-select: text;
+}
+
+/* Hidden sizer mirrors the draft text for width measurement. Same
+ * font metrics as the input so the measured width matches exactly. */
+.command-bar-rename-sizer {
+  position: absolute;
+  visibility: hidden;
+  white-space: pre;
+  pointer-events: none;
+  padding: 4px var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  font-family: var(--font-sans);
 }
 
 .command-bar-dirty-dot {
@@ -350,6 +396,29 @@ button svg {
 .command-bar-button:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+/* "Active" treatment: the popover-trigger button stays highlighted
+ * while its popover is open, so the user has a visible link between
+ * trigger and popover. */
+.command-bar-button.command-bar-button-active {
+  background: var(--bg-button-active, rgba(0,0,0,0.06));
+  color: var(--text-heading);
+}
+
+/* "Loading" treatment: pulsing background + wait cursor while an async
+ * file action (open / save / save-as) is mid-flight. The button is
+ * also disabled to prevent re-clicks. The pulse uses the existing
+ * --bg-button-hover token so it stays subtle. */
+@keyframes command-bar-loading-pulse {
+  0%, 100% { background: var(--bg-button-hover); }
+  50%      { background: var(--bg-button-active, rgba(0,0,0,0.06)); }
+}
+.command-bar-button.command-bar-button-loading,
+.command-bar-popover-item.command-bar-popover-item-loading {
+  animation: command-bar-loading-pulse 0.9s ease-in-out infinite;
+  cursor: wait !important;
+  opacity: 1 !important;
 }
 
 .command-bar-button.command-bar-button-text {

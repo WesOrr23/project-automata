@@ -61,6 +61,9 @@ export type UseFileSessionResult = {
   forgetRecent: (id: string) => void;
   /** Live recents list (re-read on each save/open). */
   recents: RecentEntry[];
+  /** Inline rename: set the in-app filename without writing to disk.
+   *  The new name will be the suggestedName for the next Save. */
+  renameCurrent: (nextName: string) => void;
 };
 
 /**
@@ -213,6 +216,16 @@ export function useFileSession(
     [refreshRecents]
   );
 
+  // Inline rename — no disk write. The next Save uses this as the
+  // suggestedName, so the rename is "applied" the next time the user
+  // saves. We deliberately don't auto-save here: renaming an open
+  // file in any desktop OS doesn't write a new file either.
+  const renameCurrent = useCallback((nextName: string) => {
+    const cleaned = nextName.trim();
+    if (cleaned.length === 0) return;
+    setCurrentName(normalizeName(cleaned));
+  }, []);
+
   return {
     currentName,
     save,
@@ -222,5 +235,6 @@ export function useFileSession(
     openRecent,
     forgetRecent,
     recents,
+    renameCurrent,
   };
 }

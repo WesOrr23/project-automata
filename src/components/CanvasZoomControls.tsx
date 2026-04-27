@@ -57,21 +57,21 @@ export function CanvasZoomControls({
       <button
         type="button"
         className="canvas-zoom-button"
+        onClick={fitToContent}
+        title="Fit to view (F)"
+        aria-label="Fit to view"
+      >
+        <Maximize2 size={15} strokeWidth={2.25} />
+      </button>
+      <button
+        type="button"
+        className="canvas-zoom-button"
         onClick={zoomOut}
         disabled={atMinScale}
         title={`Zoom out (${modifierGlyph}-)`}
         aria-label="Zoom out"
       >
         <Minus size={16} strokeWidth={2.25} />
-      </button>
-      <button
-        type="button"
-        className="canvas-zoom-button"
-        onClick={fitToContent}
-        title="Fit to view (F)"
-        aria-label="Fit to view"
-      >
-        <Maximize2 size={15} strokeWidth={2.25} />
       </button>
     </motion.div>
   );

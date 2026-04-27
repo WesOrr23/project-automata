@@ -21,15 +21,17 @@ function makeProps(overrides: Partial<ComponentProps<typeof CommandBar>> = {}) {
     isDirty: false,
     recents: [],
     onNew: vi.fn(),
-    onOpen: vi.fn(),
-    onSave: vi.fn(),
-    onSaveAs: vi.fn(),
+    onOpen: vi.fn().mockResolvedValue(undefined),
+    onSave: vi.fn().mockResolvedValue(undefined),
+    onSaveAs: vi.fn().mockResolvedValue(undefined),
     onOpenRecent: vi.fn(),
     onForgetRecent: vi.fn(),
+    onRenameCurrent: vi.fn(),
     canUndo: true,
     canRedo: true,
     onUndo: vi.fn(),
     onRedo: vi.fn(),
+    operationsCategories: [],
     ...overrides,
   };
 }
@@ -127,9 +129,12 @@ describe('CommandBar — ⋯ popover', () => {
     expect(props.onSaveAs).toHaveBeenCalledTimes(1);
   });
 
+});
+
+describe('CommandBar — Recents popover (own button)', () => {
   it('renders empty-recents message', () => {
     const { getByLabelText, getByText } = render(<CommandBar {...makeProps()} />);
-    fireEvent.click(getByLabelText('More file actions'));
+    fireEvent.click(getByLabelText('Recents'));
     expect(getByText('No recent files')).toBeTruthy();
   });
 
@@ -147,14 +152,79 @@ describe('CommandBar — ⋯ popover', () => {
       ],
     });
     const { getByLabelText, getByText } = render(<CommandBar {...props} />);
-    fireEvent.click(getByLabelText('More file actions'));
+    fireEvent.click(getByLabelText('Recents'));
     const openBtn = getByText('foo.json');
     fireEvent.click(openBtn);
     expect(props.onOpenRecent).toHaveBeenCalledWith('a');
 
     // Re-open the popover (clicking a recent closes it).
-    fireEvent.click(getByLabelText('More file actions'));
+    fireEvent.click(getByLabelText('Recents'));
     fireEvent.click(getByLabelText('Forget foo.json'));
     expect(props.onForgetRecent).toHaveBeenCalledWith('a');
+  });
+});
+
+describe('CommandBar — inline rename', () => {
+  it('clicking the filename swaps to a text input', () => {
+    const { getByText, getByLabelText } = render(
+      <CommandBar {...makeProps({ currentName: 'sample.json' })} />
+    );
+    fireEvent.click(getByText('sample.json'));
+    const input = getByLabelText('Rename file') as HTMLInputElement;
+    expect(input).toBeTruthy();
+    expect(input.value).toBe('sample.json');
+  });
+
+  it('Enter commits via onRenameCurrent', () => {
+    const props = makeProps({ currentName: 'old.json' });
+    const { getByText, getByLabelText } = render(<CommandBar {...props} />);
+    fireEvent.click(getByText('old.json'));
+    const input = getByLabelText('Rename file') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'new.json' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(props.onRenameCurrent).toHaveBeenCalledWith('new.json');
+  });
+
+  it('Escape discards (does not call onRenameCurrent)', () => {
+    const props = makeProps({ currentName: 'old.json' });
+    const { getByText, getByLabelText } = render(<CommandBar {...props} />);
+    fireEvent.click(getByText('old.json'));
+    const input = getByLabelText('Rename file') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'new.json' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(props.onRenameCurrent).not.toHaveBeenCalled();
+  });
+
+  it('empty rename is discarded', () => {
+    const props = makeProps({ currentName: 'old.json' });
+    const { getByText, getByLabelText } = render(<CommandBar {...props} />);
+    fireEvent.click(getByText('old.json'));
+    const input = getByLabelText('Rename file') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '   ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(props.onRenameCurrent).not.toHaveBeenCalled();
+  });
+});
+
+describe('CommandBar — Operations menu in EDIT segment', () => {
+  it('renders the Operations button only in EDITING', () => {
+    const cats = [{ id: 'c', label: 'Conv', items: [{ id: 'x', label: 'X', enabled: true, onClick: vi.fn() }] }];
+    const idleRender = render(<CommandBar {...makeProps({ operationsCategories: cats })} />);
+    expect(idleRender.queryByLabelText('Operations')).toBeNull();
+    idleRender.unmount();
+    const editRender = render(<CommandBar {...makeProps({ appMode: 'EDITING', operationsCategories: cats })} />);
+    expect(editRender.getByLabelText('Operations')).toBeTruthy();
+  });
+
+  it('clicking Operations opens a popover with the categories', () => {
+    const onClick = vi.fn();
+    const cats = [{ id: 'c', label: 'Conversions', items: [{ id: 'x', label: 'Convert', enabled: true, onClick }] }];
+    const { getByLabelText, getByText } = render(
+      <CommandBar {...makeProps({ appMode: 'EDITING', operationsCategories: cats })} />
+    );
+    fireEvent.click(getByLabelText('Operations'));
+    expect(getByText('Conversions')).toBeTruthy();
+    fireEvent.click(getByText('Convert'));
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 });

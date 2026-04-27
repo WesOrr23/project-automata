@@ -80,7 +80,10 @@ describe('AutomatonCanvas', () => {
       <AutomatonCanvas automaton={automaton} automatonUI={automatonUI} />
     );
     // Non-accept (q0) → 1 circle. Accept (q1) → 2 circles. Total = 3.
-    const circles = container.querySelectorAll('circle');
+    // Scope to state-node descendants so the debug center markers
+    // (red visible-center dot + blue FA-center ring) don't inflate
+    // the count.
+    const circles = container.querySelectorAll('[data-state-id] circle');
     expect(circles).toHaveLength(3);
   });
 
