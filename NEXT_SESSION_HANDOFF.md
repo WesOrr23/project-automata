@@ -128,6 +128,24 @@ Configure / Edit / Simulate) that exposes a small DSL terminal:
 - **Out of scope for now**: macros, conditionals, file I/O. Just a thin
   imperative layer over the engine. Aim for "one command per intent."
 
+### MP4 / animated export of a simulation run (future feature)
+Captured 2026-04-27. The current image-export plan is a single
+PNG/SVG snapshot. A natural follow-up would be capturing a full
+simulation run as an MP4 (or animated GIF / WebM):
+
+- **Use case**: paste a "this is what my DFA does on input `0110`"
+  clip into a homework writeup, slide deck, or bug report — much
+  more communicative than a static frame.
+- **Implementation sketch**: drive the existing useSimulation
+  step-by-step, snapshot the canvas SVG to a `<canvas>` per frame
+  via `canvas.drawImage(new Image(svgDataUrl))`, then encode with
+  a WebCodecs `VideoEncoder` (MP4 H.264) or MediaRecorder (WebM).
+  GIF is the fallback for older browsers via gif.js or similar.
+- **Out of scope for the upcoming image-export work** — ship the
+  PNG/SVG path first, then decide if MP4 is worth the encoding
+  complexity. Wes flagged it as "definitely a later feature, not
+  worth worrying about now."
+
 ### Pseudo-`?` state for incomplete DFAs (educational visualization)
 Captured during iter 7 follow-up. When a DFA is incomplete (some
 state/symbol pairs have no transition), the Simulate tab refuses to
