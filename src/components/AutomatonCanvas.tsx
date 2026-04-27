@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { HelpCircle } from 'lucide-react';
 import { Automaton } from '../engine/types';
 import { AutomatonUI } from '../ui-state/types';
 import { STATE_RADIUS } from '../ui-state/constants';
@@ -99,6 +100,15 @@ type AutomatonCanvasProp = {
   bottomRightExtras?: ReactNode;
 
   /**
+   * If provided, a small "?" help button is rendered ABOVE the zoom
+   * controls in the bottom-right stack. Click invokes the callback —
+   * App wires this to re-show the onboarding tour. Surfaces the tour
+   * as a discoverable, always-visible affordance instead of burying
+   * it in the CommandBar's ⋯ overflow.
+   */
+  onShowTour?: () => void;
+
+  /**
    * Pixels of overlay chrome (tool menu, command bar) covering the SVG.
    * Centering operations target the un-occluded region rather than the
    * geometric center, so "centered" reads as "centered in what the
@@ -160,6 +170,7 @@ export function AutomatonCanvas({
   creationDestinationId,
   creationStateKind,
   bottomRightExtras,
+  onShowTour,
   viewportInset,
 }: AutomatonCanvasProp) {
   // The start-state arrow extends LEFT of the start-state circle, which
@@ -601,6 +612,25 @@ export function AutomatonCanvas({
         atMaxScale={atMaxScale}
         atMinScale={atMinScale}
       />
+      {onShowTour && (
+        // Lives in the same column-reverse stack — DOM-after the zoom
+        // controls means it stacks visually ABOVE them. Wrapped in the
+        // same .canvas-zoom-controls pill so the visual vocabulary
+        // matches (background, blur, border, shadow). Single-button
+        // pill is intentional — keeps the help affordance distinct
+        // from the zoom cluster while sharing the chrome.
+        <div className="canvas-zoom-controls" aria-label="Help">
+          <button
+            type="button"
+            className="canvas-zoom-button"
+            onClick={onShowTour}
+            aria-label="Show tour"
+            title="Show tour"
+          >
+            <HelpCircle size={16} />
+          </button>
+        </div>
+      )}
     </div>
     </>
   );

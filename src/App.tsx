@@ -983,7 +983,7 @@ function App() {
               // centering doesn't crowd the menu's right edge.
               left:
                 16 +
-                (menuState.mode === 'COLLAPSED' ? 48 :
+                (menuState.mode === 'COLLAPSED' ? 52 :
                  menuState.mode === 'EXPANDED' ? 152 : 280) +
                 24,
               // Menu is vertically centered in the viewport via CSS
@@ -998,6 +998,7 @@ function App() {
               top: 16 + 48 + 8,
               bottom: 16 + 48 + 8,
             }}
+            onShowTour={onboarding.show}
             bottomRightExtras={
               /* Discoverability hint while in EDIT mode and the form is
                  at rest. Sits at the bottom of the canvas-bottom-right
