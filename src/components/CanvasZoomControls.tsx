@@ -19,6 +19,10 @@ type CanvasZoomControlsProp = {
   fitToContent: () => void;
   atMaxScale: boolean;
   atMinScale: boolean;
+  /** Current viewport scale. Drives the middle button's percent
+   *  display ("100%", "150%", etc.). On hover the percent fades out
+   *  and the Fit-to-view icon fades in to signal the click action. */
+  scale: number;
 };
 
 const isMac =
@@ -31,7 +35,9 @@ export function CanvasZoomControls({
   fitToContent,
   atMaxScale,
   atMinScale,
+  scale,
 }: CanvasZoomControlsProp) {
+  const percent = Math.round(scale * 100);
   return (
     // `layout` enables Framer's automatic position-change animation:
     // when a sibling in the parent stack mounts/unmounts (canvas-tip
@@ -54,14 +60,21 @@ export function CanvasZoomControls({
       >
         <Plus size={16} strokeWidth={2.25} />
       </button>
+      {/* Middle button: shows the current zoom percentage at rest;
+          on hover, swaps to the Fit-to-view icon (smooth crossfade)
+          to signal the click action. Both children are absolutely
+          positioned so they overlap and the button doesn't resize. */}
       <button
         type="button"
-        className="canvas-zoom-button"
+        className="canvas-zoom-button canvas-zoom-fit"
         onClick={fitToContent}
         title="Fit to view (F)"
-        aria-label="Fit to view"
+        aria-label={`Fit to view (current: ${percent}%)`}
       >
-        <Maximize2 size={15} strokeWidth={2.25} />
+        <span className="canvas-zoom-fit-percent">{percent}%</span>
+        <span className="canvas-zoom-fit-icon">
+          <Maximize2 size={15} strokeWidth={2.25} />
+        </span>
       </button>
       <button
         type="button"

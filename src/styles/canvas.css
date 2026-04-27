@@ -205,3 +205,43 @@
   user-select: none;
   backdrop-filter: blur(4px);
 }
+
+/* ─── Fit/zoom-percent middle button ─── */
+/* The middle zoom button shows the current scale as a percent at
+ * rest, then crossfades to the Fit-to-view icon on hover so the
+ * click affordance is unambiguous. Both children sit absolutely
+ * positioned in the same 32×32 frame so the button doesn't resize
+ * during the swap. */
+.canvas-zoom-button.canvas-zoom-fit {
+  position: relative;
+}
+
+.canvas-zoom-fit-percent,
+.canvas-zoom-fit-icon {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.18s ease;
+}
+
+.canvas-zoom-fit-percent {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  opacity: 1;
+}
+
+.canvas-zoom-fit-icon {
+  opacity: 0;
+}
+
+.canvas-zoom-button.canvas-zoom-fit:hover .canvas-zoom-fit-percent {
+  opacity: 0;
+}
+
+.canvas-zoom-button.canvas-zoom-fit:hover .canvas-zoom-fit-icon {
+  opacity: 1;
+}

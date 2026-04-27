@@ -483,6 +483,34 @@ button svg {
   color: var(--text-heading);
 }
 
+/* Operations items override the row layout: stack label over hint
+ * (vertically) instead of side-by-side, so a long hint can wrap
+ * cleanly under the label rather than overflowing the popover. */
+.command-bar-popover-item.command-bar-popover-item-op {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: var(--space-2);
+}
+
+.command-bar-popover-item.command-bar-popover-item-op:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.command-bar-popover-item-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium, 500);
+  line-height: 1.2;
+}
+
+.command-bar-popover-item-hint {
+  font-size: var(--text-xs, 11px);
+  color: var(--text-secondary);
+  font-style: italic;
+  line-height: 1.2;
+}
+
 .command-bar-popover-recents-empty {
   font-size: var(--text-sm);
   color: var(--text-secondary);

@@ -734,8 +734,7 @@ function App() {
       items: [
         {
           id: 'nfa-to-dfa',
-          label: 'Convert NFA to DFA',
-          hint: 'Subset construction (auto-minimized)',
+          label: 'Convert to DFA',
           enabled: automaton.type === 'NFA',
           ...(automaton.type !== 'NFA' ? { title: 'Already a DFA' } : {}),
           onClick: handleConvertToDfa,
@@ -743,7 +742,6 @@ function App() {
         {
           id: 'complement',
           label: 'Complement',
-          hint: 'Swap accept and non-accept',
           enabled: isCurrentDfaComplete,
           ...(isCurrentDfaComplete ? {} : { title: requiresCompleteDfaTitle }),
           onClick: handleComplement,
@@ -756,8 +754,7 @@ function App() {
       items: [
         {
           id: 'minimize',
-          label: 'Minimize DFA',
-          hint: 'Hopcroft partition refinement',
+          label: 'Minimize',
           enabled: isCurrentDfaComplete,
           ...(isCurrentDfaComplete ? {} : { title: requiresCompleteDfaTitle }),
           onClick: handleMinimize,
@@ -765,7 +762,6 @@ function App() {
         {
           id: 'compare-against',
           label: 'Compare against…',
-          hint: 'Check equivalence with another DFA',
           enabled: isCurrentDfaComplete,
           ...(isCurrentDfaComplete ? {} : { title: requiresCompleteDfaTitle }),
           onClick: handleCompareAgainst,
@@ -980,10 +976,17 @@ function App() {
                 (menuState.mode === 'COLLAPSED' ? 48 :
                  menuState.mode === 'EXPANDED' ? 152 : 280) +
                 24,
+              // Menu is vertically centered in the viewport via CSS
+              // (top:50%; translateY(-50%)). To make the FA's vertical
+              // center align with the menu's vertical center (=
+              // window vertical center), we use a SYMMETRIC vertical
+              // inset — top and bottom both reserve the same space.
+              // Otherwise the visible vertical center sits below the
+              // window center by half the top inset, and the FA looks
+              // 'too low' relative to the menu.
               right: 0,
-              // CommandBar at top:16, ~48px tall + 16 gap.
               top: 16 + 48 + 8,
-              bottom: 0,
+              bottom: 16 + 48 + 8,
             }}
             bottomRightExtras={
               /* Discoverability hint while in EDIT mode and the form is

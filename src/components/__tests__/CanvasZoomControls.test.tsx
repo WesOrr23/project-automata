@@ -16,6 +16,7 @@ function defaultProps() {
     fitToContent: vi.fn(),
     atMaxScale: false,
     atMinScale: false,
+    scale: 1,
   };
 }
 
@@ -26,7 +27,7 @@ describe('CanvasZoomControls', () => {
     );
     expect(getByLabelText('Zoom in')).toBeTruthy();
     expect(getByLabelText('Zoom out')).toBeTruthy();
-    expect(getByLabelText('Fit to view')).toBeTruthy();
+    expect(getByLabelText(/Fit to view/)).toBeTruthy();
     expect(queryByLabelText('Reset zoom')).toBeNull();
   });
 
@@ -47,7 +48,7 @@ describe('CanvasZoomControls', () => {
   it('Fit click invokes fitToContent', () => {
     const props = defaultProps();
     const { getByLabelText } = render(<CanvasZoomControls {...props} />);
-    fireEvent.click(getByLabelText('Fit to view'));
+    fireEvent.click(getByLabelText(/Fit to view/));
     expect(props.fitToContent).toHaveBeenCalledTimes(1);
   });
 
@@ -72,6 +73,6 @@ describe('CanvasZoomControls', () => {
   it('Fit stays enabled at scale extremes', () => {
     const props = { ...defaultProps(), atMaxScale: true, atMinScale: true };
     const { getByLabelText } = render(<CanvasZoomControls {...props} />);
-    expect((getByLabelText('Fit to view') as HTMLButtonElement).disabled).toBe(false);
+    expect((getByLabelText(/Fit to view/) as HTMLButtonElement).disabled).toBe(false);
   });
 });

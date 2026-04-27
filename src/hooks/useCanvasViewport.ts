@@ -299,16 +299,15 @@ export function useCanvasViewport(
 
   // Whenever the visible region shifts (overlay chrome resizes — menu
   // expanded/collapsed/opened, command bar grew, etc.), slide the pan
-  // by the same delta so the FA's RELATIVE position inside the visible
-  // region stays fixed. If the user had the FA centered at the visible
-  // mid-line, it stays at the mid-line of the new visible region; if
-  // they had panned it to a corner, it stays at the same corner of
-  // the new visible region.
+  // by the same delta to PRESERVE the FA's relative position in the
+  // visible region. If after the shift the FA would extend past the
+  // new visible region (i.e. menu now obstructs part of the FA), we
+  // additionally re-fit so auto operations NEVER hand back an
+  // obstructed canvas. User-initiated pans and zooms remain free.
   //
-  // The pan shift is instant (state set), but the canvas-content-
-  // animating CSS class is triggered for the same window so the
-  // visible transform interpolates over 300ms — staying roughly in
-  // sync with the menu's own animation.
+  // The pan shift is instant (state set), but canvas-content-animating
+  // is triggered for ~300ms so the transform interpolates and stays
+  // roughly synced with the menu's CSS animation.
   useEffect(() => {
     if (prevInsetRef.current === null) {
       prevInsetRef.current = inset;
@@ -317,28 +316,49 @@ export function useCanvasViewport(
     const prev = prevInsetRef.current;
     const dx = inset.left - prev.left;
     const dy = inset.top - prev.top;
-    // Right/bottom inset changes also affect the visible center; we
-    // shift by half the delta on those axes since the visible region's
-    // CENTER is what we're tracking, not its left/top corner. (Left/
-    // top deltas already shift the corner directly.)
     const dxRight = inset.right - prev.right;
     const dyBottom = inset.bottom - prev.bottom;
     if (dx === 0 && dy === 0 && dxRight === 0 && dyBottom === 0) return;
     prevInsetRef.current = inset;
     triggerAnimation();
     setViewport((current) => {
-      // Visible-region center x = inset.left + (W - inset.left - inset.right) / 2
-      //                         = (inset.left - inset.right) / 2 + W/2
-      // So Δcenter_x = (Δleft - Δright) / 2. To keep the FA visually
-      // anchored to the visible center, panX must grow by Δcenter_x.
+      const content = contentBoxRef.current;
+      const view = viewportSizeRef.current;
+      if (!content || !view) return current;
+
+      // Step 1: shift pan by the change in visible-region center.
+      // Δcenter_x = (Δleft - Δright) / 2 (see derivation above).
       const centerShiftX = (dx - dxRight) / 2;
       const centerShiftY = (dy - dyBottom) / 2;
-      const next: CanvasViewport = {
+      const shifted: CanvasViewport = {
         scale: current.scale,
         panX: current.panX + centerShiftX,
         panY: current.panY + centerShiftY,
       };
-      return clampViewport(next, contentBoxRef.current, viewportSizeRef.current);
+
+      // Step 2: would the FA fit in the new visible region at the
+      // current scale? If yes, ship the shifted viewport. If no,
+      // auto-fit (scale down + recenter). "Fit" here matches
+      // fitToContent's math.
+      const visibleW = Math.max(view.width - inset.left - inset.right, 1);
+      const visibleH = Math.max(view.height - inset.top - inset.bottom, 1);
+      const scaledW = content.width * shifted.scale;
+      const scaledH = content.height * shifted.scale;
+      if (scaledW <= visibleW && scaledH <= visibleH) {
+        return clampViewport(shifted, content, view);
+      }
+
+      // Auto-fit: pick a scale where the FA fits with FIT_PADDING
+      // breathing room, then center it in the visible region.
+      const availableW = Math.max(visibleW - FIT_PADDING * 2, 1);
+      const availableH = Math.max(visibleH - FIT_PADDING * 2, 1);
+      const targetScale = clamp(
+        Math.min(availableW / content.width, availableH / content.height),
+        MIN_SCALE,
+        MAX_SCALE
+      );
+      const fitted = centerInVisibleRegion(content, view, inset, originRef.current, targetScale);
+      return { scale: targetScale, panX: fitted.panX, panY: fitted.panY };
     });
   }, [inset, triggerAnimation]);
 

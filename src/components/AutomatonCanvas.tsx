@@ -208,14 +208,12 @@ export function AutomatonCanvas({
     return () => observer.disconnect();
   }, []);
 
-  // Compute a STATE-CENTRIC bounding box for centering: union of state
-  // circles only. Deliberately excludes:
-  //  - transition labels and self-loop bumps (which getBBox would
-  //    include, pulling the visual center off the states),
-  //  - the start arrow's leftward extension (which is structurally
-  //    part of the FA but biases the centroid LEFT of where the
-  //    user perceives the FA's body to sit).
-  // The user's "center of the FA" is the cluster of state circles.
+  // Bbox for centering: union of state circles + the start arrow's
+  // leftward extent. Deliberately excludes transition labels and
+  // self-loop bumps (which getBBox would include, pulling the visual
+  // center off the states themselves). The start arrow IS included
+  // because Wes considers it part of "the FA" — it shouldn't get
+  // chopped off by auto-centering.
   useLayoutEffect(() => {
     const positions = Array.from(automatonUI.states.values()).map((s) => s.position);
     if (positions.length === 0) return;
@@ -225,6 +223,13 @@ export function AutomatonCanvas({
       if (p.x + STATE_RADIUS > maxX) maxX = p.x + STATE_RADIUS;
       if (p.y - STATE_RADIUS < minY) minY = p.y - STATE_RADIUS;
       if (p.y + STATE_RADIUS > maxY) maxY = p.y + STATE_RADIUS;
+    }
+    // Account for the start arrow extending LEFT of the start state.
+    // Arrow length + arrowhead + gap ≈ 62px past the state's edge.
+    const startState = automatonUI.states.get(automaton.startState);
+    if (startState) {
+      const arrowLeft = startState.position.x - STATE_RADIUS - 62;
+      if (arrowLeft < minX) minX = arrowLeft;
     }
     const next = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
     setContentBBox((current) => {
@@ -255,6 +260,7 @@ export function AutomatonCanvas({
 
   const {
     transform,
+    viewport,
     handlers,
     zoomIn,
     zoomOut,
@@ -576,6 +582,7 @@ export function AutomatonCanvas({
         zoomIn={zoomIn}
         zoomOut={zoomOut}
         fitToContent={fitToContent}
+        scale={viewport.scale}
         atMaxScale={atMaxScale}
         atMinScale={atMinScale}
       />
