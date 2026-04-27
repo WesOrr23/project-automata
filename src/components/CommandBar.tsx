@@ -11,8 +11,12 @@
  *       lives on the canvas's HelpCircle button next to the zoom
  *       controls — no longer in this menu.)
  *
+ *   HISTORY segment (visible whenever canUndo || canRedo — stage-agnostic,
+ *     since Define-tab edits are also undoable)
+ *     ▸ [↶ Undo]  [↷ Redo]
+ *
  *   EDIT segment (visible only when appMode === 'EDITING')
- *     ▸ [↶ Undo]  [↷ Redo]  [🔧 Operations]
+ *     ▸ [🔧 Operations]
  *
  *   SIMULATE segment (reserved; nothing renders yet)
  *
@@ -412,10 +416,16 @@ export function CommandBar({
         )}
       </div>
 
-      {/* ─── EDIT segment — undo / redo / operations ─── */}
+      {/* ─── HISTORY segment — undo / redo. Stage-agnostic: appears
+            whenever there's anything to undo or redo, regardless of
+            which tool-menu tab is active. The user might toggle
+            Define-tab fields (type, alphabet, description, ε char)
+            and immediately want to undo without first hopping into
+            Edit. Empty history → segment unmounts so the bar doesn't
+            grow chrome that does nothing. ─── */}
       <AnimatePresence initial={false}>
-        {appMode === 'EDITING' && (
-          <motion.div key="edit-segment" className="command-bar-segment" {...segmentMotion}>
+        {(canUndo || canRedo) && (
+          <motion.div key="history-segment" className="command-bar-segment" {...segmentMotion}>
             <div className="command-bar-divider" aria-hidden="true" />
             <button
               type="button"
@@ -437,6 +447,16 @@ export function CommandBar({
             >
               <Redo2 size={16} />
             </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── EDIT segment — operations only. Undo/redo split into
+            their own stage-agnostic segment above. ─── */}
+      <AnimatePresence initial={false}>
+        {appMode === 'EDITING' && (
+          <motion.div key="edit-segment" className="command-bar-segment" {...segmentMotion}>
+            <div className="command-bar-divider" aria-hidden="true" />
             <button
               type="button"
               className={`command-bar-button${activePopover === 'operations' ? ' command-bar-button-active' : ''}`}

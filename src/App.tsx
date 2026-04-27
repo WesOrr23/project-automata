@@ -294,11 +294,14 @@ function App() {
     setInputString,
   });
 
-  // Global undo/redo shortcuts. Active only while editing — outside
-  // EDIT mode the keyboard shortcut is also off, matching the visible
-  // controls being hidden.
+  // Global undo/redo shortcuts. Stage-agnostic — Define-tab edits
+  // (type toggle, alphabet, ε char, description) are all undoable, so
+  // the shortcuts should work there too. Off in IDLE (menu collapsed)
+  // to keep the wheel/keyboard quiet when the user isn't actively
+  // editing anything.
   const isEditing = menuState.mode === 'OPEN' && menuState.activeTab === 'EDIT';
-  useUndoRedoShortcuts({ undo, redo, canUndo, canRedo, enabled: isEditing });
+  const inActiveStage = menuState.mode === 'OPEN';
+  useUndoRedoShortcuts({ undo, redo, canUndo, canRedo, enabled: inActiveStage });
 
   // Display labels are sequential (q0, q1, q2) regardless of underlying IDs.
   // This detaches stable engine identity from user-visible numbering.
