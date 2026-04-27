@@ -139,3 +139,87 @@
     transform: translateX(0);
   }
 }
+
+/* ─── Onboarding overlay ─── */
+/* Full-viewport dim layer + spotlight cutout + caption pill. The
+ * spotlight is achieved with a giant box-shadow on a positioned div
+ * (no clip-path needed, works in every browser). */
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  /* No background here — the spotlight div carries the dim via
+   * box-shadow, which lets us avoid layering issues with z-index
+   * and gives us a soft rounded "hole" at zero animation cost. */
+}
+
+.onboarding-caption {
+  position: fixed;
+  z-index: 10000;
+  max-width: 320px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--text-body);
+  user-select: none;
+}
+
+.onboarding-caption-step {
+  font-size: var(--text-xs, 11px);
+  font-weight: var(--weight-bold);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.onboarding-caption-text {
+  font-size: var(--text-base);
+  line-height: 1.4;
+  color: var(--text-heading);
+}
+
+.onboarding-caption-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.onboarding-button {
+  padding: 6px 14px;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-body);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.onboarding-button:hover {
+  background: var(--bg-button-hover);
+  color: var(--text-heading);
+}
+
+.onboarding-button-skip {
+  border-color: transparent;
+  color: var(--text-secondary);
+}
+
+.onboarding-button-primary {
+  background: var(--blue-500, #3b82f6);
+  border-color: var(--blue-500, #3b82f6);
+  color: white;
+}
+
+.onboarding-button-primary:hover {
+  background: var(--blue-600, #2563eb);
+  border-color: var(--blue-600, #2563eb);
+  color: white;
+}

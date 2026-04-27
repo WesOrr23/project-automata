@@ -37,7 +37,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   FilePlus, FolderOpen, Save, MoreHorizontal, Undo2, Redo2, X,
-  History, Wand2,
+  History, Wand2, HelpCircle,
 } from 'lucide-react';
 import type { RecentEntry } from '../files/recentsStore';
 
@@ -94,6 +94,11 @@ type CommandBarProp = {
    *  entirely (useful while we're still in CONFIG/SIMULATE — caller
    *  should also gate visibility on appMode). */
   operationsCategories: ReadonlyArray<OperationsCategory>;
+
+  /** Re-shows the onboarding tour. Wired to the "Show tour" item in
+   *  the ⋯ overflow so users can revisit the first-launch tour any
+   *  time. Optional so older callers / tests don't have to wire it. */
+  onShowTour?: () => void;
 };
 
 function formatRelative(iso: string): string {
@@ -137,6 +142,7 @@ export function CommandBar({
   onUndo,
   onRedo,
   operationsCategories,
+  onShowTour,
 }: CommandBarProp) {
   const [activePopover, setActivePopover] = useState<ActivePopover>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -390,6 +396,20 @@ export function CommandBar({
               <Save size={14} />
               <span>Save As…</span>
             </button>
+            {onShowTour && (
+              <button
+                type="button"
+                className="command-bar-popover-item"
+                onClick={() => {
+                  setActivePopover(null);
+                  onShowTour();
+                }}
+                title="Show the first-launch tour"
+              >
+                <HelpCircle size={14} />
+                <span>Show tour</span>
+              </button>
+            )}
           </div>
         )}
       </div>

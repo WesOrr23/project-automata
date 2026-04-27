@@ -49,6 +49,8 @@ import { useFileShortcuts } from './hooks/useFileShortcuts';
 import { createFileAdapter } from './files/fileAdapter';
 import { CommandBar } from './components/CommandBar';
 import { ComparePicker } from './components/ComparePicker';
+import { Onboarding } from './components/Onboarding';
+import { useOnboarding } from './hooks/useOnboarding';
 import { createAutomaton as createBlankAutomaton } from './engine/automaton';
 
 const fileAdapter = createFileAdapter();
@@ -771,6 +773,11 @@ function App() {
   ];
 
   // ─── File session ───
+  // First-launch tour. Auto-shown if the user has never dismissed it
+  // (localStorage flag); the "Show tour" item in the CommandBar ⋯
+  // overflow re-opens it on demand.
+  const onboarding = useOnboarding();
+
   const fileSession = useFileSession(
     {
       automaton,
@@ -894,7 +901,10 @@ function App() {
         onUndo={undo}
         onRedo={redo}
         operationsCategories={operationsCategories}
+        onShowTour={onboarding.show}
       />
+
+      <Onboarding visible={onboarding.visible} onDismiss={onboarding.dismiss} />
 
       {/* Comparison picker — opened by the Operations widget's
           "Compare against…" item, dispatches the chosen automaton
