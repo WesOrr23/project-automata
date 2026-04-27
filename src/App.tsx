@@ -906,7 +906,6 @@ function App() {
         onUndo={undo}
         onRedo={redo}
         operationsCategories={operationsCategories}
-        onShowTour={onboarding.show}
       />
 
       <Onboarding visible={onboarding.visible} onDismiss={onboarding.dismiss} />

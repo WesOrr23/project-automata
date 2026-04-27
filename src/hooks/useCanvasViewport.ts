@@ -37,6 +37,14 @@ const ZOOM_STEP = 1.25;
 const PAN_STEP = 10;
 const PAN_STEP_LARGE = 50;
 const FIT_PADDING = 40;
+/** Padding used by the DISPLAY-percent reference (`fitScale`). Larger
+ * than FIT_PADDING so 100% reads as a relaxed view rather than the
+ * tight "fills the visible region" fit. Wes's calibration: what used
+ * to display as ~70% in COLLAPSED should now display as 100%, which
+ * lands around 180px of padding on each axis at typical viewport
+ * sizes. The fit-to-view ACTION still uses FIT_PADDING + the visible
+ * region — only the displayed number is rebased here. */
+const DISPLAY_FIT_PADDING = 180;
 /** Duration the `isAnimating` flag stays true after a button-driven
  * action, so the consumer can apply a CSS / Framer transition for the
  * resulting transform change. Wheel/pinch/drag are NOT button-driven —
@@ -149,12 +157,13 @@ export type UseCanvasViewportResult = {
    */
   isAnimating: boolean;
   /**
-   * The scale at which fitToContent would land — i.e. "the FA fills
-   * the visible region with FIT_PADDING breathing room." Consumers
-   * use this to display zoom RELATIVE to fit (so 100% = fit, 200% =
-   * twice that, etc.) rather than relative to GraphViz's arbitrary
-   * raw pixel size. Recomputed each render from the latest content +
-   * viewport + inset; null when sizes aren't yet measurable.
+   * The scale that displays as "100%" — a relaxed reference fit using
+   * the full viewport (not the inset-adjusted visible region) and a
+   * generous padding. Stable across tool-menu state changes since
+   * `inset` is excluded; the displayed percent only moves when the
+   * content or the actual viewport size changes. The fit-to-view
+   * action lands at this same scale, so a Fit click always reads as
+   * 100%. Null when sizes aren't yet measurable.
    */
   fitScale: number | null;
 };
@@ -326,12 +335,13 @@ export function useCanvasViewport(
       return;
     }
     didInitialCenterRef.current = true;
-    const visibleW = Math.max(viewportSize.width - inset.left - inset.right, 1);
-    const visibleH = Math.max(viewportSize.height - inset.top - inset.bottom, 1);
-    const availableW = Math.max(visibleW - FIT_PADDING * 2, 1);
-    const availableH = Math.max(visibleH - FIT_PADDING * 2, 1);
-    // Fit-scale uses cluster + reserve so the start arrow has room
-    // even though it's not part of the centering bbox.
+    // Initial scale uses the DISPLAY fit reference (full viewport +
+    // DISPLAY_FIT_PADDING) so the app launches at exactly "100%" on
+    // the displayed scale chip, not at the tighter visible-region
+    // fit. Centering still uses the visible region (so the FA isn't
+    // sliding behind the menu).
+    const availableW = Math.max(viewportSize.width - DISPLAY_FIT_PADDING * 2, 1);
+    const availableH = Math.max(viewportSize.height - DISPLAY_FIT_PADDING * 2, 1);
     const fitW = contentBoundingBox.width + reserve.left + reserve.right;
     const fitH = contentBoundingBox.height + reserve.top + reserve.bottom;
     const initialScale = clamp(
@@ -533,13 +543,12 @@ export function useCanvasViewport(
     if (content === null || view === null) return;
     if (content.width <= 0 || content.height <= 0) return;
     if (view.width <= 0 || view.height <= 0) return;
-    const visibleW = Math.max(view.width - insetVal.left - insetVal.right, 1);
-    const visibleH = Math.max(view.height - insetVal.top - insetVal.bottom, 1);
-    const availableWidth = Math.max(visibleW - FIT_PADDING * 2, 1);
-    const availableHeight = Math.max(visibleH - FIT_PADDING * 2, 1);
-    // Include contentReserve in the fit dims so the start arrow (or
-    // any other off-bbox decoration) has room. Centering still uses
-    // the bbox alone.
+    // Scale = the same DISPLAY-percent reference used by the chip, so
+    // a Fit click always lands exactly at "100%". Reads as "go back
+    // to the relaxed reference view." Centering still uses the
+    // visible region so the FA lands in the un-occluded space.
+    const availableWidth = Math.max(view.width - DISPLAY_FIT_PADDING * 2, 1);
+    const availableHeight = Math.max(view.height - DISPLAY_FIT_PADDING * 2, 1);
     const r = reserveRef.current;
     const scaleX = availableWidth / (content.width + r.left + r.right);
     const scaleY = availableHeight / (content.height + r.top + r.bottom);
@@ -665,22 +674,24 @@ export function useCanvasViewport(
   // browsers (treated as the same CSS property).
   const transform = `translate(${viewport.panX} ${viewport.panY}) scale(${viewport.scale})`;
 
-  // The scale at which fitToContent would land. Computed inline so it
-  // tracks live changes to content size + viewport size + inset.
-  // Returns null when sizes aren't yet measurable; consumers display
-  // the raw scale or skip the percentage in that case.
+  // The reference scale that displays as "100%". DELIBERATELY ignores
+  // `inset` (and uses DISPLAY_FIT_PADDING instead of FIT_PADDING) so
+  // the percentage doesn't lurch every time the tool menu expands or
+  // collapses. This reference floats only with content + viewport
+  // size; it stays put when the user's just toggling chrome.
+  //
+  // The fit-to-view action lands on the same scale (also using the
+  // full viewport + DISPLAY_FIT_PADDING), so a Fit click always
+  // displays as exactly 100%. Centering still uses the visible region
+  // so the FA lands in un-occluded space.
   let fitScale: number | null = null;
   if (
     contentBoundingBox && viewportSize &&
     contentBoundingBox.width > 0 && contentBoundingBox.height > 0 &&
     viewportSize.width > 0 && viewportSize.height > 0
   ) {
-    const visibleW = Math.max(viewportSize.width - inset.left - inset.right, 1);
-    const visibleH = Math.max(viewportSize.height - inset.top - inset.bottom, 1);
-    const availableW = Math.max(visibleW - FIT_PADDING * 2, 1);
-    const availableH = Math.max(visibleH - FIT_PADDING * 2, 1);
-    // Include reserve in the fit dims so 100% display is consistent
-    // with the actual fitToContent result.
+    const availableW = Math.max(viewportSize.width - DISPLAY_FIT_PADDING * 2, 1);
+    const availableH = Math.max(viewportSize.height - DISPLAY_FIT_PADDING * 2, 1);
     const fitW = contentBoundingBox.width + reserve.left + reserve.right;
     const fitH = contentBoundingBox.height + reserve.top + reserve.bottom;
     fitScale = clamp(

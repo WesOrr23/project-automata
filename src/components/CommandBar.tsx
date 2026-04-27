@@ -6,8 +6,10 @@
  *   FILE segment (always visible)
  *     ▸ filename (click to rename inline) + dirty dot
  *     ▸ [📂 File ▾]  — single dropdown with: New, Open, Save,
- *       Save As, divider, Recents, divider, Show tour. Keyboard
- *       shortcuts hit the actions directly without opening the menu.
+ *       Save As, divider, Recents. Keyboard shortcuts hit the
+ *       actions directly without opening the menu. (Show tour
+ *       lives on the canvas's HelpCircle button next to the zoom
+ *       controls — no longer in this menu.)
  *
  *   EDIT segment (visible only when appMode === 'EDITING')
  *     ▸ [↶ Undo]  [↷ Redo]  [🪄 Operations]
@@ -39,7 +41,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { AnimatePresence, motion } from 'motion/react';
 import {
   FilePlus, FolderOpen, Save, Undo2, Redo2, X,
-  History, Wand2, HelpCircle,
+  History, Wand2,
 } from 'lucide-react';
 import type { RecentEntry } from '../files/recentsStore';
 
@@ -100,11 +102,6 @@ type CommandBarProp = {
    *  entirely (useful while we're still in CONFIG/SIMULATE — caller
    *  should also gate visibility on appMode). */
   operationsCategories: ReadonlyArray<OperationsCategory>;
-
-  /** Re-shows the onboarding tour. Wired to the "Show tour" item in
-   *  the ⋯ overflow so users can revisit the first-launch tour any
-   *  time. Optional so older callers / tests don't have to wire it. */
-  onShowTour?: () => void;
 };
 
 function formatRelative(iso: string): string {
@@ -148,7 +145,6 @@ export function CommandBar({
   onUndo,
   onRedo,
   operationsCategories,
-  onShowTour,
 }: CommandBarProp) {
   const [activePopover, setActivePopover] = useState<ActivePopover>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -325,7 +321,7 @@ export function CommandBar({
               }}
               title={`New (${modGlyph}N)`}
             >
-              <FilePlus size={14} />
+              <FilePlus size={16} strokeWidth={2} />
               <span className="command-bar-popover-item-label-inline">New</span>
               <span className="command-bar-popover-item-shortcut">{modGlyph}N</span>
             </button>
@@ -340,7 +336,7 @@ export function CommandBar({
               aria-busy={openLoading}
               title={`Open (${modGlyph}O)`}
             >
-              <FolderOpen size={14} />
+              <FolderOpen size={16} strokeWidth={2} />
               <span className="command-bar-popover-item-label-inline">Open…</span>
               <span className="command-bar-popover-item-shortcut">{modGlyph}O</span>
             </button>
@@ -355,7 +351,7 @@ export function CommandBar({
               aria-busy={saveLoading}
               title={`Save (${modGlyph}S)`}
             >
-              <Save size={14} />
+              <Save size={16} strokeWidth={2} />
               <span className="command-bar-popover-item-label-inline">Save</span>
               <span className="command-bar-popover-item-shortcut">{modGlyph}S</span>
             </button>
@@ -370,7 +366,7 @@ export function CommandBar({
               aria-busy={saveAsLoading}
               title={`Save As (${modGlyph}${shiftGlyph}S)`}
             >
-              <Save size={14} />
+              <Save size={16} strokeWidth={2} />
               <span className="command-bar-popover-item-label-inline">Save As…</span>
               <span className="command-bar-popover-item-shortcut">{modGlyph}{shiftGlyph}S</span>
             </button>
@@ -412,23 +408,6 @@ export function CommandBar({
               ))
             )}
 
-            {onShowTour && (
-              <>
-                <div className="command-bar-popover-divider" role="separator" />
-                <button
-                  type="button"
-                  className="command-bar-popover-item"
-                  onClick={() => {
-                    setActivePopover(null);
-                    onShowTour();
-                  }}
-                  title="Show the first-launch tour"
-                >
-                  <HelpCircle size={14} />
-                  <span className="command-bar-popover-item-label-inline">Show tour</span>
-                </button>
-              </>
-            )}
           </div>
         )}
       </div>

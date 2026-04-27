@@ -491,11 +491,23 @@ button svg {
 
 /* Inline label for File-menu items — sits between the leading icon
  * and the trailing keyboard-shortcut hint. flex:1 so the shortcut
- * pushes to the right edge. */
+ * pushes to the right edge. Typography matches the tool-menu rows
+ * and Operations items (font-sans, text-base, weight-bold) so the
+ * two command-bar dropdowns read as one family. */
 .command-bar-popover-item-label-inline {
   flex: 1 1 auto;
+  font-family: var(--font-sans);
   font-size: var(--text-sm);
-  font-weight: var(--weight-medium, 500);
+  font-weight: var(--weight-bold);
+  line-height: 1.2;
+}
+
+/* Leading icon in File-menu items. Matches the icon column in
+ * Operations items (same flex-basis + colour) so labels start at the
+ * same x in both menus. */
+.command-bar-popover-item > svg {
+  flex: 0 0 16px;
+  color: var(--text-secondary);
 }
 
 /* Keyboard shortcut hint at the right edge of a File-menu item. Tabular
@@ -547,11 +559,13 @@ button svg {
   color: var(--text-secondary);
 }
 
-/* Match the tool-menu's row label vocabulary (sans, base, bold) so
- * the two command surfaces feel like one family. */
+/* Match the tool-menu's row label vocabulary in family + weight so the
+ * two command surfaces feel like one family. Size is text-sm — at
+ * text-base the rows felt heavy in a popover (no surrounding chrome
+ * to absorb the visual weight the way the tool-menu's pill does). */
 .command-bar-popover-item-label {
   font-family: var(--font-sans);
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: var(--weight-bold);
   line-height: 1.2;
 }
