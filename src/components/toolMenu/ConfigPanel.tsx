@@ -6,16 +6,15 @@
  * interactively in Edit:
  *   - Automaton type (DFA / NFA)
  *   - Reserved ε-symbol (NFA mode only)
+ *   - Alphabet (Σ) — full editor lives here as the source of truth.
+ *     The Edit tab shows a read-only strip with a "+" jump-to button.
  *   - Free-form description / notes
  *   - Clear canvas (escape hatch)
  *   - Export to JSON
- *
- * Alphabet currently lives in Edit (Phase C of the Define refactor will
- * move it back here once the read-only badge + jump-to-Define shortcut
- * lands in Edit).
  */
 
 import { useEffect, useState } from 'react';
+import { AlphabetEditor } from './AlphabetEditor';
 
 type ConfigPanelProp = {
   automatonType: 'DFA' | 'NFA';
@@ -24,6 +23,14 @@ type ConfigPanelProp = {
   epsilonSymbol: string;
   /** Validation: returns null if accepted, an error message otherwise. */
   onEpsilonSymbolChange: (newSymbol: string) => string | null;
+  /** Alphabet (Σ) — full editor lives here. */
+  alphabet: Set<string>;
+  highlightedSymbol: string | null;
+  onAlphabetAdd: (symbol: string) => void;
+  onAlphabetRemove: (symbol: string) => void;
+  /** Counter — when it changes the alphabet input gets focused. App
+   *  bumps this when the user clicks the Edit-tab "+" jump-to button. */
+  alphabetFocusSignal: number;
   /** Free-form description / notes. Persisted in the save file's metadata. */
   description: string;
   onDescriptionChange: (next: string) => void;
@@ -37,6 +44,11 @@ export function ConfigPanel({
   onTypeChange,
   epsilonSymbol,
   onEpsilonSymbolChange,
+  alphabet,
+  highlightedSymbol,
+  onAlphabetAdd,
+  onAlphabetRemove,
+  alphabetFocusSignal,
   description,
   onDescriptionChange,
   onClearCanvas,
@@ -90,6 +102,14 @@ export function ConfigPanel({
           </button>
         </div>
       </div>
+
+      <AlphabetEditor
+        alphabet={alphabet}
+        highlightedSymbol={highlightedSymbol}
+        onAlphabetAdd={onAlphabetAdd}
+        onAlphabetRemove={onAlphabetRemove}
+        focusSignal={alphabetFocusSignal}
+      />
 
       {automatonType === 'NFA' && (
         <div>

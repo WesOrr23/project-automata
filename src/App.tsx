@@ -129,6 +129,10 @@ function App() {
   } = useUndoableAutomaton(initialSnapshot);
   const [inputString, setInputString] = useState('');
   const [menuState, setMenuState] = useState<ToolMenuState>({ mode: 'COLLAPSED' });
+  // Bumped by Edit's "+ alphabet" jump-to button. ConfigPanel/AlphabetEditor
+  // watch the value via useEffect and focus the input when it changes,
+  // so the user lands in Define ready to type.
+  const [alphabetFocusSignal, setAlphabetFocusSignal] = useState(0);
 
   const sim = useSimulation(automaton);
   const { highlightedTarget, notify } = useNotifications();
@@ -342,6 +346,11 @@ function App() {
 
   function handleTabClick(tab: ToolTabID) {
     setMenuState({ mode: 'OPEN', activeTab: tab });
+  }
+
+  function handleJumpToAlphabet() {
+    setMenuState({ mode: 'OPEN', activeTab: 'CONFIG' });
+    setAlphabetFocusSignal((n) => n + 1);
   }
 
   function handleCollapse() {
@@ -822,6 +831,11 @@ function App() {
       onTypeChange={handleTypeChange}
       epsilonSymbol={epsilonSymbol}
       onEpsilonSymbolChange={handleEpsilonSymbolChange}
+      alphabet={automaton.alphabet}
+      highlightedSymbol={highlightedSymbol}
+      onAlphabetAdd={handleAlphabetAdd}
+      onAlphabetRemove={handleAlphabetRemove}
+      alphabetFocusSignal={alphabetFocusSignal}
       description={description}
       onDescriptionChange={setDescription}
       onClearCanvas={handleClearCanvas}
@@ -838,8 +852,7 @@ function App() {
       creationState={creationState}
       creationDispatch={creationDispatch}
       epsilonSymbol={epsilonSymbol}
-      onAlphabetAdd={handleAlphabetAdd}
-      onAlphabetRemove={handleAlphabetRemove}
+      onJumpToAlphabet={handleJumpToAlphabet}
       onAddState={handleAddState}
       onRemoveState={handleRemoveState}
       onSetStartState={handleSetStartState}

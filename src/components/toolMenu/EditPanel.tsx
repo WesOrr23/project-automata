@@ -1,10 +1,15 @@
 /**
  * EditPanel Component
  *
- * Form-based editor for the automaton:
- * - Alphabet (symbols)
+ * Form-based editor for the automaton's interactively-constructed
+ * pieces:
  * - States (add, remove, start, accept)
  * - Transitions (add, remove)
+ *
+ * Alphabet was moved to Define (it's part of the formal tuple, not
+ * something you "construct"). A read-only strip stays here for
+ * reference + a "+" jump-to-Define button so adding a missing symbol
+ * mid-edit is one click instead of a tab hop.
  *
  * Highlight props (from notification system) are passed through to the
  * matching child editor so the user can see which row is being referenced.
@@ -12,7 +17,7 @@
 
 import { Dispatch } from 'react';
 import { Automaton } from '../../engine/types';
-import { AlphabetEditor } from './AlphabetEditor';
+import { AlphabetReadOnly } from './AlphabetReadOnly';
 import { StateEditor } from './StateEditor';
 import { TransitionCreator } from '../transitionEditor/TransitionCreator';
 import type {
@@ -30,8 +35,8 @@ type EditPanelProp = {
   creationDispatch: Dispatch<CreationAction>;
   /** The reserved character that means "ε" in the symbol input. */
   epsilonSymbol: string;
-  onAlphabetAdd: (symbol: string) => void;
-  onAlphabetRemove: (symbol: string) => void;
+  /** Jump to Define and focus the alphabet input. Wired from App. */
+  onJumpToAlphabet: () => void;
   onAddState: () => void;
   onRemoveState: (stateId: number) => void;
   onSetStartState: (stateId: number) => void;
@@ -51,8 +56,7 @@ export function EditPanel({
   creationState,
   creationDispatch,
   epsilonSymbol,
-  onAlphabetAdd,
-  onAlphabetRemove,
+  onJumpToAlphabet,
   onAddState,
   onRemoveState,
   onSetStartState,
@@ -61,11 +65,10 @@ export function EditPanel({
 }: EditPanelProp) {
   return (
     <>
-      <AlphabetEditor
+      <AlphabetReadOnly
         alphabet={automaton.alphabet}
         highlightedSymbol={highlightedSymbol}
-        onAlphabetAdd={onAlphabetAdd}
-        onAlphabetRemove={onAlphabetRemove}
+        onJumpToAlphabet={onJumpToAlphabet}
       />
 
       <div className="divider" />

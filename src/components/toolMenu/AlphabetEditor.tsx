@@ -7,7 +7,7 @@
  * notification system via useNotifications().
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useNotifications } from '../../notifications/useNotifications';
 
@@ -16,6 +16,11 @@ type AlphabetEditorProp = {
   highlightedSymbol: string | null;
   onAlphabetAdd: (symbol: string) => void;
   onAlphabetRemove: (symbol: string) => void;
+  /** Incrementing counter; when it changes the input gets focused.
+   *  Used by the "+" jump-to button on the Edit panel's read-only
+   *  alphabet strip — switches the menu to Define and hands the user
+   *  a focused input so they can immediately type a new symbol. */
+  focusSignal?: number;
 };
 
 export function AlphabetEditor({
@@ -23,9 +28,19 @@ export function AlphabetEditor({
   highlightedSymbol,
   onAlphabetAdd,
   onAlphabetRemove,
+  focusSignal,
 }: AlphabetEditorProp) {
   const [draftSymbol, setDraftSymbol] = useState('');
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const { notify } = useNotifications();
+
+  useEffect(() => {
+    if (focusSignal === undefined) return;
+    // Defer one tick so the focus lands after the menu's
+    // OPEN-and-show-Define render commits.
+    const id = window.setTimeout(() => inputRef.current?.focus(), 0);
+    return () => window.clearTimeout(id);
+  }, [focusSignal]);
 
   function handleAdd() {
     const symbol = draftSymbol.trim();
@@ -106,6 +121,7 @@ export function AlphabetEditor({
 
       <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
         <input
+          ref={inputRef}
           type="text"
           className="glass-input"
           value={draftSymbol}
