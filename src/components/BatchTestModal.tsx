@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { X, Upload, Download, Play } from 'lucide-react';
+import { X, Upload, Download, Play, ArrowRightFromLine } from 'lucide-react';
 import { Automaton } from '../engine/types';
 import { accepts } from '../engine/simulator';
 
@@ -24,6 +24,11 @@ type BatchTestModalProp = {
   open: boolean;
   onClose: () => void;
   automaton: Automaton;
+  /** Called when the user clicks the "load this input" affordance on
+   *  a result row. App should set the single-input field to `input`,
+   *  close the modal, and focus the simulation Play button so the
+   *  user can immediately run the animated step-through. */
+  onLoadInput?: (input: string) => void;
 };
 
 type ResultRow = {
@@ -32,7 +37,7 @@ type ResultRow = {
   detail?: string;
 };
 
-export function BatchTestModal({ open, onClose, automaton }: BatchTestModalProp) {
+export function BatchTestModal({ open, onClose, automaton, onLoadInput }: BatchTestModalProp) {
   const [inputsText, setInputsText] = useState('');
   const [results, setResults] = useState<ResultRow[] | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -193,7 +198,6 @@ export function BatchTestModal({ open, onClose, automaton }: BatchTestModalProp)
             type="button"
             className="btn btn-primary"
             onClick={runAll}
-            disabled={inputsText.trim().length === 0}
           >
             <Play size={14} />
             <span>Run all</span>
@@ -210,15 +214,18 @@ export function BatchTestModal({ open, onClose, automaton }: BatchTestModalProp)
         {results && (
           <div className="batch-test-results">
             <div className="batch-test-summary">
-              <span className="batch-test-summary-accept">
-                {acceptCount} accepted
+              <span>
+                <span className="batch-test-count-accept">{acceptCount}</span>
+                <span> accepted</span>
               </span>
-              <span className="batch-test-summary-reject">
-                {rejectCount} rejected
+              <span>
+                <span className="batch-test-count-reject">{rejectCount}</span>
+                <span> rejected</span>
               </span>
               {errorCount > 0 && (
-                <span className="batch-test-summary-error">
-                  {errorCount} error{errorCount === 1 ? '' : 's'}
+                <span>
+                  <span className="batch-test-count-error">{errorCount}</span>
+                  <span> error{errorCount === 1 ? '' : 's'}</span>
                 </span>
               )}
               <button
@@ -238,6 +245,7 @@ export function BatchTestModal({ open, onClose, automaton }: BatchTestModalProp)
                   <tr>
                     <th>Input</th>
                     <th>Result</th>
+                    {onLoadInput && <th aria-label="Load this input"></th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -251,10 +259,43 @@ export function BatchTestModal({ open, onClose, automaton }: BatchTestModalProp)
                         )}
                       </td>
                       <td className="batch-test-result-cell">
-                        {row.status === 'accept' && '✓ accept'}
-                        {row.status === 'reject' && '✗ reject'}
-                        {row.status === 'error' && `⚠ ${row.detail ?? 'error'}`}
+                        {row.status === 'accept' && (
+                          <>
+                            <span className="batch-test-marker batch-test-marker-accept">✓</span>
+                            <span> accept</span>
+                          </>
+                        )}
+                        {row.status === 'reject' && (
+                          <>
+                            <span className="batch-test-marker batch-test-marker-reject">✗</span>
+                            <span> reject</span>
+                          </>
+                        )}
+                        {row.status === 'error' && (
+                          <>
+                            <span className="batch-test-marker batch-test-marker-error">⚠</span>
+                            <span> {row.detail ?? 'error'}</span>
+                          </>
+                        )}
                       </td>
+                      {onLoadInput && (
+                        <td className="batch-test-action-cell">
+                          {/* Load this input into the single-input
+                              field, close the modal, focus Play.
+                              Same row-action vocabulary as the trash
+                              icon in the State editor — small ghost
+                              button on hover. */}
+                          <button
+                            type="button"
+                            className="batch-test-row-load"
+                            onClick={() => onLoadInput(row.input)}
+                            title="Load this input into the simulator"
+                            aria-label={`Load "${row.input || '(empty)'}" into the simulator`}
+                          >
+                            <ArrowRightFromLine size={14} />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

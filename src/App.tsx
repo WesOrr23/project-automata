@@ -136,6 +136,10 @@ function App() {
   // so the user lands in Define ready to type.
   const [alphabetFocusSignal, setAlphabetFocusSignal] = useState(0);
   const [batchTestOpen, setBatchTestOpen] = useState(false);
+  // Bumped when the user clicks "load this input" inside the batch
+  // modal — SimulationControls watches and focuses its Play button on
+  // change so the user lands ready to start the run.
+  const [playFocusSignal, setPlayFocusSignal] = useState(0);
   // Lifted from AutomatonCanvas via callback. Image-export action
   // needs the live SVG element to serialize. The export framing now
   // measures content bbox live (via getBBox on the inner content
@@ -955,6 +959,7 @@ function App() {
         canStepBack={sim.canStepBack}
         onSpeedChange={sim.setSpeed}
         onJumpTo={handleJumpTo}
+        playFocusSignal={playFocusSignal}
       />
     </>
   ) : (
@@ -1006,6 +1011,14 @@ function App() {
         open={batchTestOpen}
         onClose={() => setBatchTestOpen(false)}
         automaton={automaton}
+        onLoadInput={(input) => {
+          // Load the row's input into the single-input field, close
+          // the modal, and bump the focus signal so SimulationControls
+          // focuses Play. The user lands ready to hit Space/Enter.
+          setInputString(input);
+          setBatchTestOpen(false);
+          setPlayFocusSignal((n) => n + 1);
+        }}
       />
 
       {/* Comparison picker — opened by the Operations widget's

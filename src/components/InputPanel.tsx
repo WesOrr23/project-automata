@@ -71,7 +71,7 @@ export function InputPanel({
             aria-label="Open batch test"
           >
             <ListChecks size={12} />
-            <span>Test batch</span>
+            <span>Batch test</span>
           </button>
         </div>
       )}

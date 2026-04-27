@@ -320,17 +320,21 @@
   font-size: var(--text-sm);
 }
 
-.batch-test-summary-accept {
+/* Summary line: only the COUNT is colored — the word ("accepted",
+ * "rejected") stays in body color so the line reads like data, not
+ * a verdict. Same principle in the table markers below: only the
+ * ✓/✗/⚠ glyph is colored, the label stays neutral. */
+.batch-test-count-accept {
   color: var(--success-text, #047857);
   font-weight: var(--weight-bold);
 }
 
-.batch-test-summary-reject {
-  color: var(--text-body);
+.batch-test-count-reject {
+  color: var(--error-text, #b91c1c);
   font-weight: var(--weight-bold);
 }
 
-.batch-test-summary-error {
+.batch-test-count-error {
   color: var(--error-text, #b91c1c);
   font-weight: var(--weight-bold);
 }
@@ -385,19 +389,64 @@
 
 .batch-test-result-cell {
   white-space: nowrap;
+  /* Body color for the LABEL ("accept", "reject"); only the marker
+   * glyph carries color (.batch-test-marker-* below). */
+  color: var(--text-body);
   font-weight: var(--weight-bold);
 }
 
-.batch-test-row-accept .batch-test-result-cell {
+.batch-test-marker {
+  display: inline-block;
+  font-weight: var(--weight-bold);
+  /* tabular-style monospace alignment so the markers line up
+   * vertically across rows even though the glyphs differ in width. */
+  width: 1em;
+  text-align: center;
+}
+
+.batch-test-marker-accept {
   color: var(--success-text, #047857);
 }
 
-.batch-test-row-reject .batch-test-result-cell {
-  color: var(--text-body);
+.batch-test-marker-reject {
+  color: var(--error-text, #b91c1c);
 }
 
-.batch-test-row-error .batch-test-result-cell {
+.batch-test-marker-error {
   color: var(--error-text, #b91c1c);
+}
+
+/* Per-row "load this input into the simulator" affordance. Same
+ * vocabulary as the trash icon in the State editor — small ghost
+ * button that brightens on hover. Sits in its own narrow column. */
+.batch-test-action-cell {
+  width: 32px;
+  text-align: right;
+  padding-right: var(--space-2);
+}
+
+.batch-test-row-load {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.batch-test-row-load:hover {
+  background: var(--bg-button-hover);
+  color: var(--blue-600);
+  border-color: var(--border-subtle);
+}
+
+.batch-test-row-load:active {
+  transform: scale(0.95);
 }
 
 /* The "Test batch" trigger lives at the bottom-right of the input

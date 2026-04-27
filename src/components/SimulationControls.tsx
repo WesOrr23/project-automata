@@ -5,6 +5,7 @@
  * Layout order: speed config → play → back/step → character progress → result.
  */
 
+import { useEffect, useRef } from 'react';
 import { SimulationStatus } from '../hooks/useSimulation';
 import { SIMULATION_SPEED_MIN, SIMULATION_SPEED_MAX } from '../ui-state/constants';
 
@@ -23,6 +24,11 @@ type SimulationControlsProp = {
   canStepBack: boolean;
   onSpeedChange: (speed: number) => void;
   onJumpTo: (characterIndex: number) => void;
+  /** Incrementing counter; when it changes the Play button gets
+   *  focused. Used by the batch-test "load this input" affordance —
+   *  after the modal injects the input string and closes, focus
+   *  lands on Play so a click or Space/Enter starts the simulation. */
+  playFocusSignal?: number;
 };
 
 const SPEED_PRESETS = {
@@ -52,7 +58,17 @@ export function SimulationControls({
   canStepBack,
   onSpeedChange,
   onJumpTo,
+  playFocusSignal,
 }: SimulationControlsProp) {
+  const playButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (playFocusSignal === undefined) return;
+    // Defer so focus lands after the calling code's render commits
+    // (the input-string update propagates the same tick).
+    const id = window.setTimeout(() => playButtonRef.current?.focus(), 0);
+    return () => window.clearTimeout(id);
+  }, [playFocusSignal]);
   // Step is only valid when there are unconsumed input symbols. Once the
   // simulation finishes, Step is disabled (use Back to step backwards or
   // edit the input to start over).
@@ -161,7 +177,7 @@ export function SimulationControls({
             Pause
           </button>
         ) : (
-          <button className="btn btn-primary" onClick={onPlay} disabled={!canPlay} style={{ width: '100%' }}>
+          <button ref={playButtonRef} className="btn btn-primary" onClick={onPlay} disabled={!canPlay} style={{ width: '100%' }}>
             Play
           </button>
         )}
