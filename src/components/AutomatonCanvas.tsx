@@ -208,12 +208,12 @@ export function AutomatonCanvas({
     return () => observer.disconnect();
   }, []);
 
-  // Bbox for centering: union of state circles + the start arrow's
-  // leftward extent. Deliberately excludes transition labels and
-  // self-loop bumps (which getBBox would include, pulling the visual
-  // center off the states themselves). The start arrow IS included
-  // because Wes considers it part of "the FA" — it shouldn't get
-  // chopped off by auto-centering.
+  // Bbox for CENTERING: state circles only. The bbox center is what
+  // 'centered FA' means visually — the cluster of states. The start
+  // arrow extends ~62px LEFT of this bbox but is accounted for as a
+  // FIT-ONLY reserve (passed to the hook below) so it has room at
+  // fit-scale without dragging the centering target leftward away
+  // from the cluster center.
   useLayoutEffect(() => {
     const positions = Array.from(automatonUI.states.values()).map((s) => s.position);
     if (positions.length === 0) return;
@@ -223,13 +223,6 @@ export function AutomatonCanvas({
       if (p.x + STATE_RADIUS > maxX) maxX = p.x + STATE_RADIUS;
       if (p.y - STATE_RADIUS < minY) minY = p.y - STATE_RADIUS;
       if (p.y + STATE_RADIUS > maxY) maxY = p.y + STATE_RADIUS;
-    }
-    // Account for the start arrow extending LEFT of the start state.
-    // Arrow length + arrowhead + gap ≈ 62px past the state's edge.
-    const startState = automatonUI.states.get(automaton.startState);
-    if (startState) {
-      const arrowLeft = startState.position.x - STATE_RADIUS - 62;
-      if (arrowLeft < minX) minX = arrowLeft;
     }
     const next = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
     setContentBBox((current) => {
@@ -285,6 +278,10 @@ export function AutomatonCanvas({
     viewportSize,
     viewportInset,
     contentOrigin: effectiveOrigin,
+    // Start arrow extends ~62px LEFT of the cluster bbox; reserve
+    // that width in the FIT calculation so the arrow has room at
+    // fit-scale without affecting where 'center' lands.
+    contentReserve: { left: 62, right: 0, top: 0, bottom: 0 },
   });
 
   // Native (non-React) wheel handler — React's onWheel synthetic events
@@ -402,7 +399,7 @@ export function AutomatonCanvas({
           stay snappy. */}
       <g
         style={{ transform, transformOrigin: '0 0' }}
-        className={isAnimating ? 'canvas-content-animating' : undefined}
+        className={`canvas-content-transform${isAnimating ? ' canvas-content-animating' : ''}`}
       >
         <g transform={`translate(${-START_ARROW_RESERVE} 0)`}>
       {/* Layer 1: Transition edges (background) */}

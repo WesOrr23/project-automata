@@ -27,6 +27,19 @@
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Safari/Chromium parity for CSS transform applied to an SVG <g>.
+ * Default transform-box for SVG elements is `view-box` per spec, but
+ * Safari has historically picked `fill-box` (or applied transforms
+ * from a different origin), making getBoundingClientRect() on
+ * descendants disagree with Chromium by up to 100+ pixels for
+ * non-trivial pan/scale combinations. Setting these explicitly makes
+ * both browsers compute the same result. Applied to whichever <g>
+ * carries the CSS transform — the canvas-content group. */
+.canvas-content-transform {
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
 .canvas-card {
   background: var(--bg-card);
   border: 1px solid var(--border-light);

@@ -94,6 +94,15 @@ export type UseCanvasViewportArgs = {
    * SVG box (those gestures want the cursor's true screen position).
    */
   viewportInset?: ViewportInset | undefined;
+  /**
+   * Extra unscaled-pixel space the FIT calculation should reserve
+   * around the contentBoundingBox. The CENTERING math ignores this —
+   * the bbox center stays the visual target. Used so the start arrow
+   * (which extends 62px left of the cluster bbox) is guaranteed room
+   * at fit-scale without dragging the centroid leftward. Defaults to
+   * zero on every side.
+   */
+  contentReserve?: { left: number; right: number; top: number; bottom: number } | undefined;
 };
 
 export type UseCanvasViewportResult = {
@@ -192,9 +201,10 @@ export function clampViewport(
 export function useCanvasViewport(
   args: UseCanvasViewportArgs
 ): UseCanvasViewportResult {
-  const { contentBoundingBox, viewportSize, viewportInset, contentOrigin } = args;
+  const { contentBoundingBox, viewportSize, viewportInset, contentOrigin, contentReserve } = args;
   const inset: ViewportInset = viewportInset ?? ZERO_INSET;
   const origin = contentOrigin ?? { x: 0, y: 0 };
+  const reserve = contentReserve ?? { left: 0, right: 0, top: 0, bottom: 0 };
   const [viewport, setViewport] = useState<CanvasViewport>(DEFAULT_VIEWPORT);
   const [isAnimating, setIsAnimating] = useState(false);
 
@@ -216,6 +226,8 @@ export function useCanvasViewport(
   insetRef.current = inset;
   const originRef = useRef(origin);
   originRef.current = origin;
+  const reserveRef = useRef(reserve);
+  reserveRef.current = reserve;
 
   // Track whether we've performed the initial-center pass. Without
   // this, the very first render ships the user a content-at-top-left
@@ -302,8 +314,12 @@ export function useCanvasViewport(
     const visibleH = Math.max(viewportSize.height - inset.top - inset.bottom, 1);
     const availableW = Math.max(visibleW - FIT_PADDING * 2, 1);
     const availableH = Math.max(visibleH - FIT_PADDING * 2, 1);
+    // Fit-scale uses cluster + reserve so the start arrow has room
+    // even though it's not part of the centering bbox.
+    const fitW = contentBoundingBox.width + reserve.left + reserve.right;
+    const fitH = contentBoundingBox.height + reserve.top + reserve.bottom;
     const initialScale = clamp(
-      Math.min(availableW / contentBoundingBox.width, availableH / contentBoundingBox.height),
+      Math.min(availableW / fitW, availableH / fitH),
       MIN_SCALE,
       MAX_SCALE
     );
@@ -369,11 +385,16 @@ export function useCanvasViewport(
       }
 
       // Auto-fit: pick a scale where the FA fits with FIT_PADDING
-      // breathing room, then center it in the visible region.
+      // breathing room, then center it in the visible region. The
+      // fit dimensions include contentReserve so the start arrow has
+      // room (it's not part of the centering bbox).
       const availableW = Math.max(visibleW - FIT_PADDING * 2, 1);
       const availableH = Math.max(visibleH - FIT_PADDING * 2, 1);
+      const r = reserveRef.current;
+      const fitW = content.width + r.left + r.right;
+      const fitH = content.height + r.top + r.bottom;
       const targetScale = clamp(
-        Math.min(availableW / content.width, availableH / content.height),
+        Math.min(availableW / fitW, availableH / fitH),
         MIN_SCALE,
         MAX_SCALE
       );
@@ -401,11 +422,25 @@ export function useCanvasViewport(
     });
   }, []);
 
+  // Zoom anchor = visible region center. Anchoring at the SVG's
+  // geometric center would put the anchor *behind the menu* on the
+  // left, dragging the FA right when zooming. Anchoring at the
+  // visible region's center means: if the FA is already centered
+  // (its bbox center sits at the visible center), zoom is a pure
+  // scale change with no translation drift.
+  function visibleCenterAnchor(): { x: number; y: number } {
+    const size = viewportSizeRef.current;
+    const i = insetRef.current;
+    if (!size) return { x: 0, y: 0 };
+    return {
+      x: i.left + (size.width - i.left - i.right) / 2,
+      y: i.top + (size.height - i.top - i.bottom) / 2,
+    };
+  }
+
   const zoomIn = useCallback(() => {
     triggerAnimation();
-    const size = viewportSizeRef.current;
-    const anchorX = size ? size.width / 2 : 0;
-    const anchorY = size ? size.height / 2 : 0;
+    const { x: anchorX, y: anchorY } = visibleCenterAnchor();
     setViewport((current) => {
       const newScale = clamp(current.scale * ZOOM_STEP, MIN_SCALE, MAX_SCALE);
       if (newScale === current.scale) return current;
@@ -423,9 +458,7 @@ export function useCanvasViewport(
 
   const zoomOut = useCallback(() => {
     triggerAnimation();
-    const size = viewportSizeRef.current;
-    const anchorX = size ? size.width / 2 : 0;
-    const anchorY = size ? size.height / 2 : 0;
+    const { x: anchorX, y: anchorY } = visibleCenterAnchor();
     setViewport((current) => {
       const newScale = clamp(current.scale / ZOOM_STEP, MIN_SCALE, MAX_SCALE);
       if (newScale === current.scale) return current;
@@ -474,8 +507,12 @@ export function useCanvasViewport(
     const visibleH = Math.max(view.height - insetVal.top - insetVal.bottom, 1);
     const availableWidth = Math.max(visibleW - FIT_PADDING * 2, 1);
     const availableHeight = Math.max(visibleH - FIT_PADDING * 2, 1);
-    const scaleX = availableWidth / content.width;
-    const scaleY = availableHeight / content.height;
+    // Include contentReserve in the fit dims so the start arrow (or
+    // any other off-bbox decoration) has room. Centering still uses
+    // the bbox alone.
+    const r = reserveRef.current;
+    const scaleX = availableWidth / (content.width + r.left + r.right);
+    const scaleY = availableHeight / (content.height + r.top + r.bottom);
     const targetScale = clamp(
       Math.min(scaleX, scaleY),
       MIN_SCALE,
@@ -608,8 +645,12 @@ export function useCanvasViewport(
     const visibleH = Math.max(viewportSize.height - inset.top - inset.bottom, 1);
     const availableW = Math.max(visibleW - FIT_PADDING * 2, 1);
     const availableH = Math.max(visibleH - FIT_PADDING * 2, 1);
+    // Include reserve in the fit dims so 100% display is consistent
+    // with the actual fitToContent result.
+    const fitW = contentBoundingBox.width + reserve.left + reserve.right;
+    const fitH = contentBoundingBox.height + reserve.top + reserve.bottom;
     fitScale = clamp(
-      Math.min(availableW / contentBoundingBox.width, availableH / contentBoundingBox.height),
+      Math.min(availableW / fitW, availableH / fitH),
       MIN_SCALE,
       MAX_SCALE
     );
