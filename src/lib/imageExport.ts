@@ -140,7 +140,10 @@ function inlineComputedStyles(live: Element, clone: Element): void {
   // length mismatch in case a future change reorders children.
   const len = Math.min(liveChildren.length, cloneChildren.length);
   for (let i = 0; i < len; i++) {
-    inlineComputedStyles(liveChildren[i], cloneChildren[i]);
+    const liveChild = liveChildren[i];
+    const cloneChild = cloneChildren[i];
+    if (!liveChild || !cloneChild) continue;
+    inlineComputedStyles(liveChild, cloneChild);
   }
 }
 

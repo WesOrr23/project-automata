@@ -399,6 +399,16 @@
   line-height: 1;
 }
 
+/* Read-only variant (Edit panel reference strip): no remove button,
+ * so the asymmetric padding (small on the right to hug the X) leaves
+ * the symbol visually off-center. Re-symmetrize and drop the gap. */
+.alphabet-badge.alphabet-badge-readonly {
+  padding: 2px var(--space-2);
+  gap: 0;
+  text-align: center;
+  justify-content: center;
+}
+
 .alphabet-badge-remove {
   display: flex;
   align-items: center;

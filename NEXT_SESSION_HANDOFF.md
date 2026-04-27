@@ -129,6 +129,31 @@ Configure / Edit / Simulate) that exposes a small DSL terminal:
 - **Out of scope for now**: macros, conditionals, file I/O. Just a thin
   imperative layer over the engine. Aim for "one command per intent."
 
+### Backend rename: tab IDs to match user-facing labels
+Captured 2026-04-27. The user-facing tab labels were renamed from
+"Configure / Edit / Simulate" → "Define / Construct / Simulate", but
+the runtime IDs (`ToolTabID = 'CONFIG' | 'EDIT' | 'SIMULATE'`)
+deliberately stayed the same to avoid migration risk during the
+label change. The mismatch makes new readers wonder if `'CONFIG'`
+means something different from "Define".
+
+When ready to do the rename:
+- ID rename: `'CONFIG' → 'DEFINE'`, `'EDIT' → 'CONSTRUCT'`. Touches
+  ~30+ callsites (App.tsx mostly, plus tests).
+- localStorage migration: any persisted state keyed by the old ID
+  needs a one-time read-old-write-new shim (or accept "first launch
+  forgets the active tab"). Check toolMenu state persistence and
+  any debug overlay flag interactions.
+- Test fixtures: `__tests__` folders reference the IDs directly in
+  several places.
+- Comments: many handoff notes + JSDoc reference the old names.
+- Suggested order: types.ts first → grep for the old strings →
+  fix callsites → fix tests → fix comments → run full test suite
+  + manual smoke through every tab transition.
+Out of scope for now — just a label change is enough to answer the
+verb-overlap UX problem; the backend rename is pure bookkeeping
+without user-visible benefit.
+
 ### MP4 / animated export of a simulation run (future feature)
 Captured 2026-04-27. The current image-export plan is a single
 PNG/SVG snapshot. A natural follow-up would be capturing a full

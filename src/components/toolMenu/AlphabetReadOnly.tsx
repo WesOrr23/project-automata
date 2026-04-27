@@ -14,12 +14,14 @@
  * jump-to button collapses that round-trip into one click.
  */
 
-import { Plus } from 'lucide-react';
+import { SquarePen } from 'lucide-react';
 
 type AlphabetReadOnlyProp = {
   alphabet: Set<string>;
   highlightedSymbol: string | null;
-  /** Switches the menu to Define and focuses the alphabet input. */
+  /** Switches the menu to Define and focuses the alphabet input.
+   *  Action is broader than "add" — the user might also want to
+   *  remove a symbol — so the button reads "Edit" rather than "+". */
   onJumpToAlphabet: () => void;
 };
 
@@ -43,12 +45,20 @@ export function AlphabetReadOnly({
         <span className="label">Alphabet</span>
         <button
           type="button"
-          className="editor-row-action"
+          className="btn"
           onClick={onJumpToAlphabet}
-          title="Add a symbol (jumps to Define)"
-          aria-label="Add a symbol — jumps to Define"
+          title="Edit alphabet in Define"
+          aria-label="Edit alphabet — jumps to Define"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '2px 10px',
+            fontSize: 'var(--text-sm)',
+          }}
         >
-          <Plus size={14} />
+          <SquarePen size={12} />
+          <span>Edit</span>
         </button>
       </div>
 
@@ -61,7 +71,7 @@ export function AlphabetReadOnly({
           sortedAlphabet.map((symbol) => (
             <span
               key={symbol}
-              className={`alphabet-badge ${symbol === highlightedSymbol ? 'pulse-error' : ''}`}
+              className={`alphabet-badge alphabet-badge-readonly ${symbol === highlightedSymbol ? 'pulse-error' : ''}`}
             >
               <span className="alphabet-badge-symbol">{symbol}</span>
             </span>

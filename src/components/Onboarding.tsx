@@ -35,7 +35,7 @@ const STEPS: ReadonlyArray<Step> = [
   {
     id: 'menu',
     selector: '.tool-menu',
-    caption: 'Define your type & alphabet, edit states & transitions, then simulate. The menu expands as you hover.',
+    caption: 'Define your type & alphabet, construct states & transitions, then simulate. The menu expands as you hover.',
     placement: 'right',
   },
   {

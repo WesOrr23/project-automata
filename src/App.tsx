@@ -1,4 +1,4 @@
-import { useState, useEffect, useReducer, useMemo } from 'react';
+import { useState, useEffect, useReducer, useMemo, useRef, useCallback } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useAutomatonLayout } from './hooks/useAutomatonLayout';
 import {
@@ -54,6 +54,7 @@ import { useOnboarding } from './hooks/useOnboarding';
 import { useDebugOverlay } from './hooks/useDebugOverlay';
 import { createAutomaton as createBlankAutomaton } from './engine/automaton';
 import { Shuffle, Contrast, Shrink, GitCompare } from 'lucide-react';
+import { exportCanvasAsPNG, exportCanvasAsSVG } from './lib/imageExport';
 
 const fileAdapter = createFileAdapter();
 function blankFactory() {
@@ -133,6 +134,21 @@ function App() {
   // watch the value via useEffect and focus the input when it changes,
   // so the user lands in Define ready to type.
   const [alphabetFocusSignal, setAlphabetFocusSignal] = useState(0);
+  // Lifted from AutomatonCanvas via callbacks. Image-export action
+  // needs the live SVG element + the cluster bbox to frame the
+  // export at the FA's natural size. Kept in refs so the export
+  // handler reads fresh values without re-binding on every render.
+  const exportSvgRef = useRef<SVGSVGElement | null>(null);
+  const exportBBoxRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  const handleSvgRefChange = useCallback((svg: SVGSVGElement | null) => {
+    exportSvgRef.current = svg;
+  }, []);
+  const handleContentBBoxChange = useCallback(
+    (bbox: { x: number; y: number; width: number; height: number } | null) => {
+      exportBBoxRef.current = bbox;
+    },
+    []
+  );
 
   const sim = useSimulation(automaton);
   const { highlightedTarget, notify } = useNotifications();
@@ -155,13 +171,13 @@ function App() {
   // Derived application mode from the active tab. Used to gate visual
   // simulation effects (highlights), the preview overlay, and canvas
   // affordances — NOT to trigger resets.
-  const appMode: 'IDLE' | 'EDITING' | 'SIMULATING' =
+  const appMode: 'IDLE' | 'DEFINING' | 'EDITING' | 'SIMULATING' =
     menuState.mode === 'OPEN'
       ? (menuState.activeTab === 'EDIT'
           ? 'EDITING'
           : menuState.activeTab === 'SIMULATE'
             ? 'SIMULATING'
-            : 'IDLE')
+            : 'DEFINING')
       : 'IDLE';
 
   // Live preview of "what the canvas will look like after the user commits
@@ -298,7 +314,6 @@ function App() {
   // undoable surfaces). Off in SIMULATE (matches the hidden visible
   // control — undo would mutate the structure the running sim points
   // at). Off in IDLE (no edits in flight, no need to listen).
-  const isEditing = menuState.mode === 'OPEN' && menuState.activeTab === 'EDIT';
   const inEditableStage =
     menuState.mode === 'OPEN' && menuState.activeTab !== 'SIMULATE';
   useUndoRedoShortcuts({ undo, redo, canUndo, canRedo, enabled: inEditableStage });
@@ -469,6 +484,62 @@ function App() {
     anchor.click();
     document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
+  }
+
+  /** Build a filename stem from the current file name (or "automaton"
+   *  when untitled), stripped of any extension and unsafe characters. */
+  function exportFilenameStem(): string {
+    const base = (fileSession.currentName ?? 'automaton').replace(
+      /[^A-Za-z0-9 _-]+/g,
+      '_'
+    );
+    return base.length > 0 ? base : 'automaton';
+  }
+
+  function handleExportSVG() {
+    const svg = exportSvgRef.current;
+    const bbox = exportBBoxRef.current;
+    if (!svg || !bbox) {
+      notify({
+        severity: 'error',
+        title: 'Export failed',
+        detail: 'Canvas not ready. Try again in a moment.',
+      });
+      return;
+    }
+    try {
+      exportCanvasAsSVG(svg, bbox, `${exportFilenameStem()}.svg`);
+      notify({ severity: 'success', title: 'Exported as SVG', autoDismissMs: 2200 });
+    } catch (err) {
+      notify({
+        severity: 'error',
+        title: 'SVG export failed',
+        detail: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  async function handleExportPNG() {
+    const svg = exportSvgRef.current;
+    const bbox = exportBBoxRef.current;
+    if (!svg || !bbox) {
+      notify({
+        severity: 'error',
+        title: 'Export failed',
+        detail: 'Canvas not ready. Try again in a moment.',
+      });
+      return;
+    }
+    try {
+      await exportCanvasAsPNG(svg, bbox, `${exportFilenameStem()}.png`);
+      notify({ severity: 'success', title: 'Exported as PNG', autoDismissMs: 2200 });
+    } catch (err) {
+      notify({
+        severity: 'error',
+        title: 'PNG export failed',
+        detail: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   // ─── Edit handlers ───
@@ -922,6 +993,8 @@ function App() {
         onOpen={fileSession.openFile}
         onSave={fileSession.save}
         onSaveAs={fileSession.saveAs}
+        onExportPNG={handleExportPNG}
+        onExportSVG={handleExportSVG}
         onOpenRecent={fileSession.openRecent}
         onForgetRecent={fileSession.forgetRecent}
         onRenameCurrent={fileSession.renameCurrent}
@@ -1028,6 +1101,8 @@ function App() {
             }}
             onShowTour={onboarding.show}
             debugOverlay={debugOverlay.enabled}
+            onSvgRefChange={handleSvgRefChange}
+            onContentBBoxChange={handleContentBBoxChange}
             bottomRightExtras={
               /* Discoverability hint while in EDIT mode and the form is
                  at rest. Sits at the bottom of the canvas-bottom-right

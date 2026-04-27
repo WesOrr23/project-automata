@@ -11,13 +11,21 @@
  *       lives on the canvas's HelpCircle button next to the zoom
  *       controls — no longer in this menu.)
  *
- *   HISTORY segment (visible in DEFINE/EDIT when canUndo || canRedo)
+ *   HISTORY segment (visible in DEFINING / EDITING; always present
+ *     in those stages, buttons are disabled when their stack is empty)
  *     ▸ [↶ Undo]  [↷ Redo]
- *     Hidden in SIMULATE — undo targets structure, simulate targets
- *     behavior; mixing them risks editing the FA mid-run.
+ *     Hidden entirely in SIMULATING — undo targets structure,
+ *     simulate targets behavior; mixing them risks editing the FA
+ *     mid-run.
  *
  *   EDIT segment (visible only when appMode === 'EDITING')
  *     ▸ [🔧 Operations]
+ *
+ *   SIMULATE segment (visible only when appMode === 'SIMULATING')
+ *     ▸ [🖼 Export ▾]  — popover offering PNG (raster) and SVG (vector).
+ *       Lives here because exporting a snapshot is a "after I've
+ *       validated the FA" moment; the simulate stage is when that
+ *       validation happens.
  *
  *   SIMULATE segment (reserved; nothing renders yet)
  *
@@ -46,7 +54,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { AnimatePresence, motion } from 'motion/react';
 import {
   FilePlus, FolderOpen, Save, Undo2, Redo2, X,
-  History, Wrench,
+  History, Wrench, Image as ImageIcon, FileCode,
 } from 'lucide-react';
 import type { RecentEntry } from '../files/recentsStore';
 
@@ -55,7 +63,11 @@ const isMac =
 const modGlyph = isMac ? '\u2318' : 'Ctrl';
 const shiftGlyph = isMac ? '\u21e7' : 'Shift+';
 
-export type CommandBarAppMode = 'IDLE' | 'EDITING' | 'SIMULATING';
+// Mirrors the active stage of the tool menu, plus IDLE for "menu
+// collapsed, no stage active." DEFINING + EDITING (Construct) are
+// treated as the "editable" stages; SIMULATING is read-only as far
+// as the FA structure is concerned.
+export type CommandBarAppMode = 'IDLE' | 'DEFINING' | 'EDITING' | 'SIMULATING';
 
 export type OperationsItem = {
   id: string;
@@ -90,6 +102,14 @@ type CommandBarProp = {
   onOpen: () => Promise<void>;
   onSave: () => Promise<void>;
   onSaveAs: () => Promise<void>;
+  /** Save the current canvas as a .png file (rendered at 2× pixel
+   *  density). Async so the bar can show a loading state while the
+   *  SVG → canvas → PNG pipeline runs. Optional so older test
+   *  fixtures and tools that don't expose a canvas can omit it. */
+  onExportPNG?: () => Promise<void>;
+  /** Save the current canvas as a self-contained .svg file. Optional
+   *  for the same reason as onExportPNG. */
+  onExportSVG?: () => void;
   onOpenRecent: (id: string) => void;
   onForgetRecent: (id: string) => void;
   /** Called when the user commits an inline filename rename. The empty
@@ -131,7 +151,7 @@ const segmentMotion = {
   transition: { duration: 0.25, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] },
 };
 
-type ActivePopover = 'file' | 'operations' | null;
+type ActivePopover = 'file' | 'operations' | 'export' | null;
 
 export function CommandBar({
   appMode,
@@ -142,6 +162,8 @@ export function CommandBar({
   onOpen,
   onSave,
   onSaveAs,
+  onExportPNG,
+  onExportSVG,
   onOpenRecent,
   onForgetRecent,
   onRenameCurrent,
@@ -157,6 +179,7 @@ export function CommandBar({
   const [openLoading, setOpenLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveAsLoading, setSaveAsLoading] = useState(false);
+  const [exportPNGLoading, setExportPNGLoading] = useState(false);
 
   // Inline rename state
   const [renaming, setRenaming] = useState(false);
@@ -378,6 +401,7 @@ export function CommandBar({
 
             <div className="command-bar-popover-divider" role="separator" />
 
+
             <span className="command-bar-popover-label">
               <History size={12} aria-hidden="true" /> Recents
             </span>
@@ -417,17 +441,17 @@ export function CommandBar({
         )}
       </div>
 
-      {/* ─── HISTORY segment — undo / redo. Visible in DEFINE/EDIT
-            when there's anything to undo, hidden in SIMULATE.
-            Define-tab edits ARE undoable so the segment shouldn't be
-            EDIT-only, but Simulate is the wrong place to see edit
-            controls — the running simulation references the current
-            automaton and a structural undo mid-sim leaves the sim
-            holding a stale snapshot. Empty history → segment
-            unmounts so the bar doesn't grow chrome that does
-            nothing. ─── */}
+      {/* ─── HISTORY segment — undo / redo. Visible in DEFINE +
+            CONSTRUCT (= EDIT) regardless of whether history is
+            non-empty, so the affordance is discoverable on first
+            launch and the bar doesn't shift sideways the moment a
+            user makes their first edit. Buttons are disabled when
+            their stack is empty. Hidden entirely in SIMULATE — the
+            running simulation references the current automaton, so
+            undoing a structural change mid-run leaves the sim
+            holding a stale snapshot. ─── */}
       <AnimatePresence initial={false}>
-        {(canUndo || canRedo) && appMode !== 'SIMULATING' && (
+        {appMode !== 'SIMULATING' && appMode !== 'IDLE' && (
           <motion.div key="history-segment" className="command-bar-segment" {...segmentMotion}>
             <div className="command-bar-divider" aria-hidden="true" />
             <button
@@ -462,14 +486,15 @@ export function CommandBar({
             <div className="command-bar-divider" aria-hidden="true" />
             <button
               type="button"
-              className={`command-bar-button${activePopover === 'operations' ? ' command-bar-button-active' : ''}`}
+              className={`command-bar-button command-bar-button-text${activePopover === 'operations' ? ' command-bar-button-active' : ''}`}
               onClick={() => togglePopover('operations')}
-              aria-label="Operations"
+              aria-label="Tools"
               aria-haspopup="menu"
               aria-expanded={activePopover === 'operations'}
-              title="Operations (convert, minimize, complement…)"
+              title="Tools (convert, minimize, complement…)"
             >
-              <Wrench size={16} />
+              <Wrench size={14} />
+              <span>Tools</span>
             </button>
 
             {activePopover === 'operations' && (
@@ -510,6 +535,68 @@ export function CommandBar({
                       ))}
                     </div>
                   ))
+                )}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── SIMULATE segment — image export. Lives here (vs in the
+            File menu) because exporting a snapshot is what the user
+            does AFTER they've validated the FA in Simulate; surfacing
+            it on the simulate stage matches that workflow moment.
+            Single Export button with a popover offers PNG / SVG. ─── */}
+      <AnimatePresence initial={false}>
+        {appMode === 'SIMULATING' && (onExportPNG || onExportSVG) && (
+          <motion.div key="simulate-segment" className="command-bar-segment" {...segmentMotion}>
+            <div className="command-bar-divider" aria-hidden="true" />
+            <button
+              type="button"
+              className={`command-bar-button command-bar-button-text${activePopover === 'export' ? ' command-bar-button-active' : ''}${exportPNGLoading ? ' command-bar-button-loading' : ''}`}
+              onClick={() => togglePopover('export')}
+              aria-label="Export"
+              aria-haspopup="menu"
+              aria-expanded={activePopover === 'export'}
+              title="Export the current canvas as an image"
+            >
+              <ImageIcon size={14} />
+              <span>Export</span>
+            </button>
+
+            {activePopover === 'export' && (
+              <div className="command-bar-popover command-bar-popover-export-anchor" role="menu">
+                {onExportPNG && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`command-bar-popover-item${exportPNGLoading ? ' command-bar-popover-item-loading' : ''}`}
+                    onClick={() => {
+                      setActivePopover(null);
+                      void withLoading(setExportPNGLoading, onExportPNG);
+                    }}
+                    disabled={exportPNGLoading}
+                    aria-busy={exportPNGLoading}
+                    title="Save the current canvas as a PNG image"
+                  >
+                    <ImageIcon size={16} strokeWidth={2} />
+                    <span className="command-bar-popover-item-label-inline">PNG image</span>
+                  </button>
+                )}
+                {onExportSVG && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="command-bar-popover-item"
+                    onClick={() => {
+                      setActivePopover(null);
+                      onExportSVG();
+                    }}
+                    title="Save the current canvas as an SVG file"
+                  >
+                    <FileCode size={16} strokeWidth={2} />
+                    <span className="command-bar-popover-item-label-inline">SVG image</span>
+                  </button>
                 )}
               </div>
             )}

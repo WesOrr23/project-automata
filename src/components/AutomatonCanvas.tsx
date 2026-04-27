@@ -116,6 +116,23 @@ type AutomatonCanvasProp = {
   debugOverlay?: boolean;
 
   /**
+   * Reports the live <svg> element ref to App so the image-export
+   * action can serialize it. App stores via callback ref. Called once
+   * on mount with the element, once with null on unmount.
+   */
+  onSvgRefChange?: (svg: SVGSVGElement | null) => void;
+
+  /**
+   * Reports the measured cluster bbox (state-circle bounds in inner-g
+   * local coords) up to App. The image-export framing needs this same
+   * bbox to set viewBox; rather than re-measuring in App we reuse the
+   * one already computed here. Called every time the bbox changes.
+   */
+  onContentBBoxChange?: (
+    bbox: { x: number; y: number; width: number; height: number } | null
+  ) => void;
+
+  /**
    * Pixels of overlay chrome (tool menu, command bar) covering the SVG.
    * Centering operations target the un-occluded region rather than the
    * geometric center, so "centered" reads as "centered in what the
@@ -179,6 +196,8 @@ export function AutomatonCanvas({
   bottomRightExtras,
   onShowTour,
   debugOverlay = false,
+  onSvgRefChange,
+  onContentBBoxChange,
   viewportInset,
 }: AutomatonCanvasProp) {
   // The start-state arrow extends LEFT of the start-state circle, which
@@ -201,6 +220,20 @@ export function AutomatonCanvas({
   const [contentBBox, setContentBBox] = useState<{
     x: number; y: number; width: number; height: number;
   } | null>(null);
+
+  // Lift svg + bbox to App so the image-export action can frame the
+  // SVG without re-measuring. Effects (not refs) so the parent gets
+  // notified on remount and on bbox changes.
+  useEffect(() => {
+    if (onSvgRefChange) onSvgRefChange(svgRef.current);
+    return () => {
+      if (onSvgRefChange) onSvgRefChange(null);
+    };
+  }, [onSvgRefChange]);
+
+  useEffect(() => {
+    if (onContentBBoxChange) onContentBBoxChange(contentBBox);
+  }, [contentBBox, onContentBBoxChange]);
 
   // ResizeObserver keeps viewportSize in sync with the SVG's CSS box.
   // useLayoutEffect to read sizes synchronously after paint, avoiding
