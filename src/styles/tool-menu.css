@@ -223,6 +223,23 @@
     transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* COLLAPSED-mode rows: drop padding, gap, and flex-start anchoring so
+ * the icon sits at the row's true horizontal center. In EXPANDED/OPEN
+ * the label needs left padding + a gap from the icon, but in COLLAPSED
+ * the label is invisible and reserving space for it visibly biases the
+ * icon left of the pill's centerline. */
+.tool-menu-collapsed .tool-menu-row {
+  justify-content: center;
+  padding: 0;
+  gap: 0;
+}
+.tool-menu-collapsed .tool-menu-row-label {
+  /* Don't let the hidden label claim flex space and push the icon
+   * left of center. EXPANDED/OPEN keep the default flex: 1 1 auto. */
+  flex: 0 0 0;
+  width: 0;
+}
+
 /* Pill chrome appears whenever the row has space to display it —
  * EXPANDED and OPEN both qualify. */
 .tool-menu-expanded .tool-menu-row,
