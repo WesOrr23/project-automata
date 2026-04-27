@@ -69,12 +69,21 @@
  * track width/2 — they read as "rounding back into the pill" during
  * the shrink, not snapping at the end. */
 .tool-menu-collapsed {
-  width: 48px;
+  /* Width chosen so the icon (20) sits with symmetric padding inside
+   * the menu when the row uses its default left-anchored layout
+   * (padding 0 6, border 1, menu padding 8, menu border 1):
+   *   icon-left  = 1 + 8 + 1 + 6 = 16
+   *   icon-right = width - icon-left - 20
+   * Setting width = 52 makes icon-right = 16 → symmetric. Picking the
+   * width here means the same `padding: 0 6` rule that EXPANDED uses
+   * also reads as centered in COLLAPSED, so the icon doesn't shift
+   * during the COLLAPSED→EXPANDED hover transition. */
+  width: 52px;
   /* Fits 3 rows: 3×32 + 2×4 (gaps) + 2×8 (padding) = 120. File has
    * left the menu and now lives in the top-center CommandBar widget,
    * so the tool menu is back to the workflow-ladder size. */
   max-height: 120px;
-  border-radius: 24px;
+  border-radius: 26px;
   transition:
     height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
     max-height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
@@ -223,22 +232,15 @@
     transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* COLLAPSED-mode rows: drop padding, gap, and flex-start anchoring so
- * the icon sits at the row's true horizontal center. In EXPANDED/OPEN
- * the label needs left padding + a gap from the icon, but in COLLAPSED
- * the label is invisible and reserving space for it visibly biases the
- * icon left of the pill's centerline. */
-.tool-menu-collapsed .tool-menu-row {
-  justify-content: center;
-  padding: 0;
-  gap: 0;
-}
-.tool-menu-collapsed .tool-menu-row-label {
-  /* Don't let the hidden label claim flex space and push the icon
-   * left of center. EXPANDED/OPEN keep the default flex: 1 1 auto. */
-  flex: 0 0 0;
-  width: 0;
-}
+/* COLLAPSED-mode centering note:
+ * No override is needed — the icon sits at row's natural left padding
+ * (6px) inside row's natural left edge (8px menu padding), so its
+ * left edge is 14px from the menu's left. With a 20px icon in a 48px
+ * menu, the right edge is also 14px from the menu's right. Already
+ * symmetric. A previous justify-content/padding override re-centered
+ * the icon and caused a layout jump during COLLAPSED→EXPANDED hover —
+ * removed in favor of letting the same left-anchored position apply
+ * in every mode. */
 
 /* Pill chrome appears whenever the row has space to display it —
  * EXPANDED and OPEN both qualify. */
