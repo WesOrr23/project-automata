@@ -11,9 +11,10 @@
  *       lives on the canvas's HelpCircle button next to the zoom
  *       controls — no longer in this menu.)
  *
- *   HISTORY segment (visible whenever canUndo || canRedo — stage-agnostic,
- *     since Define-tab edits are also undoable)
+ *   HISTORY segment (visible in DEFINE/EDIT when canUndo || canRedo)
  *     ▸ [↶ Undo]  [↷ Redo]
+ *     Hidden in SIMULATE — undo targets structure, simulate targets
+ *     behavior; mixing them risks editing the FA mid-run.
  *
  *   EDIT segment (visible only when appMode === 'EDITING')
  *     ▸ [🔧 Operations]
@@ -416,15 +417,17 @@ export function CommandBar({
         )}
       </div>
 
-      {/* ─── HISTORY segment — undo / redo. Stage-agnostic: appears
-            whenever there's anything to undo or redo, regardless of
-            which tool-menu tab is active. The user might toggle
-            Define-tab fields (type, alphabet, description, ε char)
-            and immediately want to undo without first hopping into
-            Edit. Empty history → segment unmounts so the bar doesn't
-            grow chrome that does nothing. ─── */}
+      {/* ─── HISTORY segment — undo / redo. Visible in DEFINE/EDIT
+            when there's anything to undo, hidden in SIMULATE.
+            Define-tab edits ARE undoable so the segment shouldn't be
+            EDIT-only, but Simulate is the wrong place to see edit
+            controls — the running simulation references the current
+            automaton and a structural undo mid-sim leaves the sim
+            holding a stale snapshot. Empty history → segment
+            unmounts so the bar doesn't grow chrome that does
+            nothing. ─── */}
       <AnimatePresence initial={false}>
-        {(canUndo || canRedo) && (
+        {(canUndo || canRedo) && appMode !== 'SIMULATING' && (
           <motion.div key="history-segment" className="command-bar-segment" {...segmentMotion}>
             <div className="command-bar-divider" aria-hidden="true" />
             <button

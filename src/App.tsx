@@ -294,14 +294,14 @@ function App() {
     setInputString,
   });
 
-  // Global undo/redo shortcuts. Stage-agnostic — Define-tab edits
-  // (type toggle, alphabet, ε char, description) are all undoable, so
-  // the shortcuts should work there too. Off in IDLE (menu collapsed)
-  // to keep the wheel/keyboard quiet when the user isn't actively
-  // editing anything.
+  // Global undo/redo shortcuts. Active in DEFINE + EDIT (both have
+  // undoable surfaces). Off in SIMULATE (matches the hidden visible
+  // control — undo would mutate the structure the running sim points
+  // at). Off in IDLE (no edits in flight, no need to listen).
   const isEditing = menuState.mode === 'OPEN' && menuState.activeTab === 'EDIT';
-  const inActiveStage = menuState.mode === 'OPEN';
-  useUndoRedoShortcuts({ undo, redo, canUndo, canRedo, enabled: inActiveStage });
+  const inEditableStage =
+    menuState.mode === 'OPEN' && menuState.activeTab !== 'SIMULATE';
+  useUndoRedoShortcuts({ undo, redo, canUndo, canRedo, enabled: inEditableStage });
 
   // Display labels are sequential (q0, q1, q2) regardless of underlying IDs.
   // This detaches stable engine identity from user-visible numbering.
