@@ -37,9 +37,10 @@ export type NotifyFn = (input: {
 export type UseFileSessionArgs = {
   automaton: Automaton;
   epsilonSymbol: string;
+  description: string;
   isDirty: boolean;
   markSaved: () => void;
-  replaceSnapshot: (snapshot: { automaton: Automaton; epsilonSymbol: string }) => void;
+  replaceSnapshot: (snapshot: { automaton: Automaton; epsilonSymbol: string; description: string }) => void;
   adapter: FileAdapter;
   notify: NotifyFn;
 };
@@ -71,7 +72,7 @@ export type UseFileSessionResult = {
  * because what counts as "blank" depends on the app (e.g. whether to
  * include a single state, what the default ε-symbol is, etc.).
  */
-export type NewFileFactory = () => { automaton: Automaton; epsilonSymbol: string };
+export type NewFileFactory = () => { automaton: Automaton; epsilonSymbol: string; description: string };
 
 const SUGGESTED_EXTENSION = '.json';
 
@@ -92,7 +93,7 @@ export function useFileSession(
   args: UseFileSessionArgs,
   newFileFactory: NewFileFactory
 ): UseFileSessionResult {
-  const { automaton, epsilonSymbol, isDirty, markSaved, replaceSnapshot, adapter, notify } = args;
+  const { automaton, epsilonSymbol, description, isDirty, markSaved, replaceSnapshot, adapter, notify } = args;
   const [currentName, setCurrentName] = useState<string | null>(null);
   const [recents, setRecents] = useState<RecentEntry[]>(() => listRecents());
 
@@ -118,6 +119,7 @@ export function useFileSession(
       const meta: AutomataFileMetadata = {
         ...defaultMetadata(normalizeName(filename)),
         ...(currentName !== null ? { name: normalizeName(filename) } : {}),
+        ...(description.length > 0 ? { description } : {}),
       };
       const content = serializeAutomaton(automaton, meta);
       const result = await adapter.save({ content, suggestedName: filename });
@@ -133,7 +135,7 @@ export function useFileSession(
       markSaved();
       notify({ severity: 'success', title: `Saved ${result.value.name}`, autoDismissMs: 3_000 });
     },
-    [adapter, automaton, currentName, markSaved, notify, refreshRecents]
+    [adapter, automaton, currentName, description, markSaved, notify, refreshRecents]
   );
 
   const save = useCallback(async () => {
@@ -156,6 +158,9 @@ export function useFileSession(
         // Loaded files don't carry a UI ε-symbol; preserve current to
         // minimize disruption (the symbol is per-session anyway).
         epsilonSymbol,
+        // Description IS in the file metadata. Default to empty when
+        // a file omits it (older saves, hand-written JSON, etc.).
+        description: parsed.value.metadata.description ?? '',
       });
       setCurrentName(normalizeName(displayName));
       recordRecent({ name: displayName, snapshot: content, saved: false });

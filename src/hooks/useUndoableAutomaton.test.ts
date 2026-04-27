@@ -26,6 +26,7 @@ function initialSnapshot(): Snapshot {
   return {
     automaton: createAutomaton('DFA', new Set(['0', '1'])),
     epsilonSymbol: 'e',
+    description: '',
   };
 }
 
@@ -324,6 +325,7 @@ describe('useUndoableAutomaton', () => {
       const fresh: Snapshot = {
         automaton: createAutomaton('NFA', new Set(['a', 'b'])),
         epsilonSymbol: 'ε',
+        description: '',
       };
       act(() => result.current.replaceSnapshot(fresh));
       expect(result.current.automaton.type).toBe('NFA');

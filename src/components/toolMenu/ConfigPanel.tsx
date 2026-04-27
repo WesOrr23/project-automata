@@ -1,13 +1,18 @@
 /**
- * ConfigPanel Component
+ * ConfigPanel Component (renders the "Define" tab)
  *
- * App-level configuration for the automaton:
- * - Automaton type selector (DFA / NFA)
- * - Reserved ε-symbol (NFA mode only)
- * - Export to JSON
+ * Stage-1 surface in the workflow ladder. Holds the FA's *declarative*
+ * fields — the parts of the formal definition that aren't constructed
+ * interactively in Edit:
+ *   - Automaton type (DFA / NFA)
+ *   - Reserved ε-symbol (NFA mode only)
+ *   - Free-form description / notes
+ *   - Clear canvas (escape hatch)
+ *   - Export to JSON
  *
- * Note: alphabet editing lives in the Edit tab (see AlphabetEditor) because
- * alphabet is part of building the automaton, not a settings-level choice.
+ * Alphabet currently lives in Edit (Phase C of the Define refactor will
+ * move it back here once the read-only badge + jump-to-Define shortcut
+ * lands in Edit).
  */
 
 import { useEffect, useState } from 'react';
@@ -19,6 +24,9 @@ type ConfigPanelProp = {
   epsilonSymbol: string;
   /** Validation: returns null if accepted, an error message otherwise. */
   onEpsilonSymbolChange: (newSymbol: string) => string | null;
+  /** Free-form description / notes. Persisted in the save file's metadata. */
+  description: string;
+  onDescriptionChange: (next: string) => void;
   /** Reset the automaton to a single state with the current alphabet preserved. */
   onClearCanvas: () => void;
   onExportJSON?: () => void;
@@ -29,6 +37,8 @@ export function ConfigPanel({
   onTypeChange,
   epsilonSymbol,
   onEpsilonSymbolChange,
+  description,
+  onDescriptionChange,
   onClearCanvas,
   onExportJSON,
 }: ConfigPanelProp) {
@@ -106,6 +116,31 @@ export function ConfigPanel({
           </p>
         </div>
       )}
+
+      <div>
+        <span className="label" style={{ display: 'block', marginBottom: 'var(--space-2)' }}>
+          Description
+        </span>
+        <textarea
+          className="glass-input"
+          value={description}
+          onChange={(event) => onDescriptionChange(event.target.value)}
+          placeholder="What does this FA recognize? Any caveats?"
+          rows={3}
+          style={{
+            width: '100%',
+            resize: 'vertical',
+            minHeight: '60px',
+            fontFamily: 'var(--font-sans)',
+            fontSize: 'var(--text-sm)',
+            lineHeight: 1.4,
+          }}
+          aria-label="Automaton description"
+        />
+        <p className="caption" style={{ marginTop: 'var(--space-1)' }}>
+          Free-form notes. Saved with the file.
+        </p>
+      </div>
 
       <div className="divider" />
       <button

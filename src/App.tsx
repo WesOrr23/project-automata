@@ -60,6 +60,7 @@ function blankFactory() {
   return {
     automaton: createBlankAutomaton('DFA', new Set(['0', '1'])),
     epsilonSymbol: 'ε',
+    description: '',
   };
 }
 
@@ -101,7 +102,7 @@ function buildSampleDFA(): Automaton {
 }
 
 function initialSnapshot() {
-  return { automaton: buildSampleDFA(), epsilonSymbol: 'e' };
+  return { automaton: buildSampleDFA(), epsilonSymbol: 'e', description: '' };
 }
 
 function App() {
@@ -113,8 +114,10 @@ function App() {
   const {
     automaton,
     epsilonSymbol,
+    description,
     setAutomaton,
     setEpsilonSymbol,
+    setDescription,
     undo,
     redo,
     canUndo,
@@ -369,7 +372,7 @@ function App() {
       notify({
         severity: 'error',
         title: `'${symbol}' is reserved for ε-transitions in NFA mode.`,
-        detail: 'Change the reserved symbol in Configure if you need this character in the alphabet.',
+        detail: 'Change the reserved symbol in Define if you need this character in the alphabet.',
         autoDismissMs: 6_000,
       });
       return;
@@ -383,7 +386,7 @@ function App() {
     }));
   }
 
-  // Configure-tab handler for the ε symbol. Returns null on accept,
+  // Define-tab handler for the ε symbol. Returns null on accept,
   // an error string otherwise — the panel surfaces the error inline.
   function handleEpsilonSymbolChange(newSymbol: string): string | null {
     if (newSymbol.length !== 1) return 'Use a single character';
@@ -789,6 +792,7 @@ function App() {
     {
       automaton,
       epsilonSymbol,
+      description,
       isDirty,
       markSaved,
       replaceSnapshot,
@@ -818,6 +822,8 @@ function App() {
       onTypeChange={handleTypeChange}
       epsilonSymbol={epsilonSymbol}
       onEpsilonSymbolChange={handleEpsilonSymbolChange}
+      description={description}
+      onDescriptionChange={setDescription}
       onClearCanvas={handleClearCanvas}
       onExportJSON={handleExportJSON}
     />

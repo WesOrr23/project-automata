@@ -51,13 +51,18 @@ export const HISTORY_CAP = 50;
 export type Snapshot = {
   automaton: Automaton;
   epsilonSymbol: string;
+  /** Free-form description / notes about this FA. Persisted in the
+   *  save file's metadata. Empty string means "no description." */
+  description: string;
 };
 
 export type UseUndoableAutomatonResult = {
   automaton: Automaton;
   epsilonSymbol: string;
+  description: string;
   setAutomaton: (updater: (previous: Automaton) => Automaton) => void;
   setEpsilonSymbol: (next: string) => void;
+  setDescription: (next: string) => void;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
@@ -128,8 +133,8 @@ export function useUndoableAutomaton(
       pushCurrentOntoUndo();
       clearRedoStack();
       const nextSnapshot: Snapshot = {
+        ...previousSnapshot,
         automaton: nextAutomaton,
-        epsilonSymbol: previousSnapshot.epsilonSymbol,
       };
       setCurrent(nextSnapshot);
       refreshDirty(nextSnapshot);
@@ -144,8 +149,24 @@ export function useUndoableAutomaton(
       pushCurrentOntoUndo();
       clearRedoStack();
       const nextSnapshot: Snapshot = {
-        automaton: previousSnapshot.automaton,
+        ...previousSnapshot,
         epsilonSymbol: next,
+      };
+      setCurrent(nextSnapshot);
+      refreshDirty(nextSnapshot);
+    },
+    [pushCurrentOntoUndo, clearRedoStack, refreshDirty]
+  );
+
+  const setDescription = useCallback(
+    (next: string) => {
+      const previousSnapshot = currentRef.current;
+      if (next === previousSnapshot.description) return;
+      pushCurrentOntoUndo();
+      clearRedoStack();
+      const nextSnapshot: Snapshot = {
+        ...previousSnapshot,
+        description: next,
       };
       setCurrent(nextSnapshot);
       refreshDirty(nextSnapshot);
@@ -200,8 +221,10 @@ export function useUndoableAutomaton(
   return {
     automaton: current.automaton,
     epsilonSymbol: current.epsilonSymbol,
+    description: current.description,
     setAutomaton,
     setEpsilonSymbol,
+    setDescription,
     undo,
     redo,
     canUndo,
