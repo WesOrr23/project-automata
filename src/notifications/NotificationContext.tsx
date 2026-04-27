@@ -39,6 +39,19 @@ export type NotificationContextValue = {
    * clicks a stacked notification to remind themselves what it referred to.
    */
   rehighlight: (id: string) => void;
+  /**
+   * Pause the auto-dismiss countdown for `id` (e.g. while the user
+   * hovers the toast). Saves the remaining time so resumeDismiss can
+   * pick up where it left off. No-op if the notification has no
+   * auto-dismiss timer or is already paused.
+   */
+  pauseDismiss: (id: string) => void;
+  /**
+   * Resume a previously-paused auto-dismiss countdown. Re-arms the
+   * timer with whatever time was remaining when paused. No-op if the
+   * notification has no timer or isn't paused.
+   */
+  resumeDismiss: (id: string) => void;
 };
 
 export const NotificationContext = createContext<NotificationContextValue | null>(null);
@@ -65,7 +78,16 @@ export function NotificationProvider({ children }: NotificationProviderProp) {
 
   // Tracks active timeouts so we can clean them up on unmount / overwrite.
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dismissTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  // Per-notification dismiss state: the live timer (or null when paused),
+  // how much of the original autoDismissMs is still left, and when the
+  // current timer started (so a pause can subtract elapsed time). Lives
+  // in a ref because it's bookkeeping for native timers, not React state.
+  type DismissEntry = {
+    timer: ReturnType<typeof setTimeout> | null;
+    remainingMs: number;
+    startedAt: number | null;
+  };
+  const dismissEntriesRef = useRef<Map<string, DismissEntry>>(new Map());
 
   // Schedule a timeout that clears the highlight after HIGHLIGHT_DURATION_MS.
   // Replaces any prior highlight timeout so the most recent activation wins.
@@ -82,13 +104,29 @@ export function NotificationProvider({ children }: NotificationProviderProp) {
   }, []);
 
   const dismiss = useCallback((id: string) => {
-    const timer = dismissTimeoutsRef.current.get(id);
-    if (timer !== undefined) {
-      clearTimeout(timer);
-      dismissTimeoutsRef.current.delete(id);
+    const entry = dismissEntriesRef.current.get(id);
+    if (entry !== undefined) {
+      if (entry.timer !== null) clearTimeout(entry.timer);
+      dismissEntriesRef.current.delete(id);
     }
     setNotifications((previous) => previous.filter((notification) => notification.id !== id));
   }, []);
+
+  const pauseDismiss = useCallback((id: string) => {
+    const entry = dismissEntriesRef.current.get(id);
+    if (!entry || entry.timer === null || entry.startedAt === null) return;
+    clearTimeout(entry.timer);
+    entry.remainingMs = Math.max(0, entry.remainingMs - (Date.now() - entry.startedAt));
+    entry.timer = null;
+    entry.startedAt = null;
+  }, []);
+
+  const resumeDismiss = useCallback((id: string) => {
+    const entry = dismissEntriesRef.current.get(id);
+    if (!entry || entry.timer !== null) return;
+    entry.startedAt = Date.now();
+    entry.timer = setTimeout(() => dismiss(id), entry.remainingMs);
+  }, [dismiss]);
 
   const notify = useCallback(
     (input: NotifyInput): string => {
@@ -116,10 +154,15 @@ export function NotificationProvider({ children }: NotificationProviderProp) {
       activateHighlight(input.target);
 
       if (autoDismissMs !== null) {
+        const startedAt = Date.now();
         const timer = setTimeout(() => {
           dismiss(id);
         }, autoDismissMs);
-        dismissTimeoutsRef.current.set(id, timer);
+        dismissEntriesRef.current.set(id, {
+          timer,
+          remainingMs: autoDismissMs,
+          startedAt,
+        });
       }
 
       return id;
@@ -139,10 +182,13 @@ export function NotificationProvider({ children }: NotificationProviderProp) {
 
   // Clean up all pending timers on unmount.
   useEffect(() => {
+    const entries = dismissEntriesRef.current;
     return () => {
       if (highlightTimeoutRef.current !== null) clearTimeout(highlightTimeoutRef.current);
-      dismissTimeoutsRef.current.forEach((timer) => clearTimeout(timer));
-      dismissTimeoutsRef.current.clear();
+      entries.forEach((entry) => {
+        if (entry.timer !== null) clearTimeout(entry.timer);
+      });
+      entries.clear();
     };
   }, []);
 
@@ -152,6 +198,8 @@ export function NotificationProvider({ children }: NotificationProviderProp) {
     notify,
     dismiss,
     rehighlight,
+    pauseDismiss,
+    resumeDismiss,
   };
 
   return (

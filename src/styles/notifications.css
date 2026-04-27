@@ -29,18 +29,17 @@
   box-shadow: var(--shadow-lg);
   cursor: pointer;
   pointer-events: auto;
-  /* Spring-ish entry (iter 10). cubic-bezier(0.34, 1.56, 0.64, 1)
-   * overshoots slightly at the end — a micro-bounce that reads as
-   * "arriving" rather than "sliding past." 280ms gives the overshoot
-   * room to settle without dragging. */
-  animation: notification-slide-in 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
-  transition:
-    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Entry / exit / layout-shift are owned by Framer (motion.div in
+   * NotificationToast + AnimatePresence in NotificationStack). The
+   * old CSS `notification-slide-in` keyframe and `transform`
+   * transition were removed: they fought Framer's `x` animation and
+   * left the toast at a stale CSS-translated position when an exit
+   * started. We still own box-shadow as a hover-only effect since
+   * Framer doesn't animate it on this element. */
+  transition: box-shadow 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .notification-toast:hover {
-  transform: translateX(-2px);
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.10), 0 4px 8px rgba(15, 23, 42, 0.05);
 }
 
@@ -127,17 +126,6 @@
 .notification-toast-dismiss:hover {
   background: var(--bg-button-hover);
   color: var(--text-body);
-}
-
-@keyframes notification-slide-in {
-  from {
-    opacity: 0;
-    transform: translateX(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
 }
 
 /* ─── Onboarding overlay ─── */
