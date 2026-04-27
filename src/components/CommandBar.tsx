@@ -33,7 +33,7 @@
  *    state so opening one closes the others.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   FilePlus, FolderOpen, Save, MoreHorizontal, Undo2, Redo2, X,
@@ -55,6 +55,10 @@ export type OperationsItem = {
   enabled: boolean;
   /** Tooltip text — typically the reason an item is disabled. */
   title?: string;
+  /** Optional leading icon (already-sized lucide element). Renders to
+   *  the left of the label, vertically centered with it. Hint (if any)
+   *  sits below, indented to align under the label. */
+  icon?: ReactNode;
   onClick: () => void;
 };
 
@@ -474,7 +478,14 @@ export function CommandBar({
                             item.onClick();
                           }}
                         >
-                          <span className="command-bar-popover-item-label">{item.label}</span>
+                          <span className="command-bar-popover-item-row">
+                            {item.icon && (
+                              <span className="command-bar-popover-item-icon" aria-hidden="true">
+                                {item.icon}
+                              </span>
+                            )}
+                            <span className="command-bar-popover-item-label">{item.label}</span>
+                          </span>
                           {item.hint && (
                             <span className="command-bar-popover-item-hint">{item.hint}</span>
                           )}

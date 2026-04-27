@@ -486,12 +486,12 @@ button svg {
   color: var(--text-heading);
 }
 
-/* Operations items override the row layout: stack label over hint
- * (vertically) instead of side-by-side, so a long hint can wrap
- * cleanly under the label rather than overflowing the popover. */
+/* Operations items override the row layout: stack the icon+label row
+ * over the hint so a long hint can wrap cleanly under the label
+ * rather than overflowing the popover. */
 .command-bar-popover-item.command-bar-popover-item-op {
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 2px;
   padding: var(--space-2);
 }
@@ -501,9 +501,28 @@ button svg {
   cursor: not-allowed;
 }
 
+/* Icon + label sit on the same row, vertically centered. The hint
+ * lives outside this row, so it wraps freely below. */
+.command-bar-popover-item-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.command-bar-popover-item-icon {
+  flex: 0 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+/* Match the tool-menu's row label vocabulary (sans, base, bold) so
+ * the two command surfaces feel like one family. */
 .command-bar-popover-item-label {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium, 500);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
   line-height: 1.2;
 }
 
@@ -511,7 +530,17 @@ button svg {
   font-size: var(--text-xs, 11px);
   color: var(--text-secondary);
   font-style: italic;
-  line-height: 1.2;
+  line-height: 1.3;
+  /* Indent under the label so the hint visually hangs off the label,
+   * not the icon. icon flex-basis (16) + row gap (var(--space-2) = 8). */
+  padding-left: calc(16px + var(--space-2));
+}
+
+/* When an op item has no icon, the hint falls back to label-aligned
+ * (no icon-width to skip past). */
+.command-bar-popover-item-row:not(:has(.command-bar-popover-item-icon))
+  ~ .command-bar-popover-item-hint {
+  padding-left: 0;
 }
 
 .command-bar-popover-recents-empty {

@@ -52,6 +52,7 @@ import { ComparePicker } from './components/ComparePicker';
 import { Onboarding } from './components/Onboarding';
 import { useOnboarding } from './hooks/useOnboarding';
 import { createAutomaton as createBlankAutomaton } from './engine/automaton';
+import { Shuffle, Contrast, Shrink, GitCompare } from 'lucide-react';
 
 const fileAdapter = createFileAdapter();
 function blankFactory() {
@@ -737,6 +738,7 @@ function App() {
         {
           id: 'nfa-to-dfa',
           label: 'Convert to DFA',
+          icon: <Shuffle size={16} strokeWidth={2} />,
           enabled: automaton.type === 'NFA',
           ...(automaton.type !== 'NFA' ? { title: 'Already a DFA' } : {}),
           onClick: handleConvertToDfa,
@@ -744,6 +746,7 @@ function App() {
         {
           id: 'complement',
           label: 'Complement',
+          icon: <Contrast size={16} strokeWidth={2} />,
           enabled: isCurrentDfaComplete,
           ...(isCurrentDfaComplete ? {} : { title: requiresCompleteDfaTitle }),
           onClick: handleComplement,
@@ -757,6 +760,7 @@ function App() {
         {
           id: 'minimize',
           label: 'Minimize',
+          icon: <Shrink size={16} strokeWidth={2} />,
           enabled: isCurrentDfaComplete,
           ...(isCurrentDfaComplete ? {} : { title: requiresCompleteDfaTitle }),
           onClick: handleMinimize,
@@ -764,6 +768,7 @@ function App() {
         {
           id: 'compare-against',
           label: 'Compare against…',
+          icon: <GitCompare size={16} strokeWidth={2} />,
           enabled: isCurrentDfaComplete,
           ...(isCurrentDfaComplete ? {} : { title: requiresCompleteDfaTitle }),
           onClick: handleCompareAgainst,
