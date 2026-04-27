@@ -19,10 +19,15 @@ type CanvasZoomControlsProp = {
   fitToContent: () => void;
   atMaxScale: boolean;
   atMinScale: boolean;
-  /** Current viewport scale. Drives the middle button's percent
-   *  display ("100%", "150%", etc.). On hover the percent fades out
-   *  and the Fit-to-view icon fades in to signal the click action. */
+  /** Current raw viewport scale. */
   scale: number;
+  /** The scale at which fitToContent would land. Display percent is
+   *  computed as `(scale / fitScale) * 100`, so 100% means "fits the
+   *  visible region with padding," not "GraphViz's natural pixel
+   *  size" (which is meaningless to the user). null when sizes
+   *  aren't yet measurable; in that case we fall back to the raw
+   *  scale percentage. */
+  fitScale?: number | null;
 };
 
 const isMac =
@@ -36,8 +41,15 @@ export function CanvasZoomControls({
   atMaxScale,
   atMinScale,
   scale,
+  fitScale,
 }: CanvasZoomControlsProp) {
-  const percent = Math.round(scale * 100);
+  // Display percent: scale relative to fit. 100% = fit-to-content.
+  // Fallback to raw scale percentage when fitScale isn't ready yet
+  // (very early mount, before viewport sizes are measured).
+  const percent =
+    fitScale && fitScale > 0
+      ? Math.round((scale / fitScale) * 100)
+      : Math.round(scale * 100);
   return (
     // `layout` enables Framer's automatic position-change animation:
     // when a sibling in the parent stack mounts/unmounts (canvas-tip

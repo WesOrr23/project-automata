@@ -287,11 +287,14 @@ button svg {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  /* The segment manages its own width during the AnimatePresence
-   * morph (Framer animates width:auto ↔ 0). Padding is intentionally
-   * inside the segment so it collapses with the segment. */
   white-space: nowrap;
-  overflow: hidden;
+  /* No `overflow: hidden` here — that would clip the popovers (Recents,
+   * ⋯, Operations) which anchor BELOW the segment via position: absolute
+   * top: calc(100% + 8px). The Framer width:auto ↔ 0 morph on the EDIT
+   * segment doesn't need clipping because the segment's children also
+   * animate via opacity 0/1 in lockstep, so nothing visibly pokes out
+   * during the morph. */
+  position: relative;
 }
 
 .command-bar-divider {

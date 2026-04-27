@@ -248,12 +248,22 @@ export function AutomatonCanvas({
 
   // Effective content size + origin for the viewport hook. The bbox's
   // local-space origin (b.x, b.y) is shifted by the inner translate
-  // (-START_ARROW_RESERVE, 0) before becoming the visual origin in the
-  // outer-g coordinate space.
+  // (-START_ARROW_RESERVE, 0) before becoming the visual origin in
+  // the outer-g coordinate space.
+  //
+  // We pass `null` until the layout effect has measured the actual
+  // state-cluster bbox. Earlier we used GraphViz's
+  // `automatonUI.boundingBox` as a fallback; that ran the initial-
+  // center effect with WRONG sizes (GraphViz's bbox doesn't match
+  // the state-cluster bbox) and locked in a slightly-off pan that
+  // the later measurement couldn't correct (`didInitialCenterRef`
+  // had already flipped). Waiting for the real measurement adds at
+  // most one render's delay before the FA appears at scale 1, but
+  // makes centering exact instead of approximate.
   const measured = contentBBox;
   const effectiveContent = measured
     ? { width: measured.width, height: measured.height }
-    : { width: automatonUI.boundingBox.width + START_ARROW_RESERVE, height: automatonUI.boundingBox.height };
+    : null;
   const effectiveOrigin = measured
     ? { x: measured.x - START_ARROW_RESERVE, y: measured.y }
     : { x: -START_ARROW_RESERVE, y: 0 };
@@ -269,6 +279,7 @@ export function AutomatonCanvas({
     atMaxScale,
     atMinScale,
     isAnimating,
+    fitScale,
   } = useCanvasViewport({
     contentBoundingBox: effectiveContent,
     viewportSize,
@@ -583,6 +594,7 @@ export function AutomatonCanvas({
         zoomOut={zoomOut}
         fitToContent={fitToContent}
         scale={viewport.scale}
+        fitScale={fitScale}
         atMaxScale={atMaxScale}
         atMinScale={atMinScale}
       />

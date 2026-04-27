@@ -123,6 +123,15 @@ export type UseCanvasViewportResult = {
    * this — they're already smooth from the user's input cadence.
    */
   isAnimating: boolean;
+  /**
+   * The scale at which fitToContent would land — i.e. "the FA fills
+   * the visible region with FIT_PADDING breathing room." Consumers
+   * use this to display zoom RELATIVE to fit (so 100% = fit, 200% =
+   * twice that, etc.) rather than relative to GraphViz's arbitrary
+   * raw pixel size. Recomputed each render from the latest content +
+   * viewport + inset; null when sizes aren't yet measurable.
+   */
+  fitScale: number | null;
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -272,9 +281,11 @@ export function useCanvasViewport(
     };
   }
 
-  // First time both sizes are measurable, center the content in the
-  // VISIBLE region at the default scale. Runs at most once — after the
-  // first center, the user owns the viewport state.
+  // First time both sizes are measurable, FIT the content into the
+  // visible region. Runs at most once — after this initial fit the
+  // user owns the viewport state. This makes the app launch at "100%"
+  // (= fit-scale, per the redefined zoom semantics) regardless of the
+  // FA's natural pixel size.
   useEffect(() => {
     if (didInitialCenterRef.current) return;
     if (contentBoundingBox === null || viewportSize === null) return;
@@ -287,8 +298,17 @@ export function useCanvasViewport(
       return;
     }
     didInitialCenterRef.current = true;
-    const { panX, panY } = centerInVisibleRegion(contentBoundingBox, viewportSize, inset, origin, 1);
-    setViewport({ scale: 1, panX, panY });
+    const visibleW = Math.max(viewportSize.width - inset.left - inset.right, 1);
+    const visibleH = Math.max(viewportSize.height - inset.top - inset.bottom, 1);
+    const availableW = Math.max(visibleW - FIT_PADDING * 2, 1);
+    const availableH = Math.max(visibleH - FIT_PADDING * 2, 1);
+    const initialScale = clamp(
+      Math.min(availableW / contentBoundingBox.width, availableH / contentBoundingBox.height),
+      MIN_SCALE,
+      MAX_SCALE
+    );
+    const { panX, panY } = centerInVisibleRegion(contentBoundingBox, viewportSize, inset, origin, initialScale);
+    setViewport({ scale: initialScale, panX, panY });
     prevInsetRef.current = inset;
   // Initial-center should only depend on FIRST availability of sizes.
   // Inset changes after initial-center are handled by the inset-shift
@@ -574,6 +594,27 @@ export function useCanvasViewport(
   // never apply.
   const transform = `translate(${viewport.panX}px, ${viewport.panY}px) scale(${viewport.scale})`;
 
+  // The scale at which fitToContent would land. Computed inline so it
+  // tracks live changes to content size + viewport size + inset.
+  // Returns null when sizes aren't yet measurable; consumers display
+  // the raw scale or skip the percentage in that case.
+  let fitScale: number | null = null;
+  if (
+    contentBoundingBox && viewportSize &&
+    contentBoundingBox.width > 0 && contentBoundingBox.height > 0 &&
+    viewportSize.width > 0 && viewportSize.height > 0
+  ) {
+    const visibleW = Math.max(viewportSize.width - inset.left - inset.right, 1);
+    const visibleH = Math.max(viewportSize.height - inset.top - inset.bottom, 1);
+    const availableW = Math.max(visibleW - FIT_PADDING * 2, 1);
+    const availableH = Math.max(visibleH - FIT_PADDING * 2, 1);
+    fitScale = clamp(
+      Math.min(availableW / contentBoundingBox.width, availableH / contentBoundingBox.height),
+      MIN_SCALE,
+      MAX_SCALE
+    );
+  }
+
   return {
     viewport,
     transform,
@@ -586,6 +627,7 @@ export function useCanvasViewport(
     atMaxScale: viewport.scale >= MAX_SCALE,
     atMinScale: viewport.scale <= MIN_SCALE,
     isAnimating,
+    fitScale,
   };
 }
 

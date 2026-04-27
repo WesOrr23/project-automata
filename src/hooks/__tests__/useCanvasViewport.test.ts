@@ -40,15 +40,18 @@ function setupHook(args?: {
 }
 
 describe('useCanvasViewport', () => {
-  it('with both sizes available from render 0, auto-centers content (1:1 starting state)', () => {
-    // contentBox 800x600 in viewport 1000x800 → centered at (100, 100).
+  it('with both sizes available from render 0, auto-FITS content (so 100% display = fit)', () => {
+    // contentBox 800x600 in viewport 1000x800.
+    // visible (no inset) = 1000x800; available (FIT_PADDING 40 each side)
+    //   = 920x720. fitScale = min(920/800, 720/600) = min(1.15, 1.2) = 1.15.
+    // Centered: panX = (1000 - 800*1.15)/2 = 40; panY = (800 - 600*1.15)/2 = 55.
     const { result } = setupHook({
       contentBoundingBox: STANDARD_BOX,
       viewportSize: STANDARD_VIEWPORT,
     });
-    expect(result.current.viewport.scale).toBe(1);
-    expect(result.current.viewport.panX).toBe(100);
-    expect(result.current.viewport.panY).toBe(100);
+    expect(result.current.viewport.scale).toBeCloseTo(1.15, 4);
+    expect(result.current.viewport.panX).toBeCloseTo(40, 4);
+    expect(result.current.viewport.panY).toBeCloseTo(55, 4);
   });
 
   it('starts at scale=1 / pan=0,0 when sizes are unknown', () => {
