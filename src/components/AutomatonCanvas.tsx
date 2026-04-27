@@ -397,9 +397,15 @@ export function AutomatonCanvas({
           `canvas-content-animating` class adds a 0.3s transition; it's
           only applied during button-driven actions so wheel/pinch/drag
           stay snappy. */}
+      {/* SVG attribute `transform` (NOT CSS style.transform) for
+          cross-browser parity. Safari has long-standing bugs around
+          CSS transforms on SVG elements (WebKit #183237 and related);
+          the SVG attribute is unambiguously interpreted. CSS
+          `transition: transform` on the canvas-content-animating
+          class still eases SVG-attribute changes in modern browsers. */}
       <g
-        style={{ transform, transformOrigin: '0 0' }}
-        className={`canvas-content-transform${isAnimating ? ' canvas-content-animating' : ''}`}
+        transform={transform}
+        className={isAnimating ? 'canvas-content-animating' : undefined}
       >
         <g transform={`translate(${-START_ARROW_RESERVE} 0)`}>
       {/* Layer 1: Transition edges (background) */}

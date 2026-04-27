@@ -623,13 +623,17 @@ export function useCanvasViewport(
     []
   );
 
-  // CSS transform syntax: requires units + commas (vs SVG attribute
-  // syntax which uses bare numbers + spaces). The consumer applies
-  // this via style.transform on a `<g>` element so that CSS
-  // transitions can animate it; bare-number SVG syntax would be
-  // silently rejected by the CSS engine and the transform would
-  // never apply.
-  const transform = `translate(${viewport.panX}px, ${viewport.panY}px) scale(${viewport.scale})`;
+  // SVG-attribute transform syntax (bare numbers, spaces). We use the
+  // `transform` ATTRIBUTE on the <g>, NOT CSS `style.transform`. CSS
+  // transforms on SVG elements have long-standing Safari bugs around
+  // nested transforms and getBoundingClientRect (WebKit #183237 et
+  // al.) — even with `transform-box: view-box` set explicitly, Safari
+  // disagrees with Chromium by tens of pixels for non-trivial pan +
+  // scale combos. SVG-attribute transforms are unambiguously
+  // interpreted across all browsers. CSS `transition: transform` on
+  // the same element still animates SVG-attribute changes in modern
+  // browsers (treated as the same CSS property).
+  const transform = `translate(${viewport.panX} ${viewport.panY}) scale(${viewport.scale})`;
 
   // The scale at which fitToContent would land. Computed inline so it
   // tracks live changes to content size + viewport size + inset.
