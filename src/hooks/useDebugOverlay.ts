@@ -12,7 +12,7 @@
  * is no help when they're already where they should be).
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNotifications } from '../notifications/useNotifications';
 
 const STORAGE_KEY = 'automata-debug-overlay';
@@ -45,16 +45,26 @@ export function useDebugOverlay(): UseDebugOverlayResult {
   const { notify } = useNotifications();
   const [enabled, setEnabled] = useState<boolean>(readEnabled);
 
+  // Latest-value ref so toggle() reads the current enabled state
+  // without having to list `enabled` as a dependency (which would
+  // re-bind the global keydown listener every flip).
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+
   const toggle = useCallback(() => {
-    setEnabled((current) => {
-      const next = !current;
-      writeEnabled(next);
-      notify({
-        severity: 'info',
-        title: `Centering overlay ${next ? 'enabled' : 'disabled'}`,
-        autoDismissMs: 2200,
-      });
-      return next;
+    // Side effects (writeEnabled + notify) live OUTSIDE the setState
+    // updater. React 18 StrictMode double-invokes updater functions
+    // in dev, which would fire two notifications + two localStorage
+    // writes per keypress — visible to the user as duplicate toasts.
+    // Computing `next` from a ref and calling setState with the
+    // resolved value runs each side effect exactly once.
+    const next = !enabledRef.current;
+    setEnabled(next);
+    writeEnabled(next);
+    notify({
+      severity: 'info',
+      title: `Centering overlay ${next ? 'enabled' : 'disabled'}`,
+      autoDismissMs: 2200,
     });
   }, [notify]);
 
