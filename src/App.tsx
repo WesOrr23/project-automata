@@ -51,6 +51,7 @@ import { CommandBar } from './components/CommandBar';
 import { ComparePicker } from './components/ComparePicker';
 import { Onboarding } from './components/Onboarding';
 import { useOnboarding } from './hooks/useOnboarding';
+import { useDebugOverlay } from './hooks/useDebugOverlay';
 import { createAutomaton as createBlankAutomaton } from './engine/automaton';
 import { Shuffle, Contrast, Shrink, GitCompare } from 'lucide-react';
 
@@ -782,6 +783,7 @@ function App() {
   // (localStorage flag); the "Show tour" item in the CommandBar ⋯
   // overflow re-opens it on demand.
   const onboarding = useOnboarding();
+  const debugOverlay = useDebugOverlay();
 
   const fileSession = useFileSession(
     {
@@ -1003,6 +1005,7 @@ function App() {
               bottom: 16 + 48 + 8,
             }}
             onShowTour={onboarding.show}
+            debugOverlay={debugOverlay.enabled}
             bottomRightExtras={
               /* Discoverability hint while in EDIT mode and the form is
                  at rest. Sits at the bottom of the canvas-bottom-right

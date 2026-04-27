@@ -109,6 +109,13 @@ type AutomatonCanvasProp = {
   onShowTour?: () => void;
 
   /**
+   * When true, render the centering-debug visualization (red dot at
+   * the visible region's center, blue ring at the FA cluster's
+   * centroid). Off by default; toggled via ⌘⇧D — see useDebugOverlay.
+   */
+  debugOverlay?: boolean;
+
+  /**
    * Pixels of overlay chrome (tool menu, command bar) covering the SVG.
    * Centering operations target the un-occluded region rather than the
    * geometric center, so "centered" reads as "centered in what the
@@ -171,6 +178,7 @@ export function AutomatonCanvas({
   creationStateKind,
   bottomRightExtras,
   onShowTour,
+  debugOverlay = false,
   viewportInset,
 }: AutomatonCanvasProp) {
   // The start-state arrow extends LEFT of the start-state circle, which
@@ -568,10 +576,11 @@ export function AutomatonCanvas({
           />
         );
       })()}
-          {/* DEBUG: blue ring at the FA's center (state-cluster
-              centroid in inner-g local coords). Lives inside the
-              transformed content so it pans/scales with the FA. */}
-          {contentBBox && (
+          {/* DEBUG (gated by debugOverlay): blue ring at the FA's
+              center (state-cluster centroid in inner-g local coords).
+              Lives inside the transformed content so it pans/scales
+              with the FA. Toggleable via ⌘⇧D. */}
+          {debugOverlay && contentBBox && (
             <circle
               cx={contentBBox.x + contentBBox.width / 2}
               cy={contentBBox.y + contentBBox.height / 2}
@@ -584,10 +593,11 @@ export function AutomatonCanvas({
           )}
         </g>
       </g>
-      {/* DEBUG: red filled dot at the visible region's center
-          (raw SVG coords, pinned to screen regardless of pan/zoom).
-          When perfectly centered, sits inside the blue ring above. */}
-      {viewportSize && (
+      {/* DEBUG (gated by debugOverlay): red filled dot at the visible
+          region's center (raw SVG coords, pinned to screen regardless
+          of pan/zoom). When perfectly centered, sits inside the blue
+          ring above. Toggleable via ⌘⇧D. */}
+      {debugOverlay && viewportSize && (
         <circle
           cx={(viewportInset?.left ?? 0) + (viewportSize.width - (viewportInset?.left ?? 0) - (viewportInset?.right ?? 0)) / 2}
           cy={(viewportInset?.top ?? 0) + (viewportSize.height - (viewportInset?.top ?? 0) - (viewportInset?.bottom ?? 0)) / 2}

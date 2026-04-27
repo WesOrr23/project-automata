@@ -13,6 +13,7 @@ Everything you need to pick up where iterations 9 + 10 left off, written for who
 - **Iteration plans + close-outs**: see `ITERATION{8,9,10}_PLAN.md` / `_COMPLETE.md`
 - **NFA mode is live** (iter 8): ε-transitions (configurable reserved char), multi-state simulation with ε-closure, edge consolidation in both DFA and NFA modes, branch-death pulse
 - **Undo/Redo is live** (iter 9): snapshot stack capped at 50, two floating circular buttons at top-center, `⌘/Ctrl+Z` and `⌘/Ctrl+Shift+Z` shortcuts (suppressed in text fields), Clear canvas wipes both stacks
+- **Centering debug overlay**: `⌘⇧D` (or `Ctrl⇧D`) toggles a red dot at the visible-region center + a blue ring at the FA cluster centroid. Off by default, persisted in `localStorage` under `automata-debug-overlay`. Use to diagnose any future regression in the visible-region centering math (`useCanvasViewport.centerInVisibleRegion`).
 - **Aliveness pass shipped** (iter 10): eased tab-card swap in the tool menu, idle breathing on the start arrow and accept rings, single motion vocabulary (220ms hover / 80ms press / 280ms toast spring) across buttons, tool-menu items, alphabet badges, editor row actions, and notification toasts. Engine / tests untouched.
 
 ---

@@ -12,7 +12,7 @@
  *       controls — no longer in this menu.)
  *
  *   EDIT segment (visible only when appMode === 'EDITING')
- *     ▸ [↶ Undo]  [↷ Redo]  [🪄 Operations]
+ *     ▸ [↶ Undo]  [↷ Redo]  [🔧 Operations]
  *
  *   SIMULATE segment (reserved; nothing renders yet)
  *
@@ -41,7 +41,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { AnimatePresence, motion } from 'motion/react';
 import {
   FilePlus, FolderOpen, Save, Undo2, Redo2, X,
-  History, Wand2,
+  History, Wrench,
 } from 'lucide-react';
 import type { RecentEntry } from '../files/recentsStore';
 
@@ -446,7 +446,7 @@ export function CommandBar({
               aria-expanded={activePopover === 'operations'}
               title="Operations (convert, minimize, complement…)"
             >
-              <Wand2 size={16} />
+              <Wrench size={16} />
             </button>
 
             {activePopover === 'operations' && (
