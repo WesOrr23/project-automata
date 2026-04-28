@@ -335,7 +335,11 @@
 }
 
 .batch-test-count-error {
-  color: var(--error-text, #b91c1c);
+  /* Amber, not red — errors here mean "this input has symbols outside
+   * the alphabet," which is a warning condition, not a rejection. Red
+   * is reserved for actual reject results so the two outcomes don't
+   * blur together. */
+  color: #b45309;
   font-weight: var(--weight-bold);
 }
 
@@ -413,7 +417,8 @@
 }
 
 .batch-test-marker-error {
-  color: var(--error-text, #b91c1c);
+  /* See note on batch-test-count-error — amber, not red. */
+  color: #b45309;
 }
 
 /* Per-row "load this input into the simulator" affordance. Same
@@ -445,8 +450,19 @@
   border-color: var(--border-subtle);
 }
 
-.batch-test-row-load:active {
+.batch-test-row-load:active:not(:disabled) {
   transform: scale(0.95);
+}
+
+.batch-test-row-load:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.batch-test-row-load:disabled:hover {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: transparent;
 }
 
 /* The "Test batch" trigger lives at the bottom-right of the input

@@ -284,12 +284,20 @@ export function BatchTestModal({ open, onClose, automaton, onLoadInput }: BatchT
                               field, close the modal, focus Play.
                               Same row-action vocabulary as the trash
                               icon in the State editor — small ghost
-                              button on hover. */}
+                              button on hover. Disabled on error rows
+                              because the single-input field would
+                              filter out the invalid characters before
+                              the user could even see what was loaded. */}
                           <button
                             type="button"
                             className="batch-test-row-load"
                             onClick={() => onLoadInput(row.input)}
-                            title="Load this input into the simulator"
+                            disabled={row.status === 'error'}
+                            title={
+                              row.status === 'error'
+                                ? 'Cannot load — this input has symbols outside the alphabet'
+                                : 'Load this input into the simulator'
+                            }
                             aria-label={`Load "${row.input || '(empty)'}" into the simulator`}
                           >
                             <ArrowRightFromLine size={14} />
