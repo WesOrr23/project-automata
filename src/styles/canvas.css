@@ -111,6 +111,24 @@
   cursor: pointer;
 }
 
+/* Hide the browser's default focus square on state nodes. The blue
+ * pulsing ring (in pick mode) and the hover ring (in select mode)
+ * already serve as the focus signal for mouse users; the square
+ * looked like an accessibility artifact in the iter-17 user test
+ * ("the square seems like an accessibility artifact"). Keyboard
+ * users still get the square via :focus-visible — modern browsers
+ * fire :focus on click but only :focus-visible on tab. */
+.state-node-pickable:focus,
+.state-node-selectable:focus {
+  outline: none;
+}
+.state-node-pickable:focus-visible,
+.state-node-selectable:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 4px;
+  border-radius: 999px;
+}
+
 /* Transition edges in EDIT mode get the same defensive treatment —
  * the .transition-edge-clickable hover changes stroke-width and can
  * trigger the same cursor-recalc on some browsers. */

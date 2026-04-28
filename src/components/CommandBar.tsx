@@ -64,6 +64,9 @@ import type { RecentEntry } from '../files/recentsStore';
 const isMac =
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
 const modGlyph = isMac ? '\u2318' : 'Ctrl';
+// Option (\u2325) on Mac, Alt elsewhere. Used by \u2318\u2325N \u2014 see useFileShortcuts
+// for why bare \u2318N can't be ours.
+const altGlyph = isMac ? '\u2325' : 'Alt';
 const shiftGlyph = isMac ? '\u21e7' : 'Shift+';
 
 // Mirrors the active stage of the tool menu, plus VIEWING for "menu
@@ -367,11 +370,11 @@ export function CommandBar({
                 setActivePopover(null);
                 onNew();
               }}
-              title={`New (${modGlyph}N)`}
+              title={`New (${modGlyph}${altGlyph}N)`}
             >
               <FilePlus size={16} strokeWidth={2} />
               <span className="command-bar-popover-item-label-inline">New</span>
-              <span className="command-bar-popover-item-shortcut">{modGlyph}N</span>
+              <span className="command-bar-popover-item-shortcut">{modGlyph}{altGlyph}N</span>
             </button>
             <button
               type="button"

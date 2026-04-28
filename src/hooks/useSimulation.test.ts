@@ -26,6 +26,7 @@ import {
   SimulationState,
   SIMULATION_HISTORY_CAP,
 } from './useSimulation';
+import { SIMULATION_SPEED_MIN, SIMULATION_SPEED_MAX } from '../ui-state/constants';
 
 // Helper: Create a simple DFA that accepts strings ending in "01"
 // Same as the one in simulator.test.ts for consistency
@@ -459,42 +460,47 @@ describe('simulationReducer', () => {
     });
 
     it('preserves speed setting', () => {
+      // Pick a speed inside the current range so it's not clamped.
+      const inRange = SIMULATION_SPEED_MIN;
       let state = simulationReducer(initialState, {
         type: 'setSpeed',
-        speed: 200,
+        speed: inRange,
       });
 
       state = simulationReducer(state, { type: 'reset' });
-      expect(state.speed).toBe(200);
+      expect(state.speed).toBe(inRange);
     });
   });
 
   describe('setSpeed', () => {
     it('updates speed', () => {
+      // Midpoint of the range — guaranteed unclamped regardless of
+      // the current SIMULATION_SPEED_MIN/MAX values.
+      const midpoint = Math.round((SIMULATION_SPEED_MIN + SIMULATION_SPEED_MAX) / 2);
       const state = simulationReducer(initialState, {
         type: 'setSpeed',
-        speed: 300,
+        speed: midpoint,
       });
 
-      expect(state.speed).toBe(300);
+      expect(state.speed).toBe(midpoint);
     });
 
     it('clamps speed to minimum', () => {
       const state = simulationReducer(initialState, {
         type: 'setSpeed',
-        speed: 10,
+        speed: 10, // far below MIN
       });
 
-      expect(state.speed).toBe(200);
+      expect(state.speed).toBe(SIMULATION_SPEED_MIN);
     });
 
     it('clamps speed to maximum', () => {
       const state = simulationReducer(initialState, {
         type: 'setSpeed',
-        speed: 5000,
+        speed: 100_000, // far above MAX
       });
 
-      expect(state.speed).toBe(3000);
+      expect(state.speed).toBe(SIMULATION_SPEED_MAX);
     });
   });
 

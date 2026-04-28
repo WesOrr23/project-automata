@@ -1,14 +1,19 @@
 /**
  * useFileShortcuts — keyboard bindings for file operations.
  *
- *   ⌘S / Ctrl+S        → save
- *   ⌘⇧S / Ctrl+Shift+S → saveAs
- *   ⌘O / Ctrl+O        → open
- *   ⌘N / Ctrl+N        → new
+ *   ⌘S / Ctrl+S         → save
+ *   ⌘⇧S / Ctrl+Shift+S  → saveAs
+ *   ⌘O / Ctrl+O         → open
+ *   ⌘⌥N / Ctrl+Alt+N    → new
+ *
+ * Note on New: Chrome / Safari / Firefox all reserve ⌘N (Ctrl+N) for
+ * "open a new browser window" and the spec doesn't let pages
+ * preventDefault it. We use ⌘⌥N (Cmd+Option+N on Mac, Ctrl+Alt+N on
+ * Windows/Linux) — same convention Adobe / Figma use for "new from
+ * blank" so it's not entirely unfamiliar.
  *
  * Scoped via useKeyboardScope so it cooperates with other handlers
- * (popovers etc.) on the stack. Gated on `enabled` — same pattern as
- * useUndoRedoShortcuts; the file ops only matter in EDIT mode.
+ * (popovers etc.) on the stack.
  */
 
 import { useKeyboardScope } from './useKeyboardScope';
@@ -60,7 +65,8 @@ export function useFileShortcuts({
         onOpen();
         return true;
       }
-      if (key === 'n') {
+      // ⌘⌥N (alt-modified) for new — bare ⌘N is browser-reserved.
+      if (key === 'n' && event.altKey) {
         event.preventDefault();
         onNew();
         return true;

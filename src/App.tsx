@@ -126,7 +126,6 @@ function App() {
     redo,
     canUndo,
     canRedo,
-    clearHistory,
     replaceSnapshot,
     markSaved,
     isDirty,
@@ -231,6 +230,16 @@ function App() {
   } | null>(null);
 
   function handleCanvasStateClick(stateId: number, anchorEl: SVGGElement) {
+    // If we're in Define (or any non-Edit stage), clicking a state on
+    // the canvas means "I want to act on this state" — which is a
+    // Construct concept. Auto-jump into Construct and open the
+    // actions popover so the click reads as one continuous gesture.
+    // User-test feedback: "In my head, when I click on one of these,
+    // it would take me a... [to Construct]. Maybe it's always
+    // clickable and then it just moves you into the construct phase."
+    if (!(menuState.mode === 'OPEN' && menuState.activeTab === 'EDIT')) {
+      setMenuState({ mode: 'OPEN', activeTab: 'EDIT' });
+    }
     setStateActions({ stateId, anchorRect: anchorEl.getBoundingClientRect() });
   }
 
@@ -344,11 +353,15 @@ function App() {
     onStepBack: sim.stepBack,
   });
 
-  // Always-on shortcuts: F fits the canvas, ? opens the tour. Both
-  // scoped via useKeyboardScope so they don't fire while typing.
+  // Always-on shortcuts: F fits the canvas, ? opens the tour, Esc
+  // collapses the tool menu when it's open on a tab. All scoped via
+  // useKeyboardScope so typing in inputs doesn't trigger them and
+  // capture-true scopes (modals, popovers) preempt them.
   useGlobalShortcuts({
     onFit: () => setFitSignal((n) => n + 1),
     onShowTour: onboarding.show,
+    menuIsOpen: menuState.mode === 'OPEN',
+    onCollapseMenu: () => setMenuState({ mode: 'COLLAPSED' }),
   });
 
   // Display labels are sequential (q0, q1, q2) regardless of underlying IDs.
@@ -479,46 +492,6 @@ function App() {
 
   // "Clear canvas" — reset to a minimal automaton: one state, no
   // transitions, alphabet inherited from the current automaton (so the
-  // user doesn't have to retype 0/1 or whatever they were working with).
-  // Type also persists since it's a separate setting.
-  function handleClearCanvas() {
-    setAutomaton((prev) => ({
-      ...createAutomaton(prev.type, prev.alphabet.size > 0 ? prev.alphabet : new Set(['0'])),
-    }));
-    creationDispatch({ type: 'reset' });
-    sim.reset();
-    // Wholesale nuke: the clear itself isn't undoable. `setAutomaton` above
-    // would have pushed the pre-clear snapshot onto undo; `clearHistory()`
-    // drops it so the cleared state becomes the new origin.
-    clearHistory();
-  }
-
-  function handleExportJSON() {
-    const serializable = {
-      type: automaton.type,
-      states: Array.from(automaton.states).sort((a, b) => a - b),
-      alphabet: Array.from(automaton.alphabet).sort(),
-      transitions: automaton.transitions.map((t) => ({
-        from: t.from,
-        to: Array.from(t.to).sort((a, b) => a - b),
-        symbol: t.symbol,
-      })),
-      startState: automaton.startState,
-      acceptStates: Array.from(automaton.acceptStates).sort((a, b) => a - b),
-      nextStateId: automaton.nextStateId,
-    };
-    const json = JSON.stringify(serializable, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = 'automaton.json';
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    URL.revokeObjectURL(url);
-  }
-
   /** Build a filename stem from the current file name (or "automaton"
    *  when untitled), stripped of any extension and unsafe characters. */
   function exportFilenameStem(): string {
@@ -796,7 +769,21 @@ function App() {
   }
 
   function handleComplement() {
-    const result = complementDfa(automaton);
+    // NFA path: convert to DFA first, then complement. The user sees
+    // a single "Complemented" toast with a hint that conversion ran
+    // — they don't have to manually run Convert before Complement.
+    let dfa = automaton;
+    let convertedFromNfa = false;
+    if (automaton.type === 'NFA') {
+      const conv = convertNfaToDfa(automaton);
+      if (!conv.ok) {
+        notify({ severity: 'error', title: 'Complement failed', detail: errorMessage(conv.error) });
+        return;
+      }
+      dfa = conv.value.dfa;
+      convertedFromNfa = true;
+    }
+    const result = complementDfa(dfa);
     if (!result.ok) {
       notify({ severity: 'error', title: 'Complement failed', detail: errorMessage(result.error) });
       return;
@@ -805,7 +792,9 @@ function App() {
     notify({
       severity: 'success',
       title: 'Complemented DFA',
-      detail: 'Accept and non-accept states swapped.',
+      detail: convertedFromNfa
+        ? 'Converted NFA → DFA first, then swapped accept and non-accept states.'
+        : 'Accept and non-accept states swapped.',
       autoDismissMs: 3_000,
     });
   }
@@ -819,7 +808,30 @@ function App() {
   }
   function runEquivalence(other: Automaton, otherName: string) {
     setComparePickerOpen(false);
-    const result = areEquivalent(automaton, other);
+    // Equivalence requires complete DFAs on both sides. Auto-convert
+    // either if it's an NFA so the user doesn't have to manually run
+    // Convert before Compare. (The user-test feedback was: "really,
+    // comparison should be allowed for NFAs too.") Conversion errors
+    // surface the same way as native equivalence errors.
+    let leftDfa = automaton;
+    let rightDfa = other;
+    if (automaton.type === 'NFA') {
+      const conv = convertNfaToDfa(automaton);
+      if (!conv.ok) {
+        notify({ severity: 'error', title: 'Equivalence check failed', detail: errorMessage(conv.error) });
+        return;
+      }
+      leftDfa = conv.value.dfa;
+    }
+    if (other.type === 'NFA') {
+      const conv = convertNfaToDfa(other);
+      if (!conv.ok) {
+        notify({ severity: 'error', title: 'Equivalence check failed', detail: errorMessage(conv.error) });
+        return;
+      }
+      rightDfa = conv.value.dfa;
+    }
+    const result = areEquivalent(leftDfa, rightDfa);
     if (!result.ok) {
       notify({ severity: 'error', title: 'Equivalence check failed', detail: errorMessage(result.error) });
       return;
@@ -845,9 +857,24 @@ function App() {
     }
   }
 
+  // Operation gating split into two policies after the iter-17 user
+  // test:
+  //   - Complement and Compare auto-convert NFA → DFA inside their
+  //     handlers, so they're enabled for NFAs too. Only gated on
+  //     completeness — DFAs still need every (state, symbol) defined.
+  //   - Minimize is DFA-only by design (Hopcroft expects a complete
+  //     DFA; converting first would inflate the input pointlessly).
   const isCurrentDfaComplete = automaton.type === 'DFA' && isComplete(automaton);
+  const isComplementableOrComparable =
+    automaton.type === 'NFA' || isCurrentDfaComplete;
   const requiresCompleteDfaTitle =
     automaton.type !== 'DFA' ? 'Requires a DFA' : 'Requires a complete DFA';
+  // Always a string (the false branch never reaches the consumer
+  // since the gating prop short-circuits earlier — but keeping the
+  // type narrow avoids the exactOptionalPropertyTypes complaint at
+  // the spread-conditional below).
+  const requiresCompletableTitle =
+    'Requires a complete DFA (every (state, symbol) defined)';
   const operationsCategories = [
     {
       id: 'conversions',
@@ -865,8 +892,12 @@ function App() {
           id: 'complement',
           label: 'Complement',
           icon: <Contrast size={16} strokeWidth={2} />,
-          enabled: isCurrentDfaComplete,
-          ...(isCurrentDfaComplete ? {} : { title: requiresCompleteDfaTitle }),
+          enabled: isComplementableOrComparable,
+          ...(isComplementableOrComparable
+            ? automaton.type === 'NFA'
+              ? { title: 'Will convert NFA → DFA, then complement' }
+              : {}
+            : { title: requiresCompletableTitle }),
           onClick: handleComplement,
         },
       ],
@@ -887,8 +918,12 @@ function App() {
           id: 'compare-against',
           label: 'Compare against…',
           icon: <GitCompare size={16} strokeWidth={2} />,
-          enabled: isCurrentDfaComplete,
-          ...(isCurrentDfaComplete ? {} : { title: requiresCompleteDfaTitle }),
+          enabled: isComplementableOrComparable,
+          ...(isComplementableOrComparable
+            ? automaton.type === 'NFA'
+              ? { title: 'Will convert NFA → DFA, then compare' }
+              : {}
+            : { title: requiresCompletableTitle }),
           onClick: handleCompareAgainst,
         },
       ],
@@ -939,8 +974,6 @@ function App() {
       alphabetFocusSignal={alphabetFocusSignal}
       description={description}
       onDescriptionChange={setDescription}
-      onClearCanvas={handleClearCanvas}
-      onExportJSON={handleExportJSON}
     />
   );
 
@@ -1111,7 +1144,10 @@ function App() {
             pickMode={canvasPickMode}
             onPickState={handleCanvasPickState}
             onStateClick={
-              appMode === 'EDITING' && canvasPickMode === null
+              // Wire in DEFINING + EDITING. In DEFINING the click
+              // jumps to Construct (see handler). VIEWING + SIMULATING
+              // are observation modes — no state actions.
+              (appMode === 'EDITING' || appMode === 'DEFINING') && canvasPickMode === null
                 ? handleCanvasStateClick
                 : undefined
             }

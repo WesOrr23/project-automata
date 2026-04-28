@@ -876,9 +876,13 @@
   fill: var(--text-secondary);
 }
 
+/* Mini-arrow vocabulary should match the canvas TransitionEdge so
+ * the user reads "transition" the same way in both places. Canvas
+ * edges are stroke-width 2; bumped from 1.5 to 2 here for parity. */
 .mini-transition-arrow {
   stroke: var(--text-body);
-  stroke-width: 1.5;
+  stroke-width: 2;
+  stroke-linecap: round;
 }
 
 .mini-transition-arrowhead {

@@ -112,11 +112,27 @@ describe('TransitionCreator', () => {
     expect(dispatch).toHaveBeenCalledWith({ type: 'reset' });
   });
 
-  it('Escape resets the form via dispatch (useKeyboardScope)', () => {
+  it('Escape resets the form via dispatch (useKeyboardScope) when the form is non-empty', () => {
+    const dispatch = vi.fn();
+    // Form must be non-empty for the Esc scope to be active —
+    // pass a state with a picked source so it has something to clear.
+    // (Empty form pass-through is by design — Esc with nothing to
+    // clear should bubble down to the global menu-collapse handler.)
+    const stateWithSource: CreationState = {
+      ...INITIAL_CREATION_STATE,
+      source: 0,
+      phase: 'picking-destination',
+    };
+    render(<TransitionCreator {...makeProps({ dispatch, creationState: stateWithSource })} />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(dispatch).toHaveBeenCalledWith({ type: 'reset' });
+  });
+
+  it('Escape with an empty form does NOT consume the key (passes through to global handlers)', () => {
     const dispatch = vi.fn();
     render(<TransitionCreator {...makeProps({ dispatch })} />);
     fireEvent.keyDown(document, { key: 'Escape' });
-    expect(dispatch).toHaveBeenCalledWith({ type: 'reset' });
+    expect(dispatch).not.toHaveBeenCalled();
   });
 
   it('shows "Delete" as the action button when an existing transition is loaded unchanged', () => {

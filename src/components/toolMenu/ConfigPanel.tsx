@@ -3,14 +3,18 @@
  *
  * Stage-1 surface in the workflow ladder. Holds the FA's *declarative*
  * fields — the parts of the formal definition that aren't constructed
- * interactively in Edit:
+ * interactively in Construct:
  *   - Automaton type (DFA / NFA)
  *   - Reserved ε-symbol (NFA mode only)
  *   - Alphabet (Σ) — full editor lives here as the source of truth.
- *     The Edit tab shows a read-only strip with a "+" jump-to button.
+ *     The Construct tab shows a read-only strip with an "Edit" jump-to
+ *     button.
  *   - Free-form description / notes
- *   - Clear canvas (escape hatch)
- *   - Export to JSON
+ *
+ * "Clear canvas" and "Export JSON" lived here in iter-7-ish before the
+ * file-system + image-export features shipped. Both are removed:
+ * "New" in the File menu does the clear job, and image export lives
+ * in the Simulate-stage Export pill.
  */
 
 import { useEffect, useState } from 'react';
@@ -35,9 +39,6 @@ type ConfigPanelProp = {
   /** Free-form description / notes. Persisted in the save file's metadata. */
   description: string;
   onDescriptionChange: (next: string) => void;
-  /** Reset the automaton to a single state with the current alphabet preserved. */
-  onClearCanvas: () => void;
-  onExportJSON?: () => void;
 };
 
 export function ConfigPanel({
@@ -52,8 +53,6 @@ export function ConfigPanel({
   alphabetFocusSignal,
   description,
   onDescriptionChange,
-  onClearCanvas,
-  onExportJSON,
 }: ConfigPanelProp) {
   // Local draft so the user can clear the field while typing without
   // immediately tripping validation. The committed value still lives in
@@ -179,21 +178,6 @@ export function ConfigPanel({
         </p>
       </div>
 
-      <div className="divider" />
-      <button
-        className="btn btn-danger"
-        onClick={onClearCanvas}
-        style={{ width: '100%' }}
-        title="Reset the canvas: one state, no transitions. Alphabet and type are kept."
-      >
-        Clear canvas
-      </button>
-
-      {onExportJSON && (
-        <button className="btn" onClick={onExportJSON} style={{ width: '100%' }}>
-          Export JSON
-        </button>
-      )}
     </>
   );
 }

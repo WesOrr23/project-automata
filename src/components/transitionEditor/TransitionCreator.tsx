@@ -135,9 +135,22 @@ export function TransitionCreator({
   // reliable way to back out of any state, including "I just clicked an
   // edge but actually didn't want to do anything." The reset is cheap;
   // only the picker popover actually loses anything from the early-out.
+  //
+  // Pass-through when the form is ALREADY at its initial empty state
+  // (no source, no destination, no symbol, not editing) so Esc can
+  // bubble down to the global Esc-collapses-menu handler. Otherwise
+  // pressing Esc with nothing to clear silently swallows the key and
+  // the menu stays open — which the user-test caught as "I keep
+  // pressing escape, nothing happens."
+  const formIsEmpty =
+    state.source === null &&
+    state.destination === null &&
+    state.symbol === '' &&
+    state.editingExisting === null &&
+    pickerSlot === null;
   useKeyboardScope({
     id: 'transition-creator-escape',
-    active: true,
+    active: !formIsEmpty,
     capture: false,
     onKey: (event) => {
       if (event.key !== 'Escape') return false;
@@ -148,19 +161,29 @@ export function TransitionCreator({
     },
   });
 
-  // Auto-focus the symbol input when both source + destination are filled
-  // (so the user lands directly in the symbol field after the second pick,
-  // whether picked via popover or via canvas).
+  // Auto-focus the symbol input when both source + destination are filled.
+  // Two reasons:
+  //
+  //   1. In CREATE mode, the user lands directly in the symbol field
+  //      after the second pick (whether picked via popover or canvas).
+  //   2. In MODIFY mode, the user has just clicked a state on the
+  //      canvas which left focus on that state-node <button>. If they
+  //      press Enter intending to commit the modify, the browser
+  //      activates the focused button instead of firing our global
+  //      Enter scope. Auto-focusing the input gets focus off the
+  //      button so Enter routes through handleSymbolKeyDown → commit.
+  //
+  // Triggers when source/destination/symbol/editingExisting changes;
+  // the inner condition guards against re-focusing on every keystroke.
   useEffect(() => {
     if (
       state.source !== null &&
       state.destination !== null &&
-      state.symbol === '' &&
-      state.editingExisting === null
+      document.activeElement !== symbolInputRef.current
     ) {
       symbolInputRef.current?.focus();
     }
-  }, [state.source, state.destination, state.symbol, state.editingExisting]);
+  }, [state.source, state.destination, state.editingExisting]);
 
   const sortedStates = Array.from(automaton.states).sort((a, b) => a - b);
   const sortedAlphabet = Array.from(automaton.alphabet).sort();

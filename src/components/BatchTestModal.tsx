@@ -74,17 +74,26 @@ export function BatchTestModal({ open, onClose, automaton, onLoadInput }: BatchT
   }
 
   function parseInputs(): string[] {
-    // One input per line, trimmed. Blank lines preserved as the
-    // empty-string input (often a meaningful test for accept-empty
-    // automata) only if the user wrote them deliberately as a single
-    // empty line — leading/trailing blank lines are dropped.
+    // One input per line. Leading/trailing all-blank lines are
+    // dropped (they're almost always typing noise from accidentally
+    // hitting Enter). One exception: if the user's entire input is
+    // all-whitespace AND non-empty, treat it as a single ε test —
+    // that's the most natural way to ask "does my FA accept the
+    // empty string?" Without this, hitting Enter once and Run All
+    // produces zero results, which the iter-17 user test caught as
+    // confusing ("It looks like it doesn't even run it at all").
     const lines = inputsText.split(/\r?\n/);
-    // Trim leading and trailing all-blank lines, preserve internal.
     let start = 0;
     let end = lines.length;
     while (start < end && lines[start]?.trim() === '') start++;
     while (end > start && lines[end - 1]?.trim() === '') end--;
-    return lines.slice(start, end);
+    const trimmed = lines.slice(start, end);
+    if (trimmed.length === 0 && inputsText.length > 0) {
+      // User typed only whitespace (probably one or more Enters) —
+      // interpret as "test the empty string."
+      return [''];
+    }
+    return trimmed;
   }
 
   function runAll() {
@@ -204,7 +213,7 @@ export function BatchTestModal({ open, onClose, automaton, onLoadInput }: BatchT
           className="batch-test-textarea glass-input"
           value={inputsText}
           onChange={(event) => setInputsText(event.target.value)}
-          placeholder="0110&#10;1011&#10;empty line above for ε"
+          placeholder="0110&#10;1011&#10;&#10;(blank line above tests ε)"
           rows={6}
           aria-label="Input strings — one per line"
         />

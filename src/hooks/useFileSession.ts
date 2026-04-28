@@ -139,11 +139,31 @@ export function useFileSession(
   );
 
   const save = useCallback(async () => {
+    // Untitled + Save: don't silently dump 'automaton.json' to the
+    // user's downloads. The iter-17 user test caught this — the
+    // tester hit ⌘S, expected a Save dialog, got a silent download
+    // with the default name. Until the File System Access API
+    // (showSaveFilePicker) lands as the adapter, fall back to a
+    // browser prompt so the user at least gets to choose a name.
+    // Once a file has a currentName (after a save or load), ⌘S is a
+    // straight overwrite — no prompt.
+    if (currentName === null) {
+      const name = window.prompt('Save as:', 'automaton');
+      if (name === null) return; // user cancelled
+      const trimmed = name.trim();
+      if (trimmed.length === 0) return;
+      return writeAutomaton(suggestedFilename(trimmed));
+    }
     return writeAutomaton(suggestedFilename(currentName));
   }, [currentName, writeAutomaton]);
 
   const saveAs = useCallback(async () => {
-    return writeAutomaton(suggestedFilename(currentName));
+    // Save As ALWAYS prompts, even when there's already a name.
+    const name = window.prompt('Save as:', currentName ?? 'automaton');
+    if (name === null) return;
+    const trimmed = name.trim();
+    if (trimmed.length === 0) return;
+    return writeAutomaton(suggestedFilename(trimmed));
   }, [currentName, writeAutomaton]);
 
   const loadFromContent = useCallback(

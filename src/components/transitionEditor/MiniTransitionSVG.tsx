@@ -171,10 +171,23 @@ function SlotCircle({
 }
 
 function Arrowhead({ x, y, angleDeg }: { x: number; y: number; angleDeg: number }) {
-  const size = 5;
+  // Geometry mirrors src/components/TransitionEdge.tsx so the mini
+  // and canvas arrowheads read as the same vocabulary. Canvas uses
+  // ARROWHEAD_SIZE=8 with a 30° base half-angle (Math.PI/6); we use
+  // size=7 here because the mini SVG viewBox is tighter and 8 looks
+  // chunky relative to the 14px slot circles, but the proportions
+  // match.
+  const size = 7;
+  const baseHalfAngleDeg = 30;
+  const cos = Math.cos((baseHalfAngleDeg * Math.PI) / 180);
+  const sin = Math.sin((baseHalfAngleDeg * Math.PI) / 180);
+  // Triangle in local coords with tip at (0,0) and base behind it.
+  const baseX = -size * cos;
+  const baseY1 = -size * sin;
+  const baseY2 = size * sin;
   return (
     <polygon
-      points={`0,0 -${size * 1.6},-${size * 0.6} -${size * 1.6},${size * 0.6}`}
+      points={`0,0 ${baseX},${baseY1} ${baseX},${baseY2}`}
       transform={`translate(${x} ${y}) rotate(${angleDeg})`}
       className="mini-transition-arrowhead"
     />
