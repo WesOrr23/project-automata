@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { AlphabetEditor } from './AlphabetEditor';
 
 type ConfigPanelProp = {
@@ -111,31 +112,47 @@ export function ConfigPanel({
         focusSignal={alphabetFocusSignal}
       />
 
-      {automatonType === 'NFA' && (
-        <div>
-          {/* Keep the .label class's uppercase styling for "SYMBOL", but
-            * exempt the Greek lowercase ε so it doesn't render as "E". */}
-          <span
-            className="label"
-            style={{ display: 'block', marginBottom: 'var(--space-2)' }}
+      {/* The ε-symbol section appears only in NFA mode. Wrap in
+        * AnimatePresence so the toggle DFA↔NFA fades + height-animates
+        * the section in/out instead of snapping. `height: 'auto'` is
+        * Framer's special value that measures the natural content
+        * height; we pair it with `overflow: hidden` so the surrounding
+        * elements slide rather than reflow mid-animation. */}
+      <AnimatePresence initial={false}>
+        {automatonType === 'NFA' && (
+          <motion.div
+            key="epsilon-section"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+            style={{ overflow: 'hidden' }}
           >
-            <span style={{ textTransform: 'none' }}>ε</span> symbol
-          </span>
-          <input
-            type="text"
-            className={`glass-input ${error !== null ? 'invalid' : ''}`}
-            value={draft}
-            onChange={handleChange}
-            maxLength={1}
-            style={{ width: '60px', textAlign: 'center', fontFamily: 'var(--font-mono)' }}
-            aria-label="Reserved epsilon symbol"
-          />
-          <p className="caption" style={{ marginTop: 'var(--space-1)' }}>
-            {error ??
-              `Type '${epsilonSymbol}' as a transition symbol to author an ε-transition. This character is forbidden in the alphabet.`}
-          </p>
-        </div>
-      )}
+            {/* Keep the .label class's uppercase styling for "SYMBOL",
+              * but exempt the Greek lowercase ε so it doesn't render
+              * as "E". */}
+            <span
+              className="label"
+              style={{ display: 'block', marginBottom: 'var(--space-2)' }}
+            >
+              <span style={{ textTransform: 'none' }}>ε</span> symbol
+            </span>
+            <input
+              type="text"
+              className={`glass-input ${error !== null ? 'invalid' : ''}`}
+              value={draft}
+              onChange={handleChange}
+              maxLength={1}
+              style={{ width: '60px', textAlign: 'center', fontFamily: 'var(--font-mono)' }}
+              aria-label="Reserved epsilon symbol"
+            />
+            <p className="caption" style={{ marginTop: 'var(--space-1)' }}>
+              {error ??
+                `Type '${epsilonSymbol}' as a transition symbol to author an ε-transition. This character is forbidden in the alphabet.`}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div>
         <span className="label" style={{ display: 'block', marginBottom: 'var(--space-2)' }}>

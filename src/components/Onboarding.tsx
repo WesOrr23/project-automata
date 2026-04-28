@@ -41,7 +41,12 @@ const STEPS: ReadonlyArray<Step> = [
   {
     id: 'bar',
     selector: '.command-bar',
-    caption: 'Save your work, undo edits, and run operations like Convert NFA → DFA from up here.',
+    // The top bar is a *context* menu — its contents change with the
+    // active stage. File ops are always there; Undo/Redo show in
+    // Define + Construct; Tools (Convert / Minimize / Complement /
+    // Compare) shows only in Construct; Export shows only in
+    // Simulate. Caption copy authored by Wes.
+    caption: 'This is the context menu. It shows relevant useful tools pertaining to the current stage of development, including file management, and additional less-frequently used tools.',
     placement: 'below',
   },
   {
@@ -105,17 +110,6 @@ export function Onboarding({ visible, onDismiss }: OnboardingProp) {
     };
   }, [stepIndex, visible]);
 
-  // Esc dismisses. Outside-click on the dim layer dismisses (the
-  // caption pill stops propagation so clicks INSIDE it don't count).
-  useEffect(() => {
-    if (!visible) return;
-    function handleKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') onDismiss();
-    }
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [visible, onDismiss]);
-
   function next() {
     if (stepIndex >= STEPS.length - 1) {
       onDismiss();
@@ -126,6 +120,33 @@ export function Onboarding({ visible, onDismiss }: OnboardingProp) {
   function back() {
     setStepIndex((i) => Math.max(0, i - 1));
   }
+
+  // Keyboard nav. Esc dismisses; ← back; → / Space advance. Outside-
+  // click on the dim layer also dismisses (caption stops propagation
+  // so clicks INSIDE it don't count). Refs to next/back capture the
+  // latest closure without re-binding the listener every step change.
+  const nextRef = useRef(next);
+  nextRef.current = next;
+  const backRef = useRef(back);
+  backRef.current = back;
+  useEffect(() => {
+    if (!visible) return;
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onDismiss();
+      } else if (event.key === 'ArrowRight' || event.key === ' ') {
+        // Space and → advance. preventDefault on Space so the page
+        // doesn't scroll under the dim overlay.
+        event.preventDefault();
+        nextRef.current();
+      } else if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        backRef.current();
+      }
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [visible, onDismiss]);
 
   // Compute caption position from targetRect + placement.
   function captionStyle(): React.CSSProperties {
@@ -221,8 +242,10 @@ export function Onboarding({ visible, onDismiss }: OnboardingProp) {
                 type="button"
                 className="onboarding-button onboarding-button-skip"
                 onClick={onDismiss}
+                title="Skip the tour (Esc)"
               >
-                Skip
+                <span>Skip</span>
+                <kbd className="onboarding-kbd">esc</kbd>
               </button>
               <div style={{ flex: 1 }} />
               {!isFirst && (
@@ -230,16 +253,22 @@ export function Onboarding({ visible, onDismiss }: OnboardingProp) {
                   type="button"
                   className="onboarding-button"
                   onClick={back}
+                  title="Back (←)"
                 >
-                  Back
+                  <kbd className="onboarding-kbd">←</kbd>
+                  <span>Back</span>
                 </button>
               )}
               <button
                 type="button"
                 className="onboarding-button onboarding-button-primary"
                 onClick={next}
+                title={isLast ? 'Finish (→ or space)' : 'Next (→ or space)'}
               >
-                {isLast ? 'Got it' : 'Next'}
+                <span>{isLast ? 'Got it' : 'Next'}</span>
+                <kbd className="onboarding-kbd onboarding-kbd-on-primary">
+                  {isLast ? 'space' : '→'}
+                </kbd>
               </button>
             </div>
           </div>

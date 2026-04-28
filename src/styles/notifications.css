@@ -179,7 +179,10 @@
 }
 
 .onboarding-button {
-  padding: 6px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
   background: transparent;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-pill);
@@ -188,6 +191,34 @@
   color: var(--text-body);
   cursor: pointer;
   transition: all 0.15s ease;
+}
+
+/* Keyboard hint chip on tour buttons. Sized small + faded so the
+ * label still leads visually but the shortcut is discoverable. */
+.onboarding-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  line-height: 1;
+  color: var(--text-secondary);
+  background: rgba(15, 23, 42, 0.06);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+
+.onboarding-kbd-on-primary {
+  /* On the primary (blue) button, the default chip would disappear
+   * against the background. Switch to a translucent-white chip with a
+   * white border so the hint reads. */
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .onboarding-button:hover {

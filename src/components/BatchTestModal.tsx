@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { X, Upload, Download, Play, ArrowRightFromLine } from 'lucide-react';
 import { Automaton } from '../engine/types';
 import { accepts } from '../engine/simulator';
@@ -140,20 +141,33 @@ export function BatchTestModal({ open, onClose, automaton, onLoadInput }: BatchT
   const rejectCount = results?.filter((r) => r.status === 'reject').length ?? 0;
   const errorCount = results?.filter((r) => r.status === 'error').length ?? 0;
 
-  if (!open) return null;
-
   return (
-    <div
+    // AnimatePresence wraps the conditional render so opening fades
+    // the dim layer + scales-in the card; closing reverses both. The
+    // earlier `if (!open) return null` ran before any render, so the
+    // modal popped in instantly — wrapping in AnimatePresence with
+    // the gate INSIDE lets exit animations actually play.
+    <AnimatePresence>
+      {open && (
+    <motion.div
       ref={overlayRef}
       className="batch-test-overlay"
       onClick={handleOverlayClick}
       role="presentation"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
     >
-      <div
+      <motion.div
         className="batch-test-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="batch-test-title"
+        initial={{ opacity: 0, scale: 0.96, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 8, transition: { duration: 0.15 } }}
+        transition={{ duration: 0.22, ease: [0.34, 1.2, 0.64, 1] }}
       >
         <div className="batch-test-header">
           <h2 id="batch-test-title" className="batch-test-title">
@@ -311,7 +325,9 @@ export function BatchTestModal({ open, onClose, automaton, onLoadInput }: BatchT
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
