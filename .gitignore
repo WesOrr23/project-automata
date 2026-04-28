@@ -15,6 +15,10 @@ dist-ssr
 # TypeScript incremental build cache
 *.tsbuildinfo
 
+# Claude Code agent worktrees — they live under .claude/worktrees/ but
+# shouldn't show up as untracked content from the main worktree.
+.claude/worktrees/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
