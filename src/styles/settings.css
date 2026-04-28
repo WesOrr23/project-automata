@@ -1,0 +1,185 @@
+/* ===================================
+   Settings — modal opened by ⌘, with a small list of long-tail
+   user preferences. Visual language lifted from .batch-test-*
+   in notifications.css so the two modals feel like one family.
+   =================================== */
+
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 9500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  backdrop-filter: blur(2px);
+}
+
+.settings-modal {
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-4);
+  width: min(560px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.settings-title {
+  margin: 0;
+  font-size: var(--text-lg, 1.05rem);
+  font-weight: var(--weight-bold);
+  color: var(--text-heading);
+}
+
+.settings-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.settings-close:hover {
+  background: var(--bg-button-hover);
+  color: var(--text-heading);
+}
+
+.settings-hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* ─── Section grouping ─── */
+/* Each section starts with a small heading and contains one or more
+ * .settings-row children. The dividing rule above each section gives
+ * visual grouping without needing border boxes. */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.settings-section:first-of-type {
+  /* The first section sits below the header/hint; the page break
+   * above it is provided by the hint's bottom margin (gap on the
+   * modal itself). No top border needed. */
+  border-top: none;
+  padding-top: 0;
+}
+
+.settings-section-title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ─── Settings rows ─── */
+/* Label + description on the left, control (currently always a
+ * checkbox) on the right. The whole row is a <label> so clicking
+ * anywhere on the text toggles the input — bigger hit target than
+ * the checkbox alone. */
+.settings-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.settings-row:hover {
+  background: var(--bg-button-hover);
+}
+
+.settings-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-row-label {
+  font-size: var(--text-base, 0.95rem);
+  font-weight: var(--weight-medium);
+  color: var(--text-heading);
+}
+
+.settings-row-description {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.settings-row-toggle {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  cursor: pointer;
+}
+
+/* ─── Footer ─── */
+.settings-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.settings-reset-button {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.settings-reset-button:hover {
+  background: var(--bg-button-hover);
+  color: var(--text-heading);
+  border-color: var(--border-strong, var(--border-subtle));
+}
+
+/* ─── Reduce-motion respect ─── */
+/* When the user enables "reduce motion" in the modal, the store sets
+ * data-reduce-motion="true" on <body>. CSS below gates the animations
+ * defined in animations.css so the breath/pulse loops freeze. */
+body[data-reduce-motion="true"] .start-arrow-breath,
+body[data-reduce-motion="true"] .state-node-pickable circle:not(:hover),
+body[data-reduce-motion="true"] .pulse-canvas-add,
+body[data-reduce-motion="true"] .pulse-canvas-modify,
+body[data-reduce-motion="true"] .pulse-canvas-delete {
+  animation: none !important;
+}

@@ -59,6 +59,8 @@ import { createAutomaton as createBlankAutomaton } from './engine/automaton';
 import { Shuffle, Contrast, Shrink, GitCompare } from 'lucide-react';
 import { exportCanvasAsPNG, exportCanvasAsSVG } from './ui-state/imageExport';
 import { logEvent } from './telemetry';
+import { SettingsModal } from './settings';
+import { useKeyboardScope } from './hooks/useKeyboardScope';
 
 const fileAdapter = createFileAdapter();
 function blankFactory() {
@@ -138,6 +140,10 @@ function App() {
   // so the user lands in Define ready to type.
   const [alphabetFocusSignal, setAlphabetFocusSignal] = useState(0);
   const [batchTestOpen, setBatchTestOpen] = useState(false);
+  // Settings modal — opened by ⌘, (Cmd+comma, the Mac convention for
+  // app preferences). No visible button surface yet; the iter plan is
+  // to add one once the settings list is large enough to merit chrome.
+  const [settingsOpen, setSettingsOpen] = useState(false);
   // Bumped when the user clicks "load this input" inside the batch
   // modal — SimulationControls watches and focuses its Play button on
   // change so the user lands ready to start the run.
@@ -363,6 +369,26 @@ function App() {
     onShowTour: onboarding.show,
     menuIsOpen: menuState.mode === 'OPEN',
     onCollapseMenu: () => setMenuState({ mode: 'COLLAPSED' }),
+  });
+
+  // ⌘, opens the settings modal — Mac convention for app preferences.
+  // Capture-false: the modal's own Esc handler is capture-true and will
+  // shadow other Esc consumers when open, but the OPEN shortcut itself
+  // is fine at the regular layer; modals (BatchTest, Settings) own the
+  // capture-true tier for their own keys only.
+  useKeyboardScope({
+    id: 'app-settings-open',
+    active: !settingsOpen,
+    capture: false,
+    onKey: (event) => {
+      const isModifier = event.metaKey || event.ctrlKey;
+      if (!isModifier) return false;
+      if (event.key !== ',') return false;
+      event.preventDefault();
+      setSettingsOpen(true);
+      logEvent('settings.opened');
+      return true;
+    },
   });
 
   // Display labels are sequential (q0, q1, q2) regardless of underlying IDs.
@@ -1112,6 +1138,7 @@ function App() {
       />
 
       <Onboarding visible={onboarding.visible} onDismiss={onboarding.dismiss} />
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <BatchTestModal
         open={batchTestOpen}
         onClose={() => setBatchTestOpen(false)}
