@@ -8,8 +8,14 @@
 
 import { Graphviz } from '@hpcc-js/wasm-graphviz';
 import { Automaton } from '../engine/types';
-import { AutomatonUI, StateUI, TransitionUI, createDefaultLabel } from './types';
-import { STATE_RADIUS, START_ARROW_VISUAL_WIDTH_INCHES } from './constants';
+import {
+  AutomatonUI,
+  StartArrowUI,
+  StateUI,
+  TransitionUI,
+  createDefaultLabel,
+} from './types';
+import { STATE_RADIUS, PHANTOM_NODE_WIDTH_INCHES } from './constants';
 
 /**
  * Padding around the graph in the SVG canvas (pixels)
@@ -108,19 +114,55 @@ function automatonToDot(automaton: Automaton): string {
     lines.push(`  ${fromStr} -> ${toStr} [label="${label}"];`);
   }
 
-  // Reserve horizontal layout space for the separately-rendered start
-  // arrow. Without this, GraphViz happily places the start state in the
-  // middle of a row, then our arrow draws over whatever's to its left.
-  // The phantom is style=invis (renders nothing) but participates in
-  // layout — it pushes the start state into a column to its right and
-  // expands the bounding box to include the arrow's reserved area.
-  // Width derives from START_ARROW_VISUAL_WIDTH so changing the arrow's
-  // pixel dimensions automatically resizes the layout reserve.
-  // (startState is non-nullable per the engine type — createAutomaton
-  // always seeds state 0 and removeState reassigns rather than clearing.)
-  const phantomWidth = START_ARROW_VISUAL_WIDTH_INCHES.toFixed(4);
+  // The start-arrow phantom: a tiny invisible source point + an edge
+  // GraphViz routes as a real spline, which we then RENDER as the
+  // visible start arrow. Three payoffs:
+  //   1. Other edges' splines actually avoid the start-arrow lane,
+  //      because to GraphViz it's a real edge they have to route
+  //      around (a `style=invis` edge is invisible to the renderer
+  //      AND to the spline-avoidance pass — making it visible fixes
+  //      both the visual and the routing).
+  //   2. The arrow's geometry comes straight from the layout engine,
+  //      so it stays consistent at any zoom / state position without
+  //      magic pixel offsets.
+  //   3. We can pin the phantom into the leftmost rank and weight the
+  //      edge to encourage a straight horizontal line — see below.
+  //
+  // The NODE stays style=invis (we don't want a visible source dot),
+  // but the EDGE is real. (startState is non-nullable per the engine
+  // type — createAutomaton seeds state 0 and removeState reassigns
+  // rather than clearing.)
+  const phantomWidth = PHANTOM_NODE_WIDTH_INCHES.toFixed(4);
   lines.push(`  ${START_PHANTOM_NAME} [shape=point, width=${phantomWidth}, fixedsize=true, style=invis];`);
-  lines.push(`  ${START_PHANTOM_NAME} -> ${automaton.startState} [style=invis];`);
+
+  // Two-step left pin:
+  //
+  //   (a) `{rank=source; _start;}`  — phantom in the leftmost rank
+  //       (rankdir=LR ⇒ leftmost column). Without this, GraphViz can
+  //       place the phantom anywhere the spline router prefers.
+  //
+  //   (b) Invisible chains from startState → every other real state
+  //       at high weight. This forces every other state into a rank
+  //       STRICTLY GREATER than startState's, so the start state is
+  //       guaranteed to be the leftmost REAL node — not just for the
+  //       trivial DFA but also for cyclic automata where back-edges
+  //       could otherwise pull other states into the same rank.
+  //
+  // The (a)+(b) pair gives "phantom is leftmost; start state is
+  // leftmost-of-real-states" as a hard layout invariant.
+  lines.push(`  { rank=source; ${START_PHANTOM_NAME}; }`);
+  // High weight on the phantom edge tells GraphViz "make this edge
+  // as short and straight as possible" — empirically pushes it toward
+  // a horizontal line from phantom to start state. constraint=true
+  // is the default but stating it explicitly keeps the intent visible.
+  lines.push(`  ${START_PHANTOM_NAME} -> ${automaton.startState} [weight=10, constraint=true];`);
+  // Invisible "push right" chain — see (b) above. weight=2 is enough
+  // to dominate normal cycles without overwhelming aesthetic decisions
+  // GraphViz makes between non-start states (which we WANT it to make).
+  automaton.states.forEach((stateId) => {
+    if (stateId === automaton.startState) return;
+    lines.push(`  ${automaton.startState} -> ${stateId} [style=invis, weight=2, constraint=true];`);
+  });
 
   // Without further constraints, isolated states (those with no incoming
   // transitions and not the start state) are free to land in the
@@ -379,15 +421,79 @@ function parseGraphvizJson(
 
   // Extract edge data
   const transitions: TransitionUI[] = [];
+  let startArrow: StartArrowUI | null = null;
 
   for (const edge of jsonData.edges) {
     const tailNode = jsonData.objects[edge.tail];
     const headNode = jsonData.objects[edge.head];
     if (!tailNode || !headNode) continue;
 
-    // Skip the phantom start-arrow edge — its only job was to influence
-    // layout, and the actual visible arrow is drawn by StartStateArrow.
-    if (tailNode.name === START_PHANTOM_NAME || headNode.name === START_PHANTOM_NAME) {
+    // Phantom-source edges fall into two cases:
+    //   1. _start -> startState         → the visible start arrow.
+    //                                     Capture its spline.
+    //   2. _start -> <isolated state>   → still pure layout-influence
+    //                                     edges; skip.
+    if (tailNode.name === START_PHANTOM_NAME) {
+      const headStateId = parseInt(headNode.name);
+      if (headStateId === automaton.startState) {
+        const parsedPos = parseEdgePos(edge.pos);
+        if (parsedPos.controlPoints.length > 0) {
+          const pathData = buildTransformedPath(
+            parsedPos.controlPoints,
+            boundingBoxHeight
+          );
+          const lastRawControlPoint =
+            parsedPos.controlPoints[parsedPos.controlPoints.length - 1]!;
+          const rawArrowhead =
+            parsedPos.arrowheadPosition ?? lastRawControlPoint;
+          const arrowheadPosition = transformPoint(
+            rawArrowhead,
+            boundingBoxHeight
+          );
+          const lastControlPoint = transformPoint(
+            lastRawControlPoint,
+            boundingBoxHeight
+          );
+          const arrowheadAngle = computeArrowheadAngle(
+            lastControlPoint,
+            arrowheadPosition
+          );
+          // Compute a bbox over every transformed control point AND the
+          // arrowhead tip — the canvas uses this to widen fit-to-content
+          // so the arrow stays on-screen at fit zoom. We use control
+          // points (not the rendered curve) because they're a safe
+          // bounding superset of the spline.
+          const transformedControlPoints = parsedPos.controlPoints.map(
+            (point) => transformPoint(point, boundingBoxHeight)
+          );
+          const allPoints = [...transformedControlPoints, arrowheadPosition];
+          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+          for (const point of allPoints) {
+            if (point.x < minX) minX = point.x;
+            if (point.x > maxX) maxX = point.x;
+            if (point.y < minY) minY = point.y;
+            if (point.y > maxY) maxY = point.y;
+          }
+          startArrow = {
+            pathData,
+            arrowheadPosition,
+            arrowheadAngle,
+            boundingBox: {
+              x: minX,
+              y: minY,
+              width: maxX - minX,
+              height: maxY - minY,
+            },
+          };
+        }
+      }
+      // Whether we captured it or not, this edge is NOT a regular
+      // transition — don't fall through into the loop body below.
+      continue;
+    }
+    if (headNode.name === START_PHANTOM_NAME) {
+      // Reverse direction (real state -> phantom) shouldn't happen with
+      // the current DOT layout but skip defensively.
       continue;
     }
 
@@ -457,6 +563,7 @@ function parseGraphvizJson(
   return {
     states,
     transitions,
+    startArrow,
     boundingBox: {
       width: boundingBoxWidth + 2 * CANVAS_PADDING,
       height: boundingBoxHeight + 2 * CANVAS_PADDING,

@@ -1,70 +1,66 @@
 /**
  * StartStateArrow Component
  *
- * Renders an arrow pointing to the start state from the left.
- * The arrow points to the edge of the state circle, not the center.
+ * Renders the start-arrow as a GraphViz-routed spline. The geometry
+ * (path + arrowhead position + arrowhead angle) comes from a phantom
+ * edge GraphViz lays out as part of the regular automaton DOT — see
+ * `automatonToDot` and `parseGraphvizJson` in `ui-state/utils.ts`.
  *
- * The three primitives (line length, head gap, head size) live in
- * `ui-state/constants.ts` so layout-side code (the AutomatonCanvas
- * inner-group translate, the GraphViz phantom-node width) can derive
- * matching reserve values from a single source. See
- * `START_ARROW_VISUAL_WIDTH` for the derived total.
+ * Why the spline (and not a fixed pixel-offset arrow):
+ *   - GraphViz computes the path as a real edge during layout, which
+ *     means OTHER edges' splines actually avoid this lane during their
+ *     own routing. Before the refactor, q2 → q0 splines could route
+ *     through the same area we manually drew the start arrow on top
+ *     of, producing visual collisions on dense layouts.
+ *   - The spline naturally adjusts to the start state's position, so
+ *     no inner-group translate or `contentReserve.left` is needed in
+ *     AutomatonCanvas.
+ *
+ * Visual: same stroke + arrowhead as the engine's other transitions
+ * (matches `TransitionEdge`'s STROKE_WIDTH=2 and ARROWHEAD_SIZE=8) so
+ * the start arrow reads as part of the same vocabulary, not a special
+ * mark.
  */
 
-import {
-  START_ARROW_LINE_LENGTH,
-  START_ARROW_HEAD_GAP,
-  START_ARROW_HEAD_SIZE,
-} from '../ui-state/constants';
+import { START_ARROW_HEAD_SIZE } from '../ui-state/constants';
+import type { StartArrowUI } from '../ui-state/types';
 
 type StartStateArrowProp = {
-  /** X coordinate of the target state center */
-  targetX: number;
-
-  /** Y coordinate of the target state center */
-  targetY: number;
-
-  /** Radius of the state circle (to calculate edge intersection) */
-  stateRadius: number;
+  /** Pre-computed spline + arrowhead from GraphViz. */
+  geometry: StartArrowUI;
 };
 
-export function StartStateArrow({
-  targetX,
-  targetY,
-  stateRadius,
-}: StartStateArrowProp) {
-  // Calculate start and end points. Arrow comes from the left.
-  //   - tipX     = where the arrowhead's tip sits (touches the circle).
-  //   - baseX    = where the arrowhead's flat base sits.
-  //   - lineEndX = where the line stops (one ARROW_HEAD_GAP back from
-  //                the base). The visible gap reads as breathing room
-  //                between the line and head, matching the transition
-  //                edges' arrowhead spacing.
-  const tipX = targetX - stateRadius;
-  const baseX = tipX - START_ARROW_HEAD_SIZE;
-  const lineEndX = baseX - START_ARROW_HEAD_GAP;
-  const endY = targetY;
-  const startX = lineEndX - START_ARROW_LINE_LENGTH;
-  const startY = targetY;
+const STROKE_WIDTH = 2;
+
+export function StartStateArrow({ geometry }: StartStateArrowProp) {
+  const { pathData, arrowheadPosition, arrowheadAngle } = geometry;
+
+  // Arrowhead triangle from the angle, mirroring the math used in
+  // TransitionEdge.tsx so the two arrowheads look identical.
+  const angle1 = arrowheadAngle + Math.PI - Math.PI / 6;
+  const angle2 = arrowheadAngle + Math.PI + Math.PI / 6;
+  const arrowheadPoint1X =
+    arrowheadPosition.x + START_ARROW_HEAD_SIZE * Math.cos(angle1);
+  const arrowheadPoint1Y =
+    arrowheadPosition.y + START_ARROW_HEAD_SIZE * Math.sin(angle1);
+  const arrowheadPoint2X =
+    arrowheadPosition.x + START_ARROW_HEAD_SIZE * Math.cos(angle2);
+  const arrowheadPoint2Y =
+    arrowheadPosition.y + START_ARROW_HEAD_SIZE * Math.sin(angle2);
 
   return (
     // The `start-arrow-breath` class drives a subtle opacity breathing
-    // (0.85 ↔ 1.0 over 2s) at idle — see index.css. Applied to the group
-    // so both the line and arrowhead breathe together as one mark.
+    // (0.85 ↔ 1.0 over 2s) at idle — see animations.css. Applied to the
+    // group so both the line and arrowhead breathe together as one mark.
     <g className="start-arrow-breath">
-      {/* Arrow line — stops one ARROW_HEAD_GAP before the arrowhead. */}
-      <line
-        x1={startX}
-        y1={startY}
-        x2={lineEndX}
-        y2={endY}
+      <path
+        d={pathData}
+        fill="none"
         stroke="black"
-        strokeWidth={2}
+        strokeWidth={STROKE_WIDTH}
       />
-
-      {/* Arrowhead — triangle pointing right. Tip touches the circle. */}
       <polygon
-        points={`${tipX},${endY} ${baseX},${endY - START_ARROW_HEAD_SIZE / 2} ${baseX},${endY + START_ARROW_HEAD_SIZE / 2}`}
+        points={`${arrowheadPosition.x},${arrowheadPosition.y} ${arrowheadPoint1X},${arrowheadPoint1Y} ${arrowheadPoint2X},${arrowheadPoint2Y}`}
         fill="black"
       />
     </g>

@@ -10,11 +10,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { HelpCircle } from 'lucide-react';
 import { Automaton } from '../engine/types';
 import { AutomatonUI } from '../ui-state/types';
-import {
-  STATE_RADIUS,
-  START_ARROW_VISUAL_WIDTH,
-  START_ARROW_TOTAL_RESERVE,
-} from '../ui-state/constants';
+import { STATE_RADIUS } from '../ui-state/constants';
 import { StateNode } from './StateNode';
 import { TransitionEdge } from './TransitionEdge';
 import { StartStateArrow } from './StartStateArrow';
@@ -202,23 +198,23 @@ export function AutomatonCanvas({
   fitSignal,
   viewportInset,
 }: AutomatonCanvasProp) {
-  // The start-state arrow extends LEFT of the start-state circle, which
-  // is outside GraphViz's computed bounding box. Reserve room via an
-  // inner translate using START_ARROW_TOTAL_RESERVE (visual width +
-  // padding). We *also* measure the actual rendered bbox post-layout
-  // (see contentBBox below) and pass that to the viewport hook, because
-  // GraphViz's bbox doesn't reliably match the rendered SVG extent
-  // (states sometimes lay out at non-zero offsets within the bbox), and
-  // centering needs the true visible rect to be accurate.
+  // The start-state arrow is now a real GraphViz-routed spline (see
+  // automatonToDot in ui-state/utils.ts). Its geometry comes back
+  // inside `automatonUI.startArrow` and its leftward extent is already
+  // included in GraphViz's bounding box — no inner-group translate, no
+  // hand-rolled reserve. The fit-to-content reserve below DOES still
+  // grow to encompass the start arrow's bbox so it stays on-screen at
+  // fit zoom, but centering targets the cluster only.
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [viewportSize, setViewportSize] = useState<{ width: number; height: number } | null>(
     null
   );
-  // Measured bounding box of the content `<g>` (in the inner group's
-  // local coord space, before the START_ARROW_TOTAL_RESERVE inner translate).
-  // Initialized to a falsy fallback derived from automatonUI; replaced
-  // by the real measurement once the SVG has laid out.
+  // Measured bounding box of the state cluster (in inner-group coord
+  // space, which is now the same as GraphViz's coord space — no
+  // intermediate translate). Used for centering. The start arrow's
+  // bbox is added separately via contentReserve so fit-to-content
+  // still encompasses it without dragging the centering target.
   const [contentBBox, setContentBBox] = useState<{
     x: number; y: number; width: number; height: number;
   } | null>(null);
@@ -260,7 +256,7 @@ export function AutomatonCanvas({
 
   // Bbox for CENTERING: state circles only. The bbox center is what
   // 'centered FA' means visually — the cluster of states. The start
-  // arrow extends ~62px LEFT of this bbox but is accounted for as a
+  // arrow extends LEFT of this bbox but is accounted for as a
   // FIT-ONLY reserve (passed to the hook below) so it has room at
   // fit-scale without dragging the centering target leftward away
   // from the cluster center.
@@ -289,10 +285,7 @@ export function AutomatonCanvas({
     });
   }, [automaton, automatonUI]);
 
-  // Effective content size + origin for the viewport hook. The bbox's
-  // local-space origin (b.x, b.y) is shifted by the inner translate
-  // (-START_ARROW_TOTAL_RESERVE, 0) before becoming the visual origin in
-  // the outer-g coordinate space.
+  // Effective content size + origin for the viewport hook.
   //
   // We pass `null` until the layout effect has measured the actual
   // state-cluster bbox. Earlier we used GraphViz's
@@ -308,8 +301,28 @@ export function AutomatonCanvas({
     ? { width: measured.width, height: measured.height }
     : null;
   const effectiveOrigin = measured
-    ? { x: measured.x - START_ARROW_TOTAL_RESERVE, y: measured.y }
-    : { x: -START_ARROW_TOTAL_RESERVE, y: 0 };
+    ? { x: measured.x, y: measured.y }
+    : { x: 0, y: 0 };
+
+  // Fit-to-content reserve, derived from the start arrow's actual
+  // bbox. We compute "how far left/up/right/down the start arrow
+  // protrudes BEYOND the cluster bbox" and pass that as the reserve
+  // — fit math will widen its window by these amounts without
+  // moving the centering target. Defaults to all-zeros when no
+  // start arrow geometry is present yet (layout debounce).
+  const startArrowReserve = (() => {
+    const startArrow = automatonUI.startArrow;
+    if (!startArrow || !measured) {
+      return { left: 0, right: 0, top: 0, bottom: 0 };
+    }
+    const arrow = startArrow.boundingBox;
+    return {
+      left: Math.max(0, measured.x - arrow.x),
+      right: Math.max(0, arrow.x + arrow.width - (measured.x + measured.width)),
+      top: Math.max(0, measured.y - arrow.y),
+      bottom: Math.max(0, arrow.y + arrow.height - (measured.y + measured.height)),
+    };
+  })();
 
   const {
     transform,
@@ -333,13 +346,7 @@ export function AutomatonCanvas({
     // undefined when the caller didn't provide one.
     ...(viewportInset !== undefined ? { viewportInset } : {}),
     contentOrigin: effectiveOrigin,
-    // Start arrow extends START_ARROW_VISUAL_WIDTH px LEFT of the
-    // cluster bbox; reserve that width in the FIT calculation so the
-    // arrow has room at fit-scale without affecting where 'center'
-    // lands. (The inner-g translate above uses TOTAL_RESERVE which
-    // includes extra padding; fit only needs the visible width so the
-    // arrow's tip reaches the viewport edge, not beyond it.)
-    contentReserve: { left: START_ARROW_VISUAL_WIDTH, right: 0, top: 0, bottom: 0 },
+    contentReserve: startArrowReserve,
   });
 
   // Imperative fit trigger from App's global F-key shortcut. The
@@ -477,7 +484,13 @@ export function AutomatonCanvas({
         transform={transform}
         className={isAnimating ? 'canvas-content-animating' : undefined}
       >
-        <g transform={`translate(${-START_ARROW_TOTAL_RESERVE} 0)`}>
+        {/* No inner-group translate — GraphViz now lays out the
+            start-arrow spline as a real edge, so its leftward extent
+            is already inside the cluster's coordinate space. The
+            empty group is preserved as a structural anchor for the
+            existing nested-render below; collapsing it would shift
+            test selectors. */}
+        <g>
       {/* Layer 1: Transition edges (background) */}
       {automatonUI.transitions.map((transition, index) => {
         // A consolidated edge matches the simulation's "next transition"
@@ -610,21 +623,13 @@ export function AutomatonCanvas({
         );
       })}
 
-      {/* Layer 3: Start state arrow (foreground). The start state is
-          always set by the engine (createAutomaton seeds state 0), so no
-          null check is needed; we only guard the layout-map lookup,
-          which can briefly miss during the layout debounce. */}
-      {(() => {
-        const startStateUI = automatonUI.states.get(automaton.startState);
-        if (!startStateUI) return null;
-        return (
-          <StartStateArrow
-            targetX={startStateUI.position.x}
-            targetY={startStateUI.position.y}
-            stateRadius={STATE_RADIUS}
-          />
-        );
-      })()}
+      {/* Layer 3: Start state arrow (foreground). Geometry comes
+          from GraphViz via automatonUI.startArrow — null only on the
+          brief layout-debounce frames before the first computeLayout
+          resolves; render nothing in that window. */}
+      {automatonUI.startArrow !== null && (
+        <StartStateArrow geometry={automatonUI.startArrow} />
+      )}
           {/* DEBUG (gated by debugOverlay): blue ring at the FA's
               center (state-cluster centroid in inner-g local coords).
               Lives inside the transformed content so it pans/scales

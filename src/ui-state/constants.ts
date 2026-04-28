@@ -24,51 +24,29 @@ export const SIMULATION_SPEED_DEFAULT = SIMULATION_SPEED_MIN;
 
 /* ─── Start-state arrow ─────────────────────────────────────────────
  *
- * The little black arrow that points at the start state. It's drawn
- * separately from the GraphViz layout (because it has no source node)
- * but five places need to agree on how much horizontal room it takes:
+ * The start arrow is now a GraphViz-routed spline (see automatonToDot
+ * + parseGraphvizJson in ui-state/utils.ts). Two constants suffice:
  *
- *   1. StartStateArrow.tsx       — actually renders the line + head
- *   2. AutomatonCanvas.tsx       — translates the inner SVG group
- *                                  leftward so the arrow doesn't clip
- *   3. AutomatonCanvas.tsx       — passes contentReserve.left to the
- *                                  viewport hook so fit-to-content
- *                                  accounts for the arrow
- *   4. ui-state/utils.ts         — sets a phantom node's width in DOT
- *                                  so GraphViz pushes the start state
- *                                  right of its column
- *   5. (nobody else)               imageExport reads the rendered bbox
- *                                  so it picks this up automatically
+ *   - HEAD_SIZE: arrowhead triangle dimensions used at render time.
+ *     Matches TransitionEdge's arrowhead so the visuals are uniform.
+ *   - PHANTOM_NODE_WIDTH_INCHES: how wide the invisible source node
+ *     is when emitted to DOT. Doesn't have to match any pixel value
+ *     — GraphViz routes the actual spline inside whatever area it
+ *     allocates around the phantom. Slightly larger than a default
+ *     point so the start-arrow lane is unambiguously a "real" lane
+ *     other edges have to route around.
  *
- * Define the primitives once here; every other site DERIVES from them.
- * Change a single primitive and all five sites stay in sync. */
+ * Earlier iterations had five constants here for line length, head
+ * gap, total reserve, etc. — all became dead the moment GraphViz
+ * started owning the arrow's geometry. */
 
-/** Length of the visible arrow line (px). */
-export const START_ARROW_LINE_LENGTH = 50;
-/** Gap between the line's tail and the arrowhead's flat base (px) —
- *  matches the breathing whitespace transition arrowheads use. */
-export const START_ARROW_HEAD_GAP = 4;
-/** Size of the arrowhead triangle (px). Matches the transition-edge
- *  arrowhead size for visual consistency. */
+/** Size of the arrowhead triangle (px). Matches TransitionEdge's
+ *  ARROWHEAD_SIZE for visual consistency across the canvas. */
 export const START_ARROW_HEAD_SIZE = 8;
 
-/** Total horizontal extent of the start arrow, measured from the
- *  start-state circle's left edge outward. Derived — don't hand-edit. */
-export const START_ARROW_VISUAL_WIDTH =
-  START_ARROW_LINE_LENGTH + START_ARROW_HEAD_GAP + START_ARROW_HEAD_SIZE;
-
-/** Extra breathing padding so the arrow's left tip never sits flush
- *  against the inner-group's coordinate origin. Used only by the
- *  viewport translate (not by fit math — fit just needs the visual
- *  width to keep the arrow on-screen at fit zoom). */
-export const START_ARROW_RESERVE_PADDING = 8;
-
-/** Total reserve for the inner-group translate (px). Wider than the
- *  visual width by RESERVE_PADDING. */
-export const START_ARROW_TOTAL_RESERVE =
-  START_ARROW_VISUAL_WIDTH + START_ARROW_RESERVE_PADDING;
-
-/** Same visual width in inches (GraphViz works in inches at 72 DPI).
- *  Used for the phantom-node width in DOT. */
-export const START_ARROW_VISUAL_WIDTH_INCHES =
-  START_ARROW_VISUAL_WIDTH / 72;
+/** Width of the invisible phantom node in GraphViz inches (72 DPI).
+ *  GraphViz reserves this much horizontal space to the left of the
+ *  start state — the actual visible arrow's length is whatever
+ *  spline GraphViz routes into that space. Larger values give the
+ *  arrow more visual breathing room. */
+export const PHANTOM_NODE_WIDTH_INCHES = 0.65;

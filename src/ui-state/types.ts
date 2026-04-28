@@ -74,6 +74,34 @@ export type TransitionUI = {
 };
 
 /**
+ * Pre-computed rendering data for the start-state arrow.
+ *
+ * Same shape fields as TransitionUI's spline data — GraphViz computes
+ * a phantom edge `_start -> startState` whose spline we render as the
+ * visible start arrow. Letting GraphViz route it (instead of drawing
+ * it manually at fixed pixel offsets) means OTHER edges' splines
+ * actually avoid this lane during routing — fixes the case where
+ * e.g. q2→q0 was being routed through the same area we manually drew
+ * the start arrow on top of, producing the visual collision in iter-17
+ * user tests.
+ */
+export type StartArrowUI = {
+  /** SVG path d attribute (cubic bezier spline from GraphViz) */
+  pathData: string;
+  /** Position of the arrowhead tip (touches the start state's circle). */
+  arrowheadPosition: { x: number; y: number };
+  /** Arrowhead angle in radians. */
+  arrowheadAngle: number;
+  /**
+   * Axis-aligned bounding box of the spline control points (in
+   * post-transform canvas coords). Lets the canvas widen its
+   * fit-to-content reserve so the start arrow always stays on-screen
+   * at fit zoom — without us having to re-parse pathData.
+   */
+  boundingBox: { x: number; y: number; width: number; height: number };
+};
+
+/**
  * UI metadata for the entire automaton
  *
  * This type mirrors the Automaton type from the engine layer, but contains
@@ -86,6 +114,14 @@ export type AutomatonUI = {
 
   /** Pre-computed transition rendering data from GraphViz */
   transitions: TransitionUI[];
+
+  /**
+   * Pre-computed start-arrow geometry from GraphViz, or null on the
+   * brief layout-debounce frames where no layout is available yet.
+   * Always non-null in steady state because the engine guarantees a
+   * start state.
+   */
+  startArrow: StartArrowUI | null;
 
   /** Bounding box of the entire graph (for canvas sizing) */
   boundingBox: { width: number; height: number };

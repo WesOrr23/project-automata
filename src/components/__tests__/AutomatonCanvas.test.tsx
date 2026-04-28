@@ -43,6 +43,12 @@ function makeFixture(): { automaton: Automaton; automatonUI: AutomatonUI } {
         labelPosition: { x: 200, y: 80 },
       },
     ],
+    startArrow: {
+      pathData: 'M 30,100 L 70,100',
+      arrowheadPosition: { x: 70, y: 100 },
+      arrowheadAngle: 0,
+      boundingBox: { x: 30, y: 100, width: 40, height: 0 },
+    },
     boundingBox: { width: 400, height: 200 },
   };
   return { automaton, automatonUI };
