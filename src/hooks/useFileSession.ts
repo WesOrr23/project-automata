@@ -19,6 +19,7 @@ import {
   AutomataFileMetadata,
 } from '../files/format';
 import { FileAdapter } from '../files/fileAdapter';
+import { logEvent } from '../telemetry';
 import {
   listRecents,
   recordRecent,
@@ -125,7 +126,10 @@ export function useFileSession(
       const result = await adapter.save({ content, suggestedName: filename });
       if (!result.ok) {
         if (result.error !== 'file-cancelled') {
+          logEvent('file.save.failed', { kind: result.error });
           notify({ severity: 'error', title: 'Save failed', detail: errorMessage(result.error) });
+        } else {
+          logEvent('file.save.cancelled');
         }
         return;
       }
@@ -133,6 +137,11 @@ export function useFileSession(
       recordRecent({ name: result.value.name, snapshot: content, saved: true });
       refreshRecents();
       markSaved();
+      logEvent('file.saved', {
+        states: automaton.states.size,
+        transitions: automaton.transitions.length,
+        type: automaton.type,
+      });
       notify({ severity: 'success', title: `Saved ${result.value.name}`, autoDismissMs: 3_000 });
     },
     [adapter, automaton, currentName, description, markSaved, notify, refreshRecents]
@@ -170,6 +179,7 @@ export function useFileSession(
     (content: string, displayName: string) => {
       const parsed = parseAutomataFile(content);
       if (!parsed.ok) {
+        logEvent('file.open.failed', { kind: parsed.error });
         notify({ severity: 'error', title: 'Could not open file', detail: errorMessage(parsed.error) });
         return;
       }
@@ -185,6 +195,11 @@ export function useFileSession(
       setCurrentName(normalizeName(displayName));
       recordRecent({ name: displayName, snapshot: content, saved: false });
       refreshRecents();
+      logEvent('file.opened', {
+        states: parsed.value.automaton.states.size,
+        transitions: parsed.value.automaton.transitions.length,
+        type: parsed.value.automaton.type,
+      });
       notify({ severity: 'success', title: `Opened ${displayName}`, autoDismissMs: 3_000 });
     },
     [epsilonSymbol, notify, refreshRecents, replaceSnapshot]

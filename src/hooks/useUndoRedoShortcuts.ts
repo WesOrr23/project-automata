@@ -12,6 +12,7 @@
  */
 
 import { useKeyboardScope } from './useKeyboardScope';
+import { logEvent } from '../telemetry';
 
 export type UseUndoRedoShortcutsOptions = {
   undo: () => void;
@@ -43,8 +44,13 @@ export function useUndoRedoShortcuts({ undo, redo, enabled = true }: UseUndoRedo
       if (!isModifier) return false;
       if (event.key.toLowerCase() !== 'z') return false;
       event.preventDefault();
-      if (event.shiftKey) redo();
-      else undo();
+      if (event.shiftKey) {
+        redo();
+        logEvent('redo');
+      } else {
+        undo();
+        logEvent('undo');
+      }
       return true;
     },
   });

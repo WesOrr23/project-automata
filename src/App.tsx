@@ -58,6 +58,7 @@ import { useDebugOverlay } from './hooks/useDebugOverlay';
 import { createAutomaton as createBlankAutomaton } from './engine/automaton';
 import { Shuffle, Contrast, Shrink, GitCompare } from 'lucide-react';
 import { exportCanvasAsPNG, exportCanvasAsSVG } from './ui-state/imageExport';
+import { logEvent } from './telemetry';
 
 const fileAdapter = createFileAdapter();
 function blankFactory() {
@@ -409,6 +410,11 @@ function App() {
   }
 
   function handleTabClick(tab: ToolTabID) {
+    const previousTab =
+      menuState.mode === 'OPEN' ? menuState.activeTab : null;
+    if (previousTab !== tab) {
+      logEvent('mode.switched', { from: previousTab, to: tab });
+    }
     setMenuState({ mode: 'OPEN', activeTab: tab });
   }
 
@@ -434,6 +440,7 @@ function App() {
     // new-reference-same-content snapshot onto the undo stack.
     if (type === automaton.type) return;
     setAutomaton((prev) => ({ ...prev, type }));
+    logEvent('type.changed', { from: automaton.type, to: type });
   }
 
   function handleAlphabetAdd(symbol: string) {
@@ -594,6 +601,15 @@ function App() {
       // setAutomaton. The runtime is sound — the updater ran once and
       // the assignment happened-before this read.
       const errorVariant: import('./engine/result').EngineError = capturedError;
+      // Telemetry — engine errors are interesting enough to log every
+      // time. Successful edits are logged at the per-handler level
+      // below where the user's intent (add state vs toggle accept) is
+      // unambiguous; here we only know "an edit failed." EngineError is
+      // a string literal union (not an object), so pass it directly.
+      logEvent('engine.error', {
+        kind: errorVariant,
+        ...(targetOnError !== undefined ? { target: targetOnError } : {}),
+      });
       // Conditional spreads keep `detail` / `target` omit-only so the
       // notification store never sees an explicit `undefined` (would
       // undermine exactOptionalPropertyTypes).
@@ -613,10 +629,12 @@ function App() {
     // addState always succeeds; wrap the {automaton, stateId} return in
     // a Result so applyEdit's signature stays uniform.
     applyEdit((prev) => ({ ok: true, value: addState(prev).automaton }));
+    logEvent('state.added');
   }
 
   function handleRemoveState(stateId: number) {
     applyEdit((prev) => removeState(prev, stateId));
+    logEvent('state.removed', { stateId });
   }
 
   function handleSetStartState(stateId: number) {
@@ -624,14 +642,17 @@ function App() {
     // state is already the start, so the undoable store's reference-
     // equality check naturally short-circuits the redundant write.
     applyEdit((prev) => setStartState(prev, stateId));
+    logEvent('state.start.set', { stateId });
   }
 
   function handleToggleAcceptState(stateId: number) {
+    const wasAccept = automaton.acceptStates.has(stateId);
     applyEdit((prev) =>
       prev.acceptStates.has(stateId)
         ? removeAcceptState(prev, stateId)
         : addAcceptState(prev, stateId)
     );
+    logEvent('state.accept.toggled', { stateId, becameAccept: !wasAccept });
   }
 
   /**
@@ -653,6 +674,10 @@ function App() {
     // history. The loops below would still build a new object even when
     // both lists are empty.
     if (removes.length === 0 && adds.length === 0) return;
+    logEvent('transition.batch', {
+      removes: removes.length,
+      adds: adds.length,
+    });
     // Funnel through applyEdit so a Result err (e.g. an
     // addTransitionDestination call hits a stale state) surfaces as a
     // notification. removeTransitionDestination is a pure no-op on bad
@@ -707,9 +732,11 @@ function App() {
   function handleStep() {
     if (sim.simulation === null || sim.status === 'finished') {
       if (!ensureInitialized()) return;
+      logEvent('simulate.start', { inputLength: inputString.length });
       return;
     }
     sim.stepForward();
+    logEvent('simulate.step');
   }
 
   function handlePlay() {
@@ -717,11 +744,13 @@ function App() {
       if (!ensureInitialized()) return;
     }
     sim.run();
+    logEvent('simulate.run', { inputLength: inputString.length });
   }
 
   function handleJumpTo(characterIndex: number) {
     if (inputString.length === 0) return;
     sim.jumpTo(characterIndex, inputString);
+    logEvent('simulate.jumpTo', { characterIndex });
   }
 
   const resultStatus: 'accepted' | 'rejected' | null =
@@ -733,11 +762,17 @@ function App() {
   function handleConvertToDfa() {
     const result = convertNfaToDfa(automaton);
     if (!result.ok) {
+      logEvent('operation.failed', { operation: 'convert', kind: result.error });
       notify({ severity: 'error', title: 'Convert failed', detail: errorMessage(result.error) });
       return;
     }
     setAutomaton(() => result.value.dfa);
     setConversionLabels({ automatonRef: result.value.dfa, subsetMap: result.value.subsetMap });
+    logEvent('operation.run', {
+      operation: 'convert',
+      stateCountBefore: automaton.states.size,
+      stateCountAfter: result.value.dfa.states.size,
+    });
     notify({
       severity: 'success',
       title: `Converted NFA to DFA — ${result.value.dfa.states.size} state${result.value.dfa.states.size === 1 ? '' : 's'}`,
@@ -748,12 +783,14 @@ function App() {
   function handleMinimize() {
     const result = minimizeDfa(automaton);
     if (!result.ok) {
+      logEvent('operation.failed', { operation: 'minimize', kind: result.error });
       notify({ severity: 'error', title: 'Minimize failed', detail: errorMessage(result.error) });
       return;
     }
     const before = automaton.states.size;
     const after = result.value.dfa.states.size;
     if (before === after) {
+      logEvent('operation.run', { operation: 'minimize', stateCountBefore: before, stateCountAfter: after, alreadyMinimal: true });
       notify({ severity: 'info', title: 'Already minimal', detail: 'No states could be merged.', autoDismissMs: 3_000 });
       return;
     }
@@ -761,6 +798,7 @@ function App() {
     // Drop conversion labels — minimization renumbers states; the old
     // subset map's keys no longer line up.
     setConversionLabels(null);
+    logEvent('operation.run', { operation: 'minimize', stateCountBefore: before, stateCountAfter: after });
     notify({
       severity: 'success',
       title: `Minimized DFA — ${before} states → ${after}`,
@@ -777,6 +815,7 @@ function App() {
     if (automaton.type === 'NFA') {
       const conv = convertNfaToDfa(automaton);
       if (!conv.ok) {
+        logEvent('operation.failed', { operation: 'complement', stage: 'convert', kind: conv.error });
         notify({ severity: 'error', title: 'Complement failed', detail: errorMessage(conv.error) });
         return;
       }
@@ -785,10 +824,12 @@ function App() {
     }
     const result = complementDfa(dfa);
     if (!result.ok) {
+      logEvent('operation.failed', { operation: 'complement', stage: 'complement', kind: result.error });
       notify({ severity: 'error', title: 'Complement failed', detail: errorMessage(result.error) });
       return;
     }
     setAutomaton(() => result.value);
+    logEvent('operation.run', { operation: 'complement', convertedFromNfa });
     notify({
       severity: 'success',
       title: 'Complemented DFA',
