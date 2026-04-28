@@ -44,6 +44,8 @@ import { isComplete } from './engine/validator';
 import { useSimulation } from './hooks/useSimulation';
 import { useUndoableAutomaton } from './hooks/useUndoableAutomaton';
 import { useUndoRedoShortcuts } from './hooks/useUndoRedoShortcuts';
+import { useSimulationShortcuts } from './hooks/useSimulationShortcuts';
+import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { useAutomatonSimulationGlue } from './hooks/useAutomatonSimulationGlue';
 import { useFileSession } from './hooks/useFileSession';
 import { useFileShortcuts } from './hooks/useFileShortcuts';
@@ -140,6 +142,13 @@ function App() {
   // modal — SimulationControls watches and focuses its Play button on
   // change so the user lands ready to start the run.
   const [playFocusSignal, setPlayFocusSignal] = useState(0);
+  // Bumped by the global F shortcut — AutomatonCanvas watches and
+  // calls fitToContent each time the value changes.
+  const [fitSignal, setFitSignal] = useState(0);
+  // First-launch tour state. Auto-shown if the user has never
+  // dismissed it (localStorage flag); the canvas Help button +
+  // global ? shortcut re-open it on demand.
+  const onboarding = useOnboarding();
   // Lifted from AutomatonCanvas via callback. Image-export action
   // needs the live SVG element to serialize. The export framing now
   // measures content bbox live (via getBBox on the inner content
@@ -172,14 +181,14 @@ function App() {
   // Derived application mode from the active tab. Used to gate visual
   // simulation effects (highlights), the preview overlay, and canvas
   // affordances — NOT to trigger resets.
-  const appMode: 'IDLE' | 'DEFINING' | 'EDITING' | 'SIMULATING' =
+  const appMode: 'VIEWING' | 'DEFINING' | 'EDITING' | 'SIMULATING' =
     menuState.mode === 'OPEN'
       ? (menuState.activeTab === 'EDIT'
           ? 'EDITING'
           : menuState.activeTab === 'SIMULATE'
             ? 'SIMULATING'
             : 'DEFINING')
-      : 'IDLE';
+      : 'VIEWING';
 
   // Live preview of "what the canvas will look like after the user commits
   // the in-progress edit." The preview's transitions are what gets laid out;
@@ -318,6 +327,29 @@ function App() {
   const inEditableStage =
     menuState.mode === 'OPEN' && menuState.activeTab !== 'SIMULATE';
   useUndoRedoShortcuts({ undo, redo, canUndo, canRedo, enabled: inEditableStage });
+
+  // Simulate-stage-only shortcuts: Space play/pause, ←/→ step. Gated
+  // on the simulate tab being open AND the keyboard scope's text-input
+  // filter (so typing into the Input field doesn't trigger Space-as-
+  // play). The onboarding tour's own Space/←/→ scope captures above
+  // these, so the tour preempts when open.
+  const inSimulateStage =
+    menuState.mode === 'OPEN' && menuState.activeTab === 'SIMULATE';
+  useSimulationShortcuts({
+    enabled: inSimulateStage,
+    isRunning: sim.status === 'running',
+    onPlay: handlePlay,
+    onPause: sim.pause,
+    onStep: handleStep,
+    onStepBack: sim.stepBack,
+  });
+
+  // Always-on shortcuts: F fits the canvas, ? opens the tour. Both
+  // scoped via useKeyboardScope so they don't fire while typing.
+  useGlobalShortcuts({
+    onFit: () => setFitSignal((n) => n + 1),
+    onShowTour: onboarding.show,
+  });
 
   // Display labels are sequential (q0, q1, q2) regardless of underlying IDs.
   // This detaches stable engine identity from user-visible numbering.
@@ -864,10 +896,6 @@ function App() {
   ];
 
   // ─── File session ───
-  // First-launch tour. Auto-shown if the user has never dismissed it
-  // (localStorage flag); the "Show tour" item in the CommandBar ⋯
-  // overflow re-opens it on demand.
-  const onboarding = useOnboarding();
   const debugOverlay = useDebugOverlay();
 
   const fileSession = useFileSession(
@@ -1116,6 +1144,7 @@ function App() {
             onShowTour={onboarding.show}
             debugOverlay={debugOverlay.enabled}
             onSvgRefChange={handleSvgRefChange}
+            fitSignal={fitSignal}
             bottomRightExtras={
               /* Discoverability hint while in EDIT mode and the form is
                  at rest. Sits at the bottom of the canvas-bottom-right

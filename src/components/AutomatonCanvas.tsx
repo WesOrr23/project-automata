@@ -123,6 +123,14 @@ type AutomatonCanvasProp = {
   onSvgRefChange?: (svg: SVGSVGElement | null) => void;
 
   /**
+   * Incrementing counter; when it changes the canvas runs
+   * fitToContent. Used by the global F-key shortcut so App can
+   * trigger fit without holding a ref to the viewport hook's
+   * imperative methods.
+   */
+  fitSignal?: number;
+
+  /**
    * Reports the measured cluster bbox (state-circle bounds in inner-g
    * local coords) up to App. The image-export framing needs this same
    * bbox to set viewBox; rather than re-measuring in App we reuse the
@@ -198,6 +206,7 @@ export function AutomatonCanvas({
   debugOverlay = false,
   onSvgRefChange,
   onContentBBoxChange,
+  fitSignal,
   viewportInset,
 }: AutomatonCanvasProp) {
   // The start-state arrow extends LEFT of the start-state circle, which
@@ -337,6 +346,18 @@ export function AutomatonCanvas({
     // fit-scale without affecting where 'center' lands.
     contentReserve: { left: 62, right: 0, top: 0, bottom: 0 },
   });
+
+  // Imperative fit trigger from App's global F-key shortcut. The
+  // signal is an incrementing counter; each new value runs fit once.
+  // Uses a ref to track the last seen value so the very first render
+  // (signal === undefined or 0) doesn't trigger an unwanted fit.
+  const lastFitSignalRef = useRef<number | undefined>(fitSignal);
+  useEffect(() => {
+    if (fitSignal === undefined) return;
+    if (lastFitSignalRef.current === fitSignal) return;
+    lastFitSignalRef.current = fitSignal;
+    fitToContent();
+  }, [fitSignal, fitToContent]);
 
   // Native (non-React) wheel handler — React's onWheel synthetic events
   // bubble as `passive: true` listeners by default, which means

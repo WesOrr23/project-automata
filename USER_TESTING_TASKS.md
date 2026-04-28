@@ -1,23 +1,5 @@
 # Project Automata — Test Tasks
 
-Hey, thanks for poking at this. It's a tool I'm building for visualizing
-and simulating finite automata. **You know FAs already** — I'm not
-testing your CS knowledge. I'm testing whether the *program* is
-expressive enough to let you do these comfortably.
-
-## Ground rules
-
-- Don't ask me how to do anything. If you can't find a feature, that's
-  the data point I want — try something else.
-- **Think aloud / write things down** as you go: surprises, dead ends,
-  "I expected X." That's the gold.
-- Refresh the page to start over; nothing autosaves.
-
-There's no order. Pick whichever sounds fun. Each task names a result;
-how you get there is on you.
-
----
-
 ## Task 1 — Even count
 
 Build a DFA over `{a, b}` that accepts strings with an **even number of
@@ -48,21 +30,3 @@ two are actually opposites.
 Pick the FA you're proudest of. Send me a picture of it suitable for
 pasting into a slide deck or homework PDF. You decide what "suitable"
 means.
-
----
-
-## After you finish
-
-A short brain-dump in any form (text, voice memo, email):
-
-1. Anything you wanted to do but couldn't figure out how?
-2. Anything that worked better than you expected?
-3. Three labeled stages run down the left sidebar — did the names and
-   their order make sense to you, or would you have organized it
-   differently?
-4. Was there a moment you got stuck or frustrated? What were you
-   trying to do?
-
-Beer's on me.
-
-— Wes

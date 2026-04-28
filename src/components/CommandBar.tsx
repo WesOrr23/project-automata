@@ -21,11 +21,13 @@
  *   EDIT segment (visible only when appMode === 'EDITING')
  *     ▸ [🔧 Operations]
  *
- *   SIMULATE segment (visible only when appMode === 'SIMULATING')
- *     ▸ [🖼 Export ▾]  — popover offering PNG (raster) and SVG (vector).
- *       Lives here because exporting a snapshot is a "after I've
- *       validated the FA" moment; the simulate stage is when that
- *       validation happens.
+ *   SIMULATE segment (visible in SIMULATING + VIEWING)
+ *     ▸ [🖼 Export ▾]  — popover offering PNG and SVG.
+ *       Lives here because exporting a snapshot is a "looking at
+ *       the FA" activity, not an editing one. Available in Simulate
+ *       (validating the FA) and in Viewing (no tab open — user is
+ *       just inspecting the canvas). Hidden in Define / Construct
+ *       so the bar stays focused on edit affordances during edits.
  *
  *   SIMULATE segment (reserved; nothing renders yet)
  *
@@ -63,11 +65,13 @@ const isMac =
 const modGlyph = isMac ? '\u2318' : 'Ctrl';
 const shiftGlyph = isMac ? '\u21e7' : 'Shift+';
 
-// Mirrors the active stage of the tool menu, plus IDLE for "menu
-// collapsed, no stage active." DEFINING + EDITING (Construct) are
-// treated as the "editable" stages; SIMULATING is read-only as far
-// as the FA structure is concerned.
-export type CommandBarAppMode = 'IDLE' | 'DEFINING' | 'EDITING' | 'SIMULATING';
+// Mirrors the active stage of the tool menu, plus VIEWING for "menu
+// not on a tab" (collapsed or hover-expanded). DEFINING + EDITING
+// (Construct) are the "editable" stages; SIMULATING is read-only as
+// far as FA structure goes; VIEWING is "just looking at the canvas"
+// (no edit affordances surfaced, but Export is — capturing the FA
+// is a viewing-stage activity).
+export type CommandBarAppMode = 'VIEWING' | 'DEFINING' | 'EDITING' | 'SIMULATING';
 
 export type OperationsItem = {
   id: string;
@@ -457,7 +461,7 @@ export function CommandBar({
             undoing a structural change mid-run leaves the sim
             holding a stale snapshot. ─── */}
       <AnimatePresence initial={false}>
-        {appMode !== 'SIMULATING' && appMode !== 'IDLE' && (
+        {appMode !== 'SIMULATING' && appMode !== 'VIEWING' && (
           <motion.div key="history-segment" className="command-bar-segment" {...segmentMotion}>
             <div className="command-bar-divider" aria-hidden="true" />
             <button
@@ -554,7 +558,7 @@ export function CommandBar({
             it on the simulate stage matches that workflow moment.
             Single Export button with a popover offers PNG / SVG. ─── */}
       <AnimatePresence initial={false}>
-        {appMode === 'SIMULATING' && (onExportPNG || onExportSVG) && (
+        {(appMode === 'SIMULATING' || appMode === 'VIEWING') && (onExportPNG || onExportSVG) && (
           <motion.div key="simulate-segment" className="command-bar-segment" {...segmentMotion}>
             <div className="command-bar-divider" aria-hidden="true" />
             <button
