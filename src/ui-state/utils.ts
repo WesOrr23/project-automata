@@ -9,7 +9,7 @@
 import { Graphviz } from '@hpcc-js/wasm-graphviz';
 import { Automaton } from '../engine/types';
 import { AutomatonUI, StateUI, TransitionUI, createDefaultLabel } from './types';
-import { STATE_RADIUS } from './constants';
+import { STATE_RADIUS, START_ARROW_VISUAL_WIDTH_INCHES } from './constants';
 
 /**
  * Padding around the graph in the SVG canvas (pixels)
@@ -114,11 +114,12 @@ function automatonToDot(automaton: Automaton): string {
   // The phantom is style=invis (renders nothing) but participates in
   // layout — it pushes the start state into a column to its right and
   // expands the bounding box to include the arrow's reserved area.
-  // Width chosen to comfortably hold ARROW_LENGTH (50px) + arrowhead
-  // (~8px) at GraphViz's 72-DPI scale.
+  // Width derives from START_ARROW_VISUAL_WIDTH so changing the arrow's
+  // pixel dimensions automatically resizes the layout reserve.
   // (startState is non-nullable per the engine type — createAutomaton
   // always seeds state 0 and removeState reassigns rather than clearing.)
-  lines.push(`  ${START_PHANTOM_NAME} [shape=point, width=0.85, fixedsize=true, style=invis];`);
+  const phantomWidth = START_ARROW_VISUAL_WIDTH_INCHES.toFixed(4);
+  lines.push(`  ${START_PHANTOM_NAME} [shape=point, width=${phantomWidth}, fixedsize=true, style=invis];`);
   lines.push(`  ${START_PHANTOM_NAME} -> ${automaton.startState} [style=invis];`);
 
   // Without further constraints, isolated states (those with no incoming

@@ -10,7 +10,11 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { HelpCircle } from 'lucide-react';
 import { Automaton } from '../engine/types';
 import { AutomatonUI } from '../ui-state/types';
-import { STATE_RADIUS } from '../ui-state/constants';
+import {
+  STATE_RADIUS,
+  START_ARROW_VISUAL_WIDTH,
+  START_ARROW_TOTAL_RESERVE,
+} from '../ui-state/constants';
 import { StateNode } from './StateNode';
 import { TransitionEdge } from './TransitionEdge';
 import { StartStateArrow } from './StartStateArrow';
@@ -200,19 +204,19 @@ export function AutomatonCanvas({
 }: AutomatonCanvasProp) {
   // The start-state arrow extends LEFT of the start-state circle, which
   // is outside GraphViz's computed bounding box. Reserve room via an
-  // inner translate. We *also* measure the actual rendered bbox post-
-  // layout (see contentBBox below) and pass that to the viewport hook,
-  // because GraphViz's bbox doesn't reliably match the rendered SVG
-  // extent (states sometimes lay out at non-zero offsets within the
-  // bbox), and centering needs the true visible rect to be accurate.
-  const START_ARROW_RESERVE = 70;
+  // inner translate using START_ARROW_TOTAL_RESERVE (visual width +
+  // padding). We *also* measure the actual rendered bbox post-layout
+  // (see contentBBox below) and pass that to the viewport hook, because
+  // GraphViz's bbox doesn't reliably match the rendered SVG extent
+  // (states sometimes lay out at non-zero offsets within the bbox), and
+  // centering needs the true visible rect to be accurate.
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [viewportSize, setViewportSize] = useState<{ width: number; height: number } | null>(
     null
   );
   // Measured bounding box of the content `<g>` (in the inner group's
-  // local coord space, before the START_ARROW_RESERVE inner translate).
+  // local coord space, before the START_ARROW_TOTAL_RESERVE inner translate).
   // Initialized to a falsy fallback derived from automatonUI; replaced
   // by the real measurement once the SVG has laid out.
   const [contentBBox, setContentBBox] = useState<{
@@ -287,7 +291,7 @@ export function AutomatonCanvas({
 
   // Effective content size + origin for the viewport hook. The bbox's
   // local-space origin (b.x, b.y) is shifted by the inner translate
-  // (-START_ARROW_RESERVE, 0) before becoming the visual origin in
+  // (-START_ARROW_TOTAL_RESERVE, 0) before becoming the visual origin in
   // the outer-g coordinate space.
   //
   // We pass `null` until the layout effect has measured the actual
@@ -304,8 +308,8 @@ export function AutomatonCanvas({
     ? { width: measured.width, height: measured.height }
     : null;
   const effectiveOrigin = measured
-    ? { x: measured.x - START_ARROW_RESERVE, y: measured.y }
-    : { x: -START_ARROW_RESERVE, y: 0 };
+    ? { x: measured.x - START_ARROW_TOTAL_RESERVE, y: measured.y }
+    : { x: -START_ARROW_TOTAL_RESERVE, y: 0 };
 
   const {
     transform,
@@ -329,10 +333,13 @@ export function AutomatonCanvas({
     // undefined when the caller didn't provide one.
     ...(viewportInset !== undefined ? { viewportInset } : {}),
     contentOrigin: effectiveOrigin,
-    // Start arrow extends ~62px LEFT of the cluster bbox; reserve
-    // that width in the FIT calculation so the arrow has room at
-    // fit-scale without affecting where 'center' lands.
-    contentReserve: { left: 62, right: 0, top: 0, bottom: 0 },
+    // Start arrow extends START_ARROW_VISUAL_WIDTH px LEFT of the
+    // cluster bbox; reserve that width in the FIT calculation so the
+    // arrow has room at fit-scale without affecting where 'center'
+    // lands. (The inner-g translate above uses TOTAL_RESERVE which
+    // includes extra padding; fit only needs the visible width so the
+    // arrow's tip reaches the viewport edge, not beyond it.)
+    contentReserve: { left: START_ARROW_VISUAL_WIDTH, right: 0, top: 0, bottom: 0 },
   });
 
   // Imperative fit trigger from App's global F-key shortcut. The
@@ -470,7 +477,7 @@ export function AutomatonCanvas({
         transform={transform}
         className={isAnimating ? 'canvas-content-animating' : undefined}
       >
-        <g transform={`translate(${-START_ARROW_RESERVE} 0)`}>
+        <g transform={`translate(${-START_ARROW_TOTAL_RESERVE} 0)`}>
       {/* Layer 1: Transition edges (background) */}
       {automatonUI.transitions.map((transition, index) => {
         // A consolidated edge matches the simulation's "next transition"

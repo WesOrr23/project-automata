@@ -3,7 +3,19 @@
  *
  * Renders an arrow pointing to the start state from the left.
  * The arrow points to the edge of the state circle, not the center.
+ *
+ * The three primitives (line length, head gap, head size) live in
+ * `ui-state/constants.ts` so layout-side code (the AutomatonCanvas
+ * inner-group translate, the GraphViz phantom-node width) can derive
+ * matching reserve values from a single source. See
+ * `START_ARROW_VISUAL_WIDTH` for the derived total.
  */
+
+import {
+  START_ARROW_LINE_LENGTH,
+  START_ARROW_HEAD_GAP,
+  START_ARROW_HEAD_SIZE,
+} from '../ui-state/constants';
 
 type StartStateArrowProp = {
   /** X coordinate of the target state center */
@@ -15,17 +27,6 @@ type StartStateArrowProp = {
   /** Radius of the state circle (to calculate edge intersection) */
   stateRadius: number;
 };
-
-/**
- * Visual constants for start arrow
- */
-const ARROW_LENGTH = 50; // Length of the arrow line
-const ARROWHEAD_SIZE = 8; // Size of the arrowhead triangle
-// Visible gap between the line's tail end and the arrowhead's base.
-// Matches the breathing whitespace used by transition-edge arrowheads
-// elsewhere in the canvas — the line should "point at" the head, not
-// kiss it.
-const ARROW_HEAD_GAP = 4;
 
 export function StartStateArrow({
   targetX,
@@ -40,10 +41,10 @@ export function StartStateArrow({
   //                between the line and head, matching the transition
   //                edges' arrowhead spacing.
   const tipX = targetX - stateRadius;
-  const baseX = tipX - ARROWHEAD_SIZE;
-  const lineEndX = baseX - ARROW_HEAD_GAP;
+  const baseX = tipX - START_ARROW_HEAD_SIZE;
+  const lineEndX = baseX - START_ARROW_HEAD_GAP;
   const endY = targetY;
-  const startX = lineEndX - ARROW_LENGTH;
+  const startX = lineEndX - START_ARROW_LINE_LENGTH;
   const startY = targetY;
 
   return (
@@ -63,7 +64,7 @@ export function StartStateArrow({
 
       {/* Arrowhead — triangle pointing right. Tip touches the circle. */}
       <polygon
-        points={`${tipX},${endY} ${baseX},${endY - ARROWHEAD_SIZE / 2} ${baseX},${endY + ARROWHEAD_SIZE / 2}`}
+        points={`${tipX},${endY} ${baseX},${endY - START_ARROW_HEAD_SIZE / 2} ${baseX},${endY + START_ARROW_HEAD_SIZE / 2}`}
         fill="black"
       />
     </g>
