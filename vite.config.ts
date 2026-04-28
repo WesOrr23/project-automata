@@ -3,6 +3,11 @@ import react from '@vitejs/plugin-react'
 
 // Vite configuration: https://vite.dev/config/
 export default defineConfig({
+  // GitHub Pages serves the site under https://wesorr23.github.io/project_automata/,
+  // so all built asset URLs need this prefix. The `dev` server doesn't apply
+  // it (it serves at /), so localhost workflow is unaffected.
+  base: '/project_automata/',
+
   // Enable React plugin to handle JSX/TSX files
   plugins: [react()],
 

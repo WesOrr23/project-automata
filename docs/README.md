@@ -3,7 +3,7 @@
 Project documentation, organized by purpose.
 
 ## `iterations/`
-Per-iteration plan + completion notes. Each iteration has at least a `*_PLAN.md` and `*_COMPLETE.md`; some have additional architecture/audit/testing files (notably iteration 5).
+One canonical file per iteration, all following the structure of `ITERATION1_COMPLETE.md`. Completed iterations are named `*_COMPLETE.md`; the in-flight one is `*_IN_PROGRESS.md`.
 
 Read these to understand **what shipped when, and why**.
 
@@ -13,6 +13,7 @@ Long-lived reference material that doesn't belong to any one iteration:
 - `CONFIG_GUIDE.md` — config-pane controls and what they do
 - `QUICK_REFERENCE.md` — keyboard shortcuts, common operations
 - `ONBOARDING_DESIGN.md` — first-run UX design
+- `UI_ARCHITECTURE.md` — deep dive on UI infrastructure for cross-project reuse
 
 ## `brainstorms/`
 Open-ended design exploration. These are *thinking documents*, not committed plans:
@@ -22,12 +23,5 @@ Open-ended design exploration. These are *thinking documents*, not committed pla
 - `STUDENT_USABILITY_BRAINSTORM.md` — usability concerns for student users
 
 ## `planning/`
-Forward-looking docs about what's next:
-- `FUTURE_ITERATIONS.md` — backlog
-- `NEXT_FEATURES.md` — priority candidates
-- `NEXT_SESSION_HANDOFF.md` — session-to-session context handoff
-- `USER_TESTING_TASKS.md` — friend-test task list
-
-## `archive/`
-Historical material kept for reference but not actively maintained:
-- `DEBATE.md` — long-form debate over early architecture decisions
+Single forward-looking document — what's next, working style, deferred items, friend-test tasks.
+- `PLANNING.md` — roadmap, conventions, open backlog, known bugs, user-test tasks

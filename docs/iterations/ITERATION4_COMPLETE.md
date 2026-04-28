@@ -1,15 +1,18 @@
 # Iteration 4: Simulation + Visual Feedback
 
-**Status**: COMPLETE
+**Goal**: Working interactive DFA simulator — users can enter input, step or auto-play through simulation with visual state highlighting and accept/reject feedback.
+
+**Status**: **COMPLETE** — All 131 tests passing, first major interactive milestone shipped.
+
 **Start Date**: 2026-04-03
 **Completion Date**: 2026-04-04
 **Branch**: `iteration-4`
 
 ---
 
-## Completion Summary
+## What We Built
 
-### What Was Achieved
+### Completion Summary
 
 Iteration 4 transformed the app from a static visualization into an interactive DFA simulator — the **first major milestone**. Users can enter an input string, step through or auto-play the simulation, and see the automaton respond with state highlighting, transition highlighting, and accept/reject results.
 
@@ -118,10 +121,72 @@ A full UI redesign was also completed, moving from a test-page layout to a polis
 - Sidebar collapse button uses basic `‹` / `›` characters — could use proper icons
 - SVG colors hardcoded instead of using CSS variables (SVG limitation)
 
-### Next Steps
+## Status State Machine
 
-Iteration 5: Manual Editing
+The simulation hook implements a clear state machine:
+
+```
+idle     → step     → idle (or finished if input exhausted)
+idle     → run      → running
+idle     → stepBack → idle (if history exists)
+running  → auto-step exhausts input → finished
+running  → pause    → paused
+paused   → step     → paused (or finished)
+paused   → stepBack → paused
+paused   → run      → running
+finished → step     → re-initializes → idle
+finished → run      → re-initializes → running
+finished → stepBack → idle
+ANY      → reset    → idle
+ANY      → initialize → idle (auto-resets)
+```
+
+---
+
+## File Structure
+
+```
+/src
+  /hooks
+    - useSimulation.ts          # Reducer + hook with history, auto-step timer
+    - useSimulation.test.ts     # 33 pure reducer tests
+  /components
+    - InputPanel.tsx            # Text input with alphabet filtering
+    - SimulationControls.tsx    # Playback + speed + character progress + result banner
+    - AutomatonCanvas.tsx       # MODIFIED: pass-through for activeStateIds, resultStatus, nextTransition
+    - StateNode.tsx             # MODIFIED: activated isActive, added resultStatus
+    - TransitionEdge.tsx        # MODIFIED: added isNextTransition for blue highlighting
+  /ui-state
+    - constants.ts              # MODIFIED: shared simulation speed constants
+  - App.tsx                     # REWRITE: floating sidebar layout, simulation wiring
+  - main.tsx                    # MODIFIED: CSS import added
+  - index.css                   # NEW: design system tokens, components, layout
+```
+
+---
+
+## Metrics
+
+- **Test Coverage**: 131 tests, 100% passing (98 prior + 33 new hook tests)
+- **Type Safety**: TypeScript clean
+- **Engine Changes**: Zero — all simulation logic was already built in Iteration 1
+
+---
+
+## What's Next: Iteration 5
+
+Manual editing:
 - Add/remove states via UI
 - Add/remove transitions
 - Edit labels
 - Save modified automaton to JSON
+
+---
+
+## Lessons Learned
+
+1. **`useReducer` shines for state machines** — the simulation has multiple interrelated fields with strict transition rules; centralizing them in a pure reducer was the right call.
+2. **History array beats re-computation** — storing snapshots makes O(1) backward navigation trivial; memory cost is negligible for DFAs.
+3. **`setTimeout` chains naturally** — each step → re-render → effect → next timeout, avoiding stale closure bugs from `setInterval`.
+4. **Always-editable input eliminated a button** — auto-resetting on input change made "Reset" disappear as a concept.
+5. **SVG colors must be hardcoded** — SVG elements don't inherit CSS custom properties reliably; comment them with their token names instead.

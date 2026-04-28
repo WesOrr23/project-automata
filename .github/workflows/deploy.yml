@@ -1,0 +1,70 @@
+# Build and deploy the Vite app to GitHub Pages.
+#
+# Triggers on every push to main. Builds via `npm run build` (which runs
+# `tsc -b && vite build`), uploads the `dist/` directory as the Pages
+# artifact, and deploys it. GitHub Pages serves the result at
+# https://wesorr23.github.io/project_automata/ — note the repo-name
+# prefix, which is why vite.config.ts sets `base: '/project_automata/'`.
+#
+# Permissions follow the GitHub-recommended pattern for Pages
+# deployment: `pages: write` to publish, `id-token: write` for OIDC
+# attestation. `contents: read` is the default repo read.
+#
+# Concurrency: cancel in-flight runs of the same workflow when a newer
+# commit lands — only the latest deploy matters.
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  # Allow manual trigger from the Actions tab — useful for re-deploying
+  # without pushing a new commit (e.g. after toggling the Pages source).
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
