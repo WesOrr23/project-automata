@@ -42,16 +42,21 @@ function setupHook(args?: {
 describe('useCanvasViewport', () => {
   it('with both sizes available from render 0, auto-FITS content (so 100% display = fit)', () => {
     // contentBox 800x600 in viewport 1000x800.
-    // visible (no inset) = 1000x800; available (FIT_PADDING 40 each side)
-    //   = 920x720. fitScale = min(920/800, 720/600) = min(1.15, 1.2) = 1.15.
-    // Centered: panX = (1000 - 800*1.15)/2 = 40; panY = (800 - 600*1.15)/2 = 55.
+    // Auto-fit uses DISPLAY_FIT_PADDING=180 (intentionally relaxed
+    // so "100% display" is a comfortable view, not a tight crop —
+    // see useCanvasViewport.ts header comment about FIT_PADDING vs
+    // DISPLAY_FIT_PADDING).
+    //   available = (1000-360) x (800-360) = 640x440.
+    //   fitScale = min(640/800, 440/600) = min(0.8, 0.7333) = 0.7333.
+    // Centered: panX = (1000 - 800*0.7333)/2 ≈ 206.67;
+    //           panY = (800 - 600*0.7333)/2 = 180.
     const { result } = setupHook({
       contentBoundingBox: STANDARD_BOX,
       viewportSize: STANDARD_VIEWPORT,
     });
-    expect(result.current.viewport.scale).toBeCloseTo(1.15, 4);
-    expect(result.current.viewport.panX).toBeCloseTo(40, 4);
-    expect(result.current.viewport.panY).toBeCloseTo(55, 4);
+    expect(result.current.viewport.scale).toBeCloseTo(0.7333, 3);
+    expect(result.current.viewport.panX).toBeCloseTo(206.67, 1);
+    expect(result.current.viewport.panY).toBeCloseTo(180, 1);
   });
 
   it('starts at scale=1 / pan=0,0 when sizes are unknown', () => {
@@ -245,15 +250,16 @@ describe('useCanvasViewport', () => {
   });
 
   it('fitToContent scales content to fit viewport with padding and centers it', () => {
-    // Content 800x600 in a 1000x800 viewport with 40px padding =>
-    // scaleX = 920/800 = 1.15, scaleY = 720/600 = 1.2 → use min = 1.15.
+    // Content 800x600 in a 1000x800 viewport. fitToContent uses
+    // DISPLAY_FIT_PADDING=180 (relaxed) so a Fit click lands on the
+    // same scale the % chip displays as 100%.
+    //   available = 640x440; fitScale = min(0.8, 0.7333) = 0.7333.
+    //   panX = (1000 - 586.67)/2 ≈ 206.67; panY = (800 - 440)/2 = 180.
     const { result } = setupHook({ contentBoundingBox: STANDARD_BOX, viewportSize: STANDARD_VIEWPORT });
     act(() => result.current.fitToContent());
-    expect(result.current.viewport.scale).toBeCloseTo(1.15, 4);
-    // Centering: (1000 - 800*1.15)/2 = (1000 - 920)/2 = 40
-    expect(result.current.viewport.panX).toBeCloseTo(40, 4);
-    // (800 - 600*1.15)/2 = (800 - 690)/2 = 55
-    expect(result.current.viewport.panY).toBeCloseTo(55, 4);
+    expect(result.current.viewport.scale).toBeCloseTo(0.7333, 3);
+    expect(result.current.viewport.panX).toBeCloseTo(206.67, 1);
+    expect(result.current.viewport.panY).toBeCloseTo(180, 1);
   });
 
   it('fitToContent is a no-op if content or viewport is unknown', () => {

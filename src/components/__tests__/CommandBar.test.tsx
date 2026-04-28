@@ -1,12 +1,18 @@
 /**
  * @vitest-environment jsdom
  *
- * RTL tests for CommandBar. Covers:
- *   - file segment is present in every appMode
- *   - EDIT segment (undo/redo + Convert to DFA) appears in EDITING and
- *     hides in IDLE / SIMULATING
- *   - clicks on file + edit buttons dispatch the right callbacks
- *   - the ⋯ popover opens, lists Save As + Recents, dispatches
+ * RTL tests for CommandBar against the post-iter-17 layout. The bar
+ * is now a four-segment context menu that changes shape with appMode:
+ *
+ *   FILE       — always: filename (rename) + [📂 File ▾] dropdown
+ *   HISTORY    — DEFINING / EDITING when canUndo || canRedo: undo / redo
+ *   EDIT       — EDITING only: [🔧 Tools ▾]
+ *   SIMULATE   — SIMULATING / VIEWING: [🖼 Export ▾]
+ *
+ * Most of what the prior layout asserted (callbacks fire, popovers
+ * open, recents render) is still verifiable — the test bodies just
+ * have to open the File popover first instead of clicking standalone
+ * buttons that no longer exist.
  */
 
 import type { ComponentProps } from 'react';
@@ -16,7 +22,7 @@ import { CommandBar, type CommandBarAppMode } from '../CommandBar';
 
 function makeProps(overrides: Partial<ComponentProps<typeof CommandBar>> = {}) {
   return {
-    appMode: 'IDLE' as CommandBarAppMode,
+    appMode: 'VIEWING' as CommandBarAppMode,
     currentName: null,
     isDirty: false,
     recents: [],
@@ -37,24 +43,14 @@ function makeProps(overrides: Partial<ComponentProps<typeof CommandBar>> = {}) {
 }
 
 describe('CommandBar — file segment', () => {
-  it('is present in IDLE mode', () => {
-    const { getByLabelText, getByText } = render(<CommandBar {...makeProps()} />);
-    expect(getByLabelText('New')).toBeTruthy();
-    expect(getByLabelText('Open')).toBeTruthy();
-    expect(getByLabelText('Save')).toBeTruthy();
-    expect(getByText('Untitled')).toBeTruthy();
-  });
-
-  it('is present in EDITING mode', () => {
-    const { getByLabelText } = render(<CommandBar {...makeProps({ appMode: 'EDITING' })} />);
-    expect(getByLabelText('New')).toBeTruthy();
-    expect(getByLabelText('Save')).toBeTruthy();
-  });
-
-  it('is present in SIMULATING mode', () => {
-    const { getByLabelText } = render(<CommandBar {...makeProps({ appMode: 'SIMULATING' })} />);
-    expect(getByLabelText('New')).toBeTruthy();
-    expect(getByLabelText('Save')).toBeTruthy();
+  it('shows the File menu trigger in every appMode', () => {
+    for (const mode of ['VIEWING', 'DEFINING', 'EDITING', 'SIMULATING'] as const) {
+      const { getByLabelText, unmount } = render(
+        <CommandBar {...makeProps({ appMode: mode })} />
+      );
+      expect(getByLabelText('File menu')).toBeTruthy();
+      unmount();
+    }
   });
 
   it('shows the current filename and dirty marker', () => {
@@ -65,20 +61,44 @@ describe('CommandBar — file segment', () => {
     expect(container.querySelector('.command-bar-dirty-dot')).toBeTruthy();
   });
 
-  it('dispatches file callbacks on click', () => {
+  // The popover items don't have aria-labels — they're standard
+  // <button>s with text + a keyboard-shortcut chip. The accessible
+  // name is "Save⌘S" on Mac, "SaveCtrlS" on other platforms (jsdom
+  // doesn't pretend to be Mac), so we look up the inner label
+  // <span> by exact text and click its closest <button>. Disambig-
+  // uates Save from Save As… without depending on the shortcut glyph.
+  function clickFileItem(container: HTMLElement, openMenu: () => void, exactLabel: string) {
+    openMenu();
+    const labelSpan = Array.from(container.querySelectorAll('.command-bar-popover-item-label-inline'))
+      .find((el) => el.textContent === exactLabel);
+    if (!labelSpan) throw new Error(`File popover item not found: ${exactLabel}`);
+    const button = labelSpan.closest('button');
+    if (!button) throw new Error(`Item ${exactLabel} is not inside a <button>`);
+    fireEvent.click(button);
+  }
+
+  it('opens the File popover and dispatches file callbacks', () => {
     const props = makeProps();
-    const { getByLabelText } = render(<CommandBar {...props} />);
-    fireEvent.click(getByLabelText('New'));
-    fireEvent.click(getByLabelText('Open'));
-    fireEvent.click(getByLabelText('Save'));
+    const { container, getByLabelText } = render(<CommandBar {...props} />);
+    const openMenu = () => fireEvent.click(getByLabelText('File menu'));
+    clickFileItem(container, openMenu, 'New');
+    clickFileItem(container, openMenu, 'Open…');
+    clickFileItem(container, openMenu, 'Save');
     expect(props.onNew).toHaveBeenCalledTimes(1);
     expect(props.onOpen).toHaveBeenCalledTimes(1);
     expect(props.onSave).toHaveBeenCalledTimes(1);
   });
+
+  it('File popover exposes Save As', () => {
+    const props = makeProps();
+    const { container, getByLabelText } = render(<CommandBar {...props} />);
+    clickFileItem(container, () => fireEvent.click(getByLabelText('File menu')), 'Save As…');
+    expect(props.onSaveAs).toHaveBeenCalledTimes(1);
+  });
 });
 
-describe('CommandBar — EDIT segment', () => {
-  it('hides undo/redo in IDLE', () => {
+describe('CommandBar — HISTORY segment (undo/redo)', () => {
+  it('hides undo/redo in VIEWING', () => {
     const { queryByLabelText } = render(<CommandBar {...makeProps()} />);
     expect(queryByLabelText('Undo')).toBeNull();
     expect(queryByLabelText('Redo')).toBeNull();
@@ -95,6 +115,14 @@ describe('CommandBar — EDIT segment', () => {
   it('shows undo/redo in EDITING', () => {
     const { getByLabelText } = render(
       <CommandBar {...makeProps({ appMode: 'EDITING' })} />
+    );
+    expect(getByLabelText('Undo')).toBeTruthy();
+    expect(getByLabelText('Redo')).toBeTruthy();
+  });
+
+  it('shows undo/redo in DEFINING (post-iter-12 stage-agnostic edits)', () => {
+    const { getByLabelText } = render(
+      <CommandBar {...makeProps({ appMode: 'DEFINING' })} />
     );
     expect(getByLabelText('Undo')).toBeTruthy();
     expect(getByLabelText('Redo')).toBeTruthy();
@@ -118,23 +146,10 @@ describe('CommandBar — EDIT segment', () => {
   });
 });
 
-describe('CommandBar — ⋯ popover', () => {
-  it('opens on click and exposes Save As', () => {
-    const props = makeProps();
-    const { getByLabelText, getByText } = render(<CommandBar {...props} />);
-    fireEvent.click(getByLabelText('More file actions'));
-    const saveAs = getByText('Save As…');
-    expect(saveAs).toBeTruthy();
-    fireEvent.click(saveAs);
-    expect(props.onSaveAs).toHaveBeenCalledTimes(1);
-  });
-
-});
-
-describe('CommandBar — Recents popover (own button)', () => {
-  it('renders empty-recents message', () => {
+describe('CommandBar — Recents (in File popover)', () => {
+  it('renders empty-recents message inside the File popover', () => {
     const { getByLabelText, getByText } = render(<CommandBar {...makeProps()} />);
-    fireEvent.click(getByLabelText('Recents'));
+    fireEvent.click(getByLabelText('File menu'));
     expect(getByText('No recent files')).toBeTruthy();
   });
 
@@ -152,13 +167,12 @@ describe('CommandBar — Recents popover (own button)', () => {
       ],
     });
     const { getByLabelText, getByText } = render(<CommandBar {...props} />);
-    fireEvent.click(getByLabelText('Recents'));
-    const openBtn = getByText('foo.json');
-    fireEvent.click(openBtn);
+    fireEvent.click(getByLabelText('File menu'));
+    fireEvent.click(getByText('foo.json'));
     expect(props.onOpenRecent).toHaveBeenCalledWith('a');
 
     // Re-open the popover (clicking a recent closes it).
-    fireEvent.click(getByLabelText('Recents'));
+    fireEvent.click(getByLabelText('File menu'));
     fireEvent.click(getByLabelText('Forget foo.json'));
     expect(props.onForgetRecent).toHaveBeenCalledWith('a');
   });
@@ -206,25 +220,65 @@ describe('CommandBar — inline rename', () => {
   });
 });
 
-describe('CommandBar — Operations menu in EDIT segment', () => {
-  it('renders the Operations button only in EDITING', () => {
-    const cats = [{ id: 'c', label: 'Conv', items: [{ id: 'x', label: 'X', enabled: true, onClick: vi.fn() }] }];
-    const idleRender = render(<CommandBar {...makeProps({ operationsCategories: cats })} />);
-    expect(idleRender.queryByLabelText('Operations')).toBeNull();
-    idleRender.unmount();
-    const editRender = render(<CommandBar {...makeProps({ appMode: 'EDITING', operationsCategories: cats })} />);
-    expect(editRender.getByLabelText('Operations')).toBeTruthy();
+describe('CommandBar — Tools (Operations) menu in EDIT segment', () => {
+  it('renders the Tools button only in EDITING', () => {
+    const cats = [
+      { id: 'c', label: 'Conv', items: [{ id: 'x', label: 'X', enabled: true, onClick: vi.fn() }] },
+    ];
+    const viewingRender = render(<CommandBar {...makeProps({ operationsCategories: cats })} />);
+    expect(viewingRender.queryByLabelText('Tools')).toBeNull();
+    viewingRender.unmount();
+    const editRender = render(
+      <CommandBar {...makeProps({ appMode: 'EDITING', operationsCategories: cats })} />
+    );
+    expect(editRender.getByLabelText('Tools')).toBeTruthy();
   });
 
-  it('clicking Operations opens a popover with the categories', () => {
+  it('clicking Tools opens a popover with the categories', () => {
     const onClick = vi.fn();
-    const cats = [{ id: 'c', label: 'Conversions', items: [{ id: 'x', label: 'Convert', enabled: true, onClick }] }];
+    const cats = [
+      {
+        id: 'c',
+        label: 'Conversions',
+        items: [{ id: 'x', label: 'Convert', enabled: true, onClick }],
+      },
+    ];
     const { getByLabelText, getByText } = render(
       <CommandBar {...makeProps({ appMode: 'EDITING', operationsCategories: cats })} />
     );
-    fireEvent.click(getByLabelText('Operations'));
+    fireEvent.click(getByLabelText('Tools'));
     expect(getByText('Conversions')).toBeTruthy();
     fireEvent.click(getByText('Convert'));
     expect(onClick).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('CommandBar — SIMULATE segment (Export)', () => {
+  it('shows Export pill in VIEWING', () => {
+    const { getByLabelText } = render(
+      <CommandBar {...makeProps({ onExportPNG: vi.fn(), onExportSVG: vi.fn() })} />
+    );
+    expect(getByLabelText('Export')).toBeTruthy();
+  });
+
+  it('shows Export pill in SIMULATING', () => {
+    const { getByLabelText } = render(
+      <CommandBar
+        {...makeProps({ appMode: 'SIMULATING', onExportPNG: vi.fn(), onExportSVG: vi.fn() })}
+      />
+    );
+    expect(getByLabelText('Export')).toBeTruthy();
+  });
+
+  it('hides Export pill in DEFINING / EDITING (edit-focused stages)', () => {
+    for (const mode of ['DEFINING', 'EDITING'] as const) {
+      const { queryByLabelText, unmount } = render(
+        <CommandBar
+          {...makeProps({ appMode: mode, onExportPNG: vi.fn(), onExportSVG: vi.fn() })}
+        />
+      );
+      expect(queryByLabelText('Export')).toBeNull();
+      unmount();
+    }
   });
 });

@@ -2,7 +2,8 @@
  * @vitest-environment jsdom
  *
  * RTL tests for CanvasZoomControls. Covers click dispatch on each of
- * the four buttons + disabled-state at scale extremes.
+ * the four buttons, disabled-state at scale extremes, and the iter-17
+ * two-stage middle button (Recenter vs Fit, gated on isCentered).
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -14,6 +15,10 @@ function defaultProps() {
     zoomIn: vi.fn(),
     zoomOut: vi.fn(),
     fitToContent: vi.fn(),
+    centerToContent: vi.fn(),
+    // Default: FA is centered → middle button is in the Fit branch.
+    // Tests for the Recenter branch flip this to false explicitly.
+    isCentered: true,
     atMaxScale: false,
     atMinScale: false,
     scale: 1,
@@ -45,11 +50,20 @@ describe('CanvasZoomControls', () => {
     expect(props.zoomOut).toHaveBeenCalledTimes(1);
   });
 
-  it('Fit click invokes fitToContent', () => {
+  it('Fit click invokes fitToContent (when isCentered)', () => {
     const props = defaultProps();
     const { getByLabelText } = render(<CanvasZoomControls {...props} />);
     fireEvent.click(getByLabelText(/Fit to view/));
     expect(props.fitToContent).toHaveBeenCalledTimes(1);
+    expect(props.centerToContent).not.toHaveBeenCalled();
+  });
+
+  it('Recenter click invokes centerToContent (when NOT isCentered)', () => {
+    const props = { ...defaultProps(), isCentered: false };
+    const { getByLabelText } = render(<CanvasZoomControls {...props} />);
+    fireEvent.click(getByLabelText(/Recenter/));
+    expect(props.centerToContent).toHaveBeenCalledTimes(1);
+    expect(props.fitToContent).not.toHaveBeenCalled();
   });
 
   it('Zoom in is disabled at max scale', () => {
