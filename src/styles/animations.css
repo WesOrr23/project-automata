@@ -153,23 +153,19 @@
   animation: pulse-die 0.7s ease-out 1 forwards;
 }
 
-/* Transition-creator slot pulse (lives in tool-menu.css). Keyframe is
- * shared with no other consumer right now, but it belongs with the
- * other animation keyframes. */
+/* Transition-creator slot pulse (lives in tool-menu.css). Stroke-only
+ * — was a filter drop-shadow halo through iter-17, replaced per user-
+ * test feedback ("I don't want the halo at all"). */
 @keyframes mini-transition-pulse {
-  0%, 100% {
-    stroke-opacity: 1;
-    filter: drop-shadow(0 0 0 var(--blue-300));
-  }
-  50% {
-    stroke-opacity: 0.6;
-    filter: drop-shadow(0 0 4px var(--blue-300));
-  }
+  0%, 100% { stroke-width: 2; stroke-opacity: 1; }
+  50%      { stroke-width: 3.5; stroke-opacity: 0.7; }
 }
 
-/* State-node pickable breath (lives in canvas.css). Keyframe shared
- * here for consistency with the other "alive at idle" animations. */
+/* State-node pickable breath (lives in canvas.css). Stroke-only —
+ * pulses the stroke width so the "I am clickable" rhythm reads
+ * without painting a halo around the circle. Same 2s period the
+ * filter-based version had, so the canvas rhythm is identical. */
 @keyframes state-node-pickable-breath {
-  0%, 100% { filter: drop-shadow(0 0 0 rgba(59, 130, 246, 0)); }
-  50%      { filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.45)); }
+  0%, 100% { stroke-width: 2; }
+  50%      { stroke-width: 3.5; }
 }

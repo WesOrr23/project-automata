@@ -895,7 +895,10 @@ function App() {
           enabled: isComplementableOrComparable,
           ...(isComplementableOrComparable
             ? automaton.type === 'NFA'
-              ? { title: 'Will convert NFA → DFA, then complement' }
+              ? {
+                  title:
+                    'NFAs accept by existence (some path), so flipping accept/reject doesn\'t produce the complement. Will determinize (NFA → DFA) first, then swap.',
+                }
               : {}
             : { title: requiresCompletableTitle }),
           onClick: handleComplement,

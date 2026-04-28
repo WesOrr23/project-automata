@@ -61,23 +61,25 @@
 /* Pulsing ring + cursor:pointer tells the user "click one of these." */
 
 .state-node-pickable circle {
-  transition: stroke-width 0.15s ease, filter 0.15s ease;
-  /* Pre-promote to a compositing layer so the hover filter swap
-   * doesn't trigger a layer recalculation mid-hover — without this,
-   * some browsers briefly drop the inherited cursor during the
-   * compositing-layer creation, causing a pointer→default flash. */
-  will-change: filter;
+  transition: stroke-width 0.15s ease, stroke 0.15s ease;
   /* Explicit cursor on the hit-target child so the cursor lookup
    * doesn't traverse to the parent <g>; eliminates a small flicker
    * window on hover. */
   cursor: pointer;
 }
 
+/* Hover: bolder stroke. No drop-shadow halo per iter-17 user-test
+ * feedback ("remove the blue glow when highlighting... just bold the
+ * stroke as it is currently"). */
 .state-node-pickable:hover circle {
   stroke-width: 4;
-  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.5));
 }
 
+/* Idle pickable: pulsing stroke-width tells the user "I am clickable"
+ * without painting a glow. Same period as the previous halo-breath
+ * (2s) so the rhythm of the canvas is unchanged. Suspended on hover
+ * so the deliberate stroke-width=4 sticks instead of fighting the
+ * keyframe. */
 .state-node-pickable circle:not(:hover) {
   animation: state-node-pickable-breath 2s ease-in-out infinite;
 }
@@ -90,15 +92,13 @@
 .state-node-selectable circle {
   transition:
     stroke-width 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
-    filter 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-  /* See note on .state-node-pickable circle above — same flash fix. */
-  will-change: filter;
+    stroke 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
   cursor: pointer;
 }
 
+/* Hover: stroke-only, no halo. */
 .state-node-selectable:hover circle {
   stroke-width: 3;
-  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.4));
 }
 
 /* Defensive cursor on the inner accept circle and the label text —
