@@ -20,6 +20,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, FolderOpen } from 'lucide-react';
 import type { RecentEntry } from '../files/recentsStore';
 import type { FileAdapter } from '../files/fileAdapter';
+import { useKeyboardScope } from '../hooks/useKeyboardScope';
 import type { Automaton } from '../engine/types';
 import { parseAutomataFile } from '../files/format';
 import { isComplete } from '../engine/validator';
@@ -84,8 +85,8 @@ export function ComparePicker({
 }: ComparePickerProp) {
   const ref = useRef<HTMLDivElement | null>(null);
 
-  // Outside-click + Escape close. Same idiom as the OperationsWidget
-  // popover so the two feel consistent.
+  // Outside-click closes. Mouse listener stays raw (no scope-stack
+  // for mouse events).
   useEffect(() => {
     if (!visible) return;
     function handlePointerDown(event: MouseEvent) {
@@ -94,16 +95,24 @@ export function ComparePicker({
         onClose();
       }
     }
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
-    }
     document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => document.removeEventListener('mousedown', handlePointerDown);
   }, [visible, onClose]);
+
+  // Esc closes. Capture-true since this is modal-flavored — the
+  // picker should preempt other Esc handlers (CommandBar popover Esc,
+  // batch test Esc, etc.) when it's the topmost open surface.
+  useKeyboardScope({
+    id: 'compare-picker-esc',
+    active: visible,
+    capture: true,
+    onKey: (event) => {
+      if (event.key !== 'Escape') return false;
+      event.preventDefault();
+      onClose();
+      return true;
+    },
+  });
 
   async function handleOpenAnother() {
     const result = await adapter.open();

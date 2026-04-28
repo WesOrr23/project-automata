@@ -12,8 +12,9 @@
  * is no help when they're already where they should be).
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useNotifications } from '../notifications/useNotifications';
+import { useKeyboardScope } from './useKeyboardScope';
 
 const STORAGE_KEY = 'automata-debug-overlay';
 
@@ -68,23 +69,27 @@ export function useDebugOverlay(): UseDebugOverlayResult {
     });
   }, [notify]);
 
-  // Global hotkey: ⌘⇧D / Ctrl⇧D. Bound at the document level so the
-  // shortcut works regardless of which input is focused. Skips when
-  // the user is typing into a contenteditable / input that isn't a
-  // canvas — e.g. don't toggle while renaming a file. Modifier
-  // requirement is strict (must include Shift) so plain ⌘D
+  // Global hotkey: ⌘⇧D / Ctrl⇧D. Routed through useKeyboardScope as a
+  // transparent scope so it cooperates with whatever else is on the
+  // stack — modals can register their own ⌘⇧D handler if they ever
+  // need to. inTextInputs:true so the toggle works even while a file
+  // rename input is focused (the modifier combo is unambiguous).
+  // Modifier requirement is strict (must include Shift) so plain ⌘D
   // (browser bookmark) isn't intercepted.
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'd' && event.key !== 'D') return;
-      if (!event.shiftKey) return;
-      if (!(event.metaKey || event.ctrlKey)) return;
+  useKeyboardScope({
+    id: 'debug-overlay-toggle',
+    active: true,
+    capture: false,
+    inTextInputs: true,
+    onKey: (event) => {
+      if (event.key !== 'd' && event.key !== 'D') return false;
+      if (!event.shiftKey) return false;
+      if (!(event.metaKey || event.ctrlKey)) return false;
       event.preventDefault();
       toggle();
-    }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [toggle]);
+      return true;
+    },
+  });
 
   return { enabled, toggle };
 }

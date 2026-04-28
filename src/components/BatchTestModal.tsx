@@ -20,6 +20,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { X, Upload, Download, Play, ArrowRightFromLine } from 'lucide-react';
 import { Automaton } from '../engine/types';
 import { accepts } from '../engine/simulator';
+import { useKeyboardScope } from '../hooks/useKeyboardScope';
 
 type BatchTestModalProp = {
   open: boolean;
@@ -45,17 +46,27 @@ export function BatchTestModal({ open, onClose, automaton, onLoadInput }: BatchT
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
-  // Esc to dismiss + focus the close button on open so keyboard
-  // navigation has a sensible starting point.
+  // Focus the close button on open so keyboard navigation has a
+  // sensible starting point.
   useEffect(() => {
     if (!open) return;
-    function handleKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
-    }
-    document.addEventListener('keydown', handleKey);
     closeButtonRef.current?.focus();
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [open, onClose]);
+  }, [open]);
+
+  // Esc dismisses. Capture-true since this is a modal — Esc should
+  // close THIS modal first, not bubble down to the CommandBar
+  // popover-Esc or anything else on the stack.
+  useKeyboardScope({
+    id: 'batch-test-modal-esc',
+    active: open,
+    capture: true,
+    onKey: (event) => {
+      if (event.key !== 'Escape') return false;
+      event.preventDefault();
+      onClose();
+      return true;
+    },
+  });
 
   function handleOverlayClick(event: React.MouseEvent<HTMLDivElement>) {
     // Click outside the modal card dismisses; clicks inside don't.

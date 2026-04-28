@@ -54,6 +54,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import { useKeyboardScope } from '../hooks/useKeyboardScope';
 import {
   FilePlus, FolderOpen, Save, Undo2, Redo2, X,
   History, Wrench, Image as ImageIcon, FileCode,
@@ -198,9 +199,9 @@ export function CommandBar({
   const renameSizerRef = useRef<HTMLSpanElement | null>(null);
   const [renameWidth, setRenameWidth] = useState<number>(120);
 
-  // Outside-click + Escape close popovers. Filename rename has its own
-  // Escape handler (below) that runs first because the input owns the
-  // event. Outside-click during rename also commits (via blur).
+  // Outside-click closes popovers. Mouse listener stays raw (mouse
+  // events don't have a scope-stack equivalent in this codebase).
+  // Filename rename has its own outside-click commit via blur.
   useEffect(() => {
     if (activePopover === null) return;
     function handlePointerDown(event: MouseEvent) {
@@ -209,16 +210,25 @@ export function CommandBar({
         setActivePopover(null);
       }
     }
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setActivePopover(null);
-    }
     document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => document.removeEventListener('mousedown', handlePointerDown);
   }, [activePopover]);
+
+  // Esc closes the active popover. Routed through useKeyboardScope so
+  // it cooperates with other handlers (e.g., the onboarding tour
+  // captures above this scope). Active only when a popover is open
+  // so Esc remains free for other scopes the rest of the time.
+  useKeyboardScope({
+    id: 'command-bar-popover-esc',
+    active: activePopover !== null,
+    capture: false,
+    onKey: (event) => {
+      if (event.key !== 'Escape') return false;
+      event.preventDefault();
+      setActivePopover(null);
+      return true;
+    },
+  });
 
   // Auto-focus + select-all when entering rename mode so the user can
   // start typing immediately.
