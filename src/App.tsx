@@ -55,7 +55,7 @@ import { useOnboarding } from './hooks/useOnboarding';
 import { useDebugOverlay } from './hooks/useDebugOverlay';
 import { createAutomaton as createBlankAutomaton } from './engine/automaton';
 import { Shuffle, Contrast, Shrink, GitCompare } from 'lucide-react';
-import { exportCanvasAsPNG, exportCanvasAsSVG } from './lib/imageExport';
+import { exportCanvasAsPNG, exportCanvasAsSVG } from './ui-state/imageExport';
 
 const fileAdapter = createFileAdapter();
 function blankFactory() {
