@@ -38,7 +38,7 @@ Track what's tested vs not tested at module granularity. The original engine-vs-
 - `src/hooks/useSimulation.test.ts` — reducer transitions, step, autoStep, reset.
 - `src/hooks/useUndoableAutomaton.test.ts` — cap behavior, clear, no-op short-circuit, redo invalidation, the iter-12 Snapshot.description field.
 - `src/hooks/useUndoRedoShortcuts.test.ts` (iter-13) — the iter-17 `useFileShortcuts` should follow this template.
-- `src/hooks/useKeyboardScope.test.ts` (iter-11) — stack ordering, capture vs transparent, text-input filter, latest-closure usage. The text-input + capturing-scope interaction (line 161) is exactly the test audit-002 F10 was asking for.
+- `src/hooks/useKeyboardScope.test.ts` (iter-11) — stack ordering, capture vs transparent, text-input filter, latest-closure usage. The text-input + capturing-scope interaction is covered by `it('a capturing scope still blocks lower scopes while in a text input, even though it is itself skipped')` — exactly the test audit-002 F10 was asking for.
 - `src/hooks/__tests__/useCanvasViewport.test.ts` — **partial; 2 tests broken** (test math doesn't match the iter-17 DISPLAY_FIT_PADDING split). New iter-17 surface (`centerToContent`, `isCentered`, `fitScale`) is not directly tested.
 - `src/hooks/__tests__/useAutomatonLayout.test.ts` — covers the GraphViz integration.
 

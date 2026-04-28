@@ -45,7 +45,7 @@ The third row is the canonical case for serialization, overlay metadata, and any
 
 `EdgeOverlay.oldSymbol?: string` in `src/engine/preview.ts`. Producer: `...(oldSymbol !== null && { oldSymbol })` in the symbol-modify branch. Absence vs presence is meaningful (purple-edge label rendering depends on it).
 
-`AutomataFileMetadata.description?: string` in `src/files/format.ts`. Producer at `parseAutomataFile` line 110: `...(meta.description !== undefined ? { description: meta.description } : {})`. On-disk format omits the key when there's no description; in-memory the value is collapsed to `''` for simpler form binding. The boundary at `useFileSession.ts:122` does the conversion.
+`AutomataFileMetadata.description?: string` in `src/files/format.ts`. Producer in `parseAutomataFile` (the metadata-shape branch): `...(meta.description !== undefined ? { description: meta.description } : {})`. On-disk format omits the key when there's no description; in-memory the value is collapsed to `''` for simpler form binding. The boundary in `useFileSession`'s `writeAutomaton` (the metadata-build block) does the conversion: `...(description.length > 0 ? { description } : {})`.
 
 ## Anti-patterns
 

@@ -3,7 +3,7 @@ agent: qa-reviewer
 type: knowledge
 topic: known-coverage-gaps
 schema-version: 1
-verified-as-of: 369cd14
+verified-as-of: 107ab42
 last-updated: 2026-04-27
 confidence: high
 ---
@@ -16,13 +16,13 @@ Specific, named gaps in test coverage that have been catalogued. The auditor use
 
 ## Current state
 
-### Tests-exist-but-broken (load-bearing, blocks CI as of 369cd14)
+### Tests-exist-but-broken — ALL CLOSED (commit `107ab42`)
 
-These were green at the time their assertions were written; intervening UI restructures (CommandBar redesign, two-stage zoom, DISPLAY_FIT_PADDING split) deleted or reshaped the surfaces the tests assumed. Recovery is **not** a fixture tweak in two of three cases — it's a rewrite against the new surface.
+The three tests-exist-but-broken entries from the 2026-04-27 sweep are all closed as of commit `107ab42`. Kept as a record of what changed and why so future readers see the pattern:
 
-- **`src/components/__tests__/CommandBar.test.tsx`** (9 failures, **NOT fixture-recoverable**). Tests target the iter-15-era separate `aria-label="New" / "Open" / "Save"` buttons, the `aria-label="More file actions"` ⋯ overflow, the standalone `aria-label="Recents"` button, and `aria-label="Operations"`. All four were deliberately removed (`4a47fec` collapsed file ops into a single File popover; `39c9535` dropped Show tour; `be89644` renamed Operations→Tools). The intent of each test (file callbacks fire, recents render, Save As reachable) is still verifiable against the new layout, but each test body needs to open the File popover first then assert on popover items. The 6 still-passing tests (rename, undo/redo flag handling) survived because those surfaces survived.
-- **`src/components/__tests__/CanvasZoomControls.test.tsx`** (3 runtime failures + 7 TS2739 errors, **fixture-recoverable**). Iter-17 (`a611034`) added required props `centerToContent: () => void` and `isCentered: boolean`. Add both to `defaultProps()`, set `isCentered: true` for the Fit-branch tests, add at least one Recenter-branch test for the now-uncovered `isCentered: false` path.
-- **`src/hooks/__tests__/useCanvasViewport.test.ts:43-55, 250-256`** (2 failures, **test-math-wrong-not-code-wrong**). Tests assert `scale = 1.15` from `min(920/800, 720/600)` with a 40-pixel padding. Implementation now uses a `FIT_PADDING = 40` (action only) vs `DISPLAY_FIT_PADDING = 180` (display reference + auto-fit-on-mount + `fitToContent` action) split. Auto-fit goes through DISPLAY_FIT_PADDING giving `min(640/800, 440/600) = 0.7333`. Update the test math; ideally add coverage for both branches since FIT_PADDING is still load-bearing in the visible-region path.
+- ~~`src/components/__tests__/CommandBar.test.tsx` (9 failures, NOT fixture-recoverable)~~ — rewrote against the new layout: tests now open the File popover before asserting on popover items; renamed `'IDLE'` fixtures to `'VIEWING'`; renamed Operations→Tools; added a SIMULATE-segment Export-pill test block. Item lookup uses `.command-bar-popover-item-label-inline` text matching to disambiguate "Save" from "Save As…" without depending on the modifier glyph (⌘ on Mac, "Ctrl" in jsdom).
+- ~~`src/components/__tests__/CanvasZoomControls.test.tsx` (3 + 7 TS errors, fixture-recoverable)~~ — added `centerToContent: vi.fn()` and `isCentered: true` to `defaultProps()`. Added a new Recenter-branch test covering `isCentered: false`, closing the iter-17 two-stage middle-button coverage gap.
+- ~~`src/hooks/__tests__/useCanvasViewport.test.ts` (2 failures, test-math-wrong-not-code-wrong)~~ — fixture math updated to the post-iter-17 DISPLAY_FIT_PADDING=180 reference (`min(640/800, 440/600) ≈ 0.7333`). FIT_PADDING=40 (visible-region inset-shift path) remains untested by direct assertion; coverage hole worth knowing about (no longer a test breakage, just a gap).
 
 ### iter-12+ untested surfaces (test gap, not a break)
 
@@ -39,8 +39,8 @@ Net-new code shipped without coverage. Listed in priority order for the iter-18 
 ### iter-12+ Tier-2 holes worth knowing
 
 - `centerToContent`, `isCentered`, `fitScale` on `useCanvasViewport` — exported but never directly tested. `isCentered` flip threshold, `centerToContent` actually centering, `fitScale` matching displayed percentage are all unverified. Combined with the broken CanvasZoomControls test, the entire two-stage middle zoom button is unverified.
-- `AutomatonCanvas.onSvgRefChange` lift pattern (`src/components/AutomatonCanvas.tsx:227-232`) — fires on mount/unmount; image export depends on the ref being current. Test isn't passing the prop, so the unmount-null path is unexercised.
-- `useFileSession` beforeunload guard (`src/hooks/useFileSession.ts:107-115`) — gated on `isDirty`. Easy to test inside whatever F9 produces.
+- `AutomatonCanvas` `onSvgRefChange` lift pattern (the `useEffect` that calls `onSvgRefChange(svgRef.current)` on mount and `null` on unmount) — image export depends on the ref being current. The existing `AutomatonCanvas.test.tsx` doesn't pass `onSvgRefChange`, so the unmount-null path is unexercised.
+- `useFileSession` beforeunload guard (the `useEffect` watching `isDirty` that adds/removes the `beforeunload` listener) — easy to test inside whatever F9 produces.
 
 ### `ui-state/utils.ts` math helpers
 

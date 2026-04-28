@@ -69,6 +69,23 @@ Index entry format:
 
 Knowledge files include `verified-as-of: <commit-hash>` indicating the codebase commit they were last validated against. The auditor flags knowledge files where `verified-as-of` is older than a threshold relative to recent diffs.
 
+**Snapshot-vs-HEAD reconciliation rule (audit-003 P2).** When a reviewer is given a diff snapshot `iteration-2..<snapshot-hash>` and the orchestrator's commit lands at a later HEAD (because a code commit slipped in between the agent's review and the council commit), the knowledge file's `verified-as-of` should EITHER:
+
+- be set to the snapshot hash the agent actually reviewed, with an in-body note like "verified at `<snapshot>`; subsequent commits not re-verified" — preserves honest scope; OR
+- be set to HEAD only AFTER the orchestrator re-verifies the affected claims against any intervening commits.
+
+The default is the snapshot hash, not HEAD. Bumping to HEAD without re-verification creates the silent-drift failure mode audit-003 F3 caught (architect's `keyboard-scope-stack.md` missed `BatchTestModal` because that site landed in a code commit after the diff snapshot the agent had).
+
+## Journal `iteration` field format (audit-003 F14)
+
+Journal frontmatter `iteration:` field uses one of these shapes:
+
+- A single integer for a single-iteration journal: `iteration: 12`
+- A range with hyphen for cross-iteration sweeps: `iteration: 11-12`
+- An optional parenthetical context after either form: `iteration: 11-12 (combined catch-up)`
+
+Reviewers had drifted into three different shapes by 2026-04-27 (`12`, `11+12 (combined catch-up)`, `11-12`). Standardized to integer-or-hyphen-range so a future tool can parse them programmatically.
+
 **Use commit hashes** (short SHA, 7+ characters) by default. Iteration markers like `iteration-11` are acceptable only when the work spans many commits and a single hash would be misleading; in that case, name the iteration's terminating commit in the file body. Mixed conventions reduce the auditor's ability to programmatically detect staleness — be consistent.
 
 ## Confidence levels
