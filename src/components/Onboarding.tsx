@@ -22,6 +22,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useKeyboardScope } from '../hooks/useKeyboardScope';
 
 type Step = {
   id: string;
@@ -121,32 +122,57 @@ export function Onboarding({ visible, onDismiss }: OnboardingProp) {
     setStepIndex((i) => Math.max(0, i - 1));
   }
 
-  // Keyboard nav. Esc dismisses; ← back; → / Space advance. Outside-
-  // click on the dim layer also dismisses (caption stops propagation
-  // so clicks INSIDE it don't count). Refs to next/back capture the
-  // latest closure without re-binding the listener every step change.
-  const nextRef = useRef(next);
-  nextRef.current = next;
-  const backRef = useRef(back);
-  backRef.current = back;
+  // Keyboard nav. Esc dismisses; ← back; → / Space advance.
+  // Registered as a CAPTURE-PHASE scope at the top of the keyboard-
+  // scope stack so any other scope below (simulate's space/←/→, etc.)
+  // never sees the key while the tour is open. Outside-click on the
+  // dim layer also dismisses; the caption stops propagation so clicks
+  // INSIDE it don't count.
+  useKeyboardScope({
+    id: 'onboarding-tour',
+    active: visible,
+    capture: true,
+    // Tour buttons can be focused while the tour is open; native
+    // button activation on Space/Enter would otherwise advance the
+    // tour twice. We blur the active element on open (below) so this
+    // path stays clean — but inTextInputs:true is a belt-and-suspenders
+    // guarantee that even if focus is somewhere with a default Space
+    // handler, the tour still wins.
+    inTextInputs: true,
+    onKey: (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onDismiss();
+        return true;
+      }
+      if (event.key === 'ArrowRight' || event.key === ' ') {
+        event.preventDefault();
+        next();
+        return true;
+      }
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        back();
+        return true;
+      }
+      return false;
+    },
+  });
+
+  // When the tour opens, blur whatever was previously focused. The
+  // common case driving this fix: the user clicks the canvas Help
+  // button to re-open the tour — focus stays on that button — then
+  // presses Space to advance. Without the blur, the focused button
+  // also activates from the Space, re-toggling the tour. Same risk
+  // with the Play button in Simulate stage. blur() leaves focus on
+  // <body>, which has no Space handler.
   useEffect(() => {
     if (!visible) return;
-    function handleKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        onDismiss();
-      } else if (event.key === 'ArrowRight' || event.key === ' ') {
-        // Space and → advance. preventDefault on Space so the page
-        // doesn't scroll under the dim overlay.
-        event.preventDefault();
-        nextRef.current();
-      } else if (event.key === 'ArrowLeft') {
-        event.preventDefault();
-        backRef.current();
-      }
+    const previouslyFocused = document.activeElement;
+    if (previouslyFocused instanceof HTMLElement) {
+      previouslyFocused.blur();
     }
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [visible, onDismiss]);
+  }, [visible]);
 
   // Compute caption position from targetRect + placement.
   function captionStyle(): React.CSSProperties {
