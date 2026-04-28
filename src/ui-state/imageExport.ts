@@ -74,13 +74,18 @@ export function buildExportSVGString(
   // We need a bbox in the coordinate space the export viewBox uses —
   // i.e. the outer-group coords AFTER the pan/zoom transform is
   // stripped. Trick: temporarily clear the transform on the live
-  // group, measure, restore. This only works because we're measuring
-  // synchronously on the live DOM and the user can't perceive a
-  // single-frame transform flicker (we restore before any paint).
+  // group, measure, restore. try/finally guarantees the restore
+  // runs even if getBBox() throws (Safari has been known to throw on
+  // empty groups) — without it the user would see the live canvas
+  // snap to origin on a failed export.
   const savedTransform = liveContentGroup.getAttribute('transform');
-  if (savedTransform !== null) liveContentGroup.removeAttribute('transform');
-  const liveBBox = (liveContentGroup as SVGGraphicsElement).getBBox();
-  if (savedTransform !== null) liveContentGroup.setAttribute('transform', savedTransform);
+  let liveBBox: DOMRect;
+  try {
+    if (savedTransform !== null) liveContentGroup.removeAttribute('transform');
+    liveBBox = liveContentGroup.getBBox();
+  } finally {
+    if (savedTransform !== null) liveContentGroup.setAttribute('transform', savedTransform);
+  }
 
   const clone = liveSvg.cloneNode(true) as SVGSVGElement;
 
@@ -89,12 +94,12 @@ export function buildExportSVGString(
   const outerGroups = clone.querySelectorAll(':scope > g[transform]');
   outerGroups.forEach((g) => g.removeAttribute('transform'));
 
-  // Strip debug-overlay shapes (red dot + blue ring) — they're
-  // toggleable in the live UI but never wanted in an export.
-  const debugCircles = clone.querySelectorAll(
-    'circle[fill="#ef4444"], circle[stroke="#3b82f6"]'
-  );
-  debugCircles.forEach((el) => el.remove());
+  // Strip debug-overlay shapes — keyed by data-debug-overlay attribute
+  // (set in AutomatonCanvas) rather than by hex color so a designer
+  // tweak to the dot colors doesn't silently start including debug
+  // shapes in exported files. Architect-flagged in iter-12 close-out.
+  const debugShapes = clone.querySelectorAll('[data-debug-overlay]');
+  debugShapes.forEach((el) => el.remove());
 
   // Inline computed styles so the standalone file doesn't depend on
   // the document's stylesheets for fill/stroke/font.

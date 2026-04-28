@@ -32,7 +32,14 @@ type MiniTransitionSVGProp = {
   symbol: string;
   /** Which slot is currently being picked (drives pulsing ring). */
   activeSlot: SlotKind | null;
-  onSlotClick: (slot: SlotKind, anchor: HTMLElement) => void;
+  /** Anchor is `Element` rather than `HTMLElement` because the click
+   *  target is an SVG `<g>` slot, not an HTML element. The consumer
+   *  (TransitionCreator.openPickerForSlot) only calls
+   *  .getBoundingClientRect() on the anchor — defined on Element —
+   *  so the wider type is sufficient and avoids an `as unknown as
+   *  HTMLElement` model-mismatch cast at the event.currentTarget
+   *  pass-through. */
+  onSlotClick: (slot: SlotKind, anchor: Element) => void;
 };
 
 export const MiniTransitionSVG = forwardRef<SVGSVGElement, MiniTransitionSVGProp>(
@@ -55,12 +62,8 @@ export const MiniTransitionSVG = forwardRef<SVGSVGElement, MiniTransitionSVGProp
           destinationLabel={destinationLabel}
           symbol={symbol}
           activeSlot={activeSlot}
-          onSourceClick={(event) =>
-            onSlotClick('source', event.currentTarget as unknown as HTMLElement)
-          }
-          onDestinationClick={(event) =>
-            onSlotClick('destination', event.currentTarget as unknown as HTMLElement)
-          }
+          onSourceClick={(event) => onSlotClick('source', event.currentTarget)}
+          onDestinationClick={(event) => onSlotClick('destination', event.currentTarget)}
         />
       </svg>
     );

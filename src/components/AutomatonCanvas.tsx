@@ -131,23 +131,13 @@ type AutomatonCanvasProp = {
   fitSignal?: number;
 
   /**
-   * Reports the measured cluster bbox (state-circle bounds in inner-g
-   * local coords) up to App. The image-export framing needs this same
-   * bbox to set viewBox; rather than re-measuring in App we reuse the
-   * one already computed here. Called every time the bbox changes.
-   */
-  onContentBBoxChange?: (
-    bbox: { x: number; y: number; width: number; height: number } | null
-  ) => void;
-
-  /**
    * Pixels of overlay chrome (tool menu, command bar) covering the SVG.
    * Centering operations target the un-occluded region rather than the
    * geometric center, so "centered" reads as "centered in what the
    * user can actually see." Pan-clamp / zoom-toward-cursor remain
    * full-SVG.
    */
-  viewportInset?: ViewportInset | undefined;
+  viewportInset?: ViewportInset;
 
   /**
    * Called when the user clicks an existing transition edge on the canvas.
@@ -205,7 +195,6 @@ export function AutomatonCanvas({
   onShowTour,
   debugOverlay = false,
   onSvgRefChange,
-  onContentBBoxChange,
   fitSignal,
   viewportInset,
 }: AutomatonCanvasProp) {
@@ -239,10 +228,6 @@ export function AutomatonCanvas({
       if (onSvgRefChange) onSvgRefChange(null);
     };
   }, [onSvgRefChange]);
-
-  useEffect(() => {
-    if (onContentBBoxChange) onContentBBoxChange(contentBBox);
-  }, [contentBBox, onContentBBoxChange]);
 
   // ResizeObserver keeps viewportSize in sync with the SVG's CSS box.
   // useLayoutEffect to read sizes synchronously after paint, avoiding
@@ -339,7 +324,10 @@ export function AutomatonCanvas({
   } = useCanvasViewport({
     contentBoundingBox: effectiveContent,
     viewportSize,
-    viewportInset,
+    // Spread-conditional: viewportInset is omit-only on both ends
+    // (per optional-prop-policy), so don't pass an explicit
+    // undefined when the caller didn't provide one.
+    ...(viewportInset !== undefined ? { viewportInset } : {}),
     contentOrigin: effectiveOrigin,
     // Start arrow extends ~62px LEFT of the cluster bbox; reserve
     // that width in the FIT calculation so the arrow has room at
@@ -636,6 +624,7 @@ export function AutomatonCanvas({
               with the FA. Toggleable via ⌘⇧D. */}
           {debugOverlay && contentBBox && (
             <circle
+              data-debug-overlay="cluster-center"
               cx={contentBBox.x + contentBBox.width / 2}
               cy={contentBBox.y + contentBBox.height / 2}
               r={10}
@@ -653,6 +642,7 @@ export function AutomatonCanvas({
           ring above. Toggleable via ⌘⇧D. */}
       {debugOverlay && viewportSize && (
         <circle
+          data-debug-overlay="visible-region-center"
           cx={(viewportInset?.left ?? 0) + (viewportSize.width - (viewportInset?.left ?? 0) - (viewportInset?.right ?? 0)) / 2}
           cy={(viewportInset?.top ?? 0) + (viewportSize.height - (viewportInset?.top ?? 0) - (viewportInset?.bottom ?? 0)) / 2}
           r={4}

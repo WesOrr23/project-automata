@@ -192,7 +192,7 @@ export function TransitionCreator({
     automaton.type === 'NFA'
   );
 
-  function openPickerForSlot(slot: 'source' | 'destination', anchorEl: HTMLElement) {
+  function openPickerForSlot(slot: 'source' | 'destination', anchorEl: Element) {
     setPickerSlot(slot);
     setPickerAnchor(anchorEl.getBoundingClientRect());
     dispatch({

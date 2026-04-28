@@ -101,7 +101,7 @@ export type UseCanvasViewportArgs = {
    * center. Zoom-toward-cursor and pan-clamp continue to use the full
    * SVG box (those gestures want the cursor's true screen position).
    */
-  viewportInset?: ViewportInset | undefined;
+  viewportInset?: ViewportInset;
   /**
    * Extra unscaled-pixel space the FIT calculation should reserve
    * around the contentBoundingBox. The CENTERING math ignores this —
